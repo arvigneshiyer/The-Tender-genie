@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Tender Genie</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:    #0B1F3A;
+      --navy2:   #152E55;
+      --gold:    #C49A2D;
+      --goldL:   #E8BB4A;
+      --smoke:   #F4F5F7;
+      --white:   #FFFFFF;
+      --text:    #1A1F2E;
+      --muted:   #5B6478;
+      --border:  #D4D8E2;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--navy);
+      color: var(--white);
+      font-family: 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(196,154,45,0.18) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 40% at 90% 80%, rgba(26,92,168,0.15) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 28px 40px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .logo-mark {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, #C49A2D, #E8BB4A);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .brand-name {
+      font-family: 'Instrument Serif', serif;
+      font-size: 22px;
+      color: var(--white);
+    }
+
+    .brand-tagline {
+      font-size: 11px;
+      color: rgba(255,255,255,0.45);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-top: 1px;
+    }
+
+    .copyright-badge {
+      margin-left: auto;
+      font-size: 11px;
+      color: rgba(255,255,255,0.3);
+    }
+
+    #login-screen {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    .login-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 48px 44px;
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+    }
+
+    .login-icon { font-size: 44px; margin-bottom: 20px; display: block; }
+
+    .login-title {
+      font-family: 'Instrument Serif', serif;
+      font-size: 28px;
+      color: var(--white);
+      margin-bottom: 8px;
+    }
+
+    .login-sub {
+      font-size: 13px;
+      color: rgba(255,255,255,0.45);
+      margin-bottom: 32px;
+      line-height: 1.5;
+    }
+
+    .input-wrap { margin-bottom: 14px; }
+
+    .input-wrap input {
+      width: 100%;
+      padding: 13px 16px;
+      background: rgba(255,255,255,0.07);
+      border: 1.5px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      color: var(--white);
+      font-size: 15px;
+      font-family: 'Inter', sans-serif;
+      letter-spacing: 0.12em;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-wrap input::placeholder { color: rgba(255,255,255,0.25); letter-spacing: 0.04em; }
+    .input-wrap input:focus { border-color: #E8BB4A; }
+
+    .btn-login {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, #C49A2D, #E8BB4A);
+      border: none;
+      border-radius: 10px;
+      color: #0B1F3A;
+      font-size: 14px;
+      font-weight: 700;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      letter-spacing: 0.04em;
+      transition: opacity 0.15s;
+      margin-top: 4px;
+    }
+
+    .btn-login:hover { opacity: 0.88; }
+
+    .error-msg {
+      margin-top: 12px;
+      font-size: 12px;
+      color: #F1948A;
+      display: none;
+    }
+
+    .error-msg.show { display: block; }
+
+    #dashboard {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+    }
+
+    #dashboard.visible { display: flex; }
+
+    .dash-hero {
+      padding: 56px 40px 40px;
+      text-align: center;
+    }
+
+    .dash-hello {
+      font-size: 11px;
+      color: #E8BB4A;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .dash-title {
+      font-family: 'Instrument Serif', serif;
+      font-size: 42px;
+      line-height: 1.15;
+      color: var(--white);
+      margin-bottom: 14px;
+    }
+
+    .dash-title em { font-style: italic; color: #E8BB4A; }
+
+    .dash-desc {
+      font-size: 14px;
+      color: rgba(255,255,255,0.45);
+      max-width: 480px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    .tools-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      padding: 8px 40px 60px;
+      max-width: 900px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .tool-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 18px;
+      padding: 36px 32px;
+      cursor: pointer;
+      text-decoration: none;
+      display: block;
+      transition: background 0.2s, border-color 0.2s, transform 0.15s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tool-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #C49A2D, #E8BB4A);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .tool-card:hover {
+      background: rgba(255,255,255,0.07);
+      border-color: rgba(196,154,45,0.35);
+      transform: translateY(-3px);
+    }
+
+    .tool-card:hover::before { opacity: 1; }
+
+    .tool-icon { font-size: 36px; margin-bottom: 18px; display: block; }
+
+    .tool-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #E8BB4A;
+      margin-bottom: 8px;
+    }
+
+    .tool-name {
+      font-family: 'Instrument Serif', serif;
+      font-size: 24px;
+      color: var(--white);
+      margin-bottom: 10px;
+    }
+
+    .tool-desc {
+      font-size: 13px;
+      color: rgba(255,255,255,0.45);
+      line-height: 1.65;
+      margin-bottom: 24px;
+    }
+
+    .tool-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .tag {
+      font-size: 10px;
+      padding: 3px 9px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.07);
+      color: rgba(255,255,255,0.45);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .tool-arrow {
+      position: absolute;
+      bottom: 28px;
+      right: 28px;
+      font-size: 18px;
+      color: rgba(255,255,255,0.2);
+      transition: color 0.2s, transform 0.2s;
+    }
+
+    .tool-card:hover .tool-arrow { color: #E8BB4A; transform: translate(3px, -3px); }
+
+    footer {
+      padding: 20px 40px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .footer-copy { font-size: 11px; color: rgba(255,255,255,0.25); }
+
+    .logout-btn {
+      font-size: 11px;
+      color: rgba(255,255,255,0.25);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      transition: color 0.15s;
+    }
+
+    .logout-btn:hover { color: rgba(255,255,255,0.55); }
+
+    @media (max-width: 600px) {
+      header { padding: 20px; }
+      .tools-grid { grid-template-columns: 1fr; padding: 8px 20px 40px; }
+      .dash-hero { padding: 36px 20px 24px; }
+      .dash-title { font-size: 30px; }
+      .login-card { padding: 36px 24px; }
+      footer { padding: 16px 20px; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="logo-mark">🧞</div>
+    <div>
+      <div class="brand-name">The Tender Genie</div>
+      <div class="brand-tagline">RFP Document Builder</div>
+    </div>
+    <div class="copyright-badge">© 2025 The Tender Genie. All rights reserved.</div>
+  </header>
+
+  <div id="login-screen">
+    <div class="login-card">
+      <span class="login-icon">🔐</span>
+      <div class="login-title">Welcome back</div>
+      <div class="login-sub">Enter your access code to open<br>The Tender Genie dashboard.</div>
+      <div class="input-wrap">
+        <input type="password" id="access-input" placeholder="Enter access code" autocomplete="off" />
+      </div>
+      <button class="btn-login" onclick="checkCode()">Unlock Dashboard →</button>
+      <div class="error-msg" id="error-msg">Incorrect access code. Please try again.</div>
+    </div>
+  </div>
+
+  <div id="dashboard">
+    <div class="dash-hero">
+      <div class="dash-hello">✦ Ready to draft</div>
+      <div class="dash-title">Which RFP are you<br><em>building today?</em></div>
+      <div class="dash-desc">Select a tool below to start building your tender document. All fields auto-calculate fees, EMD, and generate a ready-to-issue Word file.</div>
+    </div>
+
+    <div class="tools-grid">
+      <a class="tool-card" href="services-tender-tool (1).html">
+        <span class="tool-icon">📋</span>
+        <div class="tool-label">Consultancy &amp; Advisory</div>
+        <div class="tool-name">Services RFP Tool</div>
+        <div class="tool-desc">For appointing consultants, PMCs, and advisory firms. Supports QCBS, L1, and Empanelment selection methods.</div>
+        <div class="tool-tags">
+          <span class="tag">QCBS 70:30</span>
+          <span class="tag">QCBS 80:20</span>
+          <span class="tag">L1</span>
+          <span class="tag">Empanelment</span>
+        </div>
+        <span class="tool-arrow">↗</span>
+      </a>
+
+      <a class="tool-card" href="works-tender-tool (2).html">
+        <span class="tool-icon">🏗️</span>
+        <div class="tool-label">Civil &amp; Infrastructure</div>
+        <div class="tool-name">Works Tender Tool</div>
+        <div class="tool-desc">For civil works, infrastructure contracts, and construction tenders. Item-rate and lump sum contract formats.</div>
+        <div class="tool-tags">
+          <span class="tag">Item Rate</span>
+          <span class="tag">Lump Sum</span>
+          <span class="tag">EPC</span>
+          <span class="tag">BOQ</span>
+        </div>
+        <span class="tool-arrow">↗</span>
+      </a>
+    </div>
+  </div>
+
+  <footer>
+    <div class="footer-copy">© 2025 The Tender Genie · Unauthorised use prohibited</div>
+    <button class="logout-btn" onclick="logout()">Sign out</button>
+  </footer>
+
+</div>
+<script>
+  const ACCESS_CODE = "TENDERGENIE";
+  const SESSION_KEY = "tg_auth";
+
+  function checkCode() {
+    const val = document.getElementById("access-input").value.trim().toUpperCase();
+    if (val === ACCESS_CODE) {
+      sessionStorage.setItem(SESSION_KEY, "1");
+      showDashboard();
+    } else {
+      document.getElementById("error-msg").classList.add("show");
+      document.getElementById("access-input").focus();
+    }
+  }
+
+  function showDashboard() {
+    document.getElementById("login-screen").style.display = "none";
+    document.getElementById("dashboard").classList.add("visible");
+  }
+
+  function logout() {
+    sessionStorage.removeItem(SESSION_KEY);
+    document.getElementById("dashboard").classList.remove("visible");
+    document.getElementById("login-screen").style.display = "flex";
+    document.getElementById("access-input").value = "";
+    document.getElementById("error-msg").classList.remove("show");
+  }
+
+  document.getElementById("access-input").addEventListener("keydown", function(e) {
+    if (e.key === "Enter") checkCode();
+  });
+
+  if (sessionStorage.getItem(SESSION_KEY) === "1") showDashboard();
+</script>
+</body>
+</html>
