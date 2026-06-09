@@ -435,14 +435,9 @@ window.SECTIONS = [
   {
     id: "schedule", title: "Bidding Schedule", icon: "📅",
     fields: [
-      { id: "tenderUploadDate", label: "Tender Upload / Release Date",               type: "datepicker" },
-      { id: "queryLastDate",    label: "Last Date for Receiving Pre-bid Queries",    type: "datepicker" },
-      { id: "preBidDate",       label: "Pre-Bid Conference Date",                    type: "datepicker" },
+      { id: "_schedulePanel",   label: "",                                            type: "schedulepanel" },
       { id: "preBidMode",       label: "Pre-Bid Conference Mode",                    type: "select",    options: ["Online (video conference)","Offline (in-person)","Hybrid (online + in-person)"] },
       { id: "preBidVenue",      label: "Pre-Bid Conference Venue / Link",            type: "text",      placeholder: "Conference Room, Authority Office, Nashik / Zoom link…" },
-      { id: "bidStartDate",     label: "Bid Submission Start Date",                  type: "datepicker" },
-      { id: "bidEndDate",       label: "Bid Submission End Date (PDD)",              type: "datepicker" },
-      { id: "techOpenDate",     label: "Technical Bid Opening Date",                 type: "datepicker" },
       { id: "bidValidity",      label: "Bid Validity Period",                        type: "select",    options: ["90 Days","120 Days","180 Days"] },
       { id: "proposalLanguage", label: "Proposal Language",                          type: "select",    options: ["English","Hindi","English and Hindi"] },
     ],
@@ -22092,6 +22087,282 @@ function SlbTableField({
     }
   }, "+ Add SLB"));
 }
+// ── Holiday Data ─────────────────────────────────────────────────────────────
+window.HOLIDAYS = {
+  Maharashtra: new Set([
+    "2026-01-26","2026-02-15","2026-02-19","2026-03-03","2026-03-19",
+    "2026-03-21","2026-03-26","2026-03-31","2026-04-03","2026-04-14",
+    "2026-05-01","2026-05-28","2026-06-26","2026-08-15","2026-08-26",
+    "2026-09-14","2026-10-02","2026-10-20","2026-11-08","2026-11-10",
+    "2026-11-11","2026-11-24","2026-12-25"
+  ]),
+  "Uttar Pradesh": new Set([
+    "2026-01-01","2026-01-03","2026-01-26","2026-02-15","2026-03-03",
+    "2026-03-21","2026-03-27","2026-03-31","2026-04-01","2026-04-03",
+    "2026-04-14","2026-05-01","2026-05-27","2026-06-26","2026-08-15",
+    "2026-08-25","2026-08-28","2026-09-04","2026-10-02","2026-10-20",
+    "2026-11-08","2026-11-09","2026-11-11","2026-11-24","2026-12-23",
+    "2026-12-25"
+  ])
+};
+
+// ── Schedule helpers ──────────────────────────────────────────────────────────
+window.isHoliday = function(dateStr, state) {
+  if (!dateStr) return false;
+  const h = window.HOLIDAYS[state];
+  return h ? h.has(dateStr) : false;
+};
+
+window.isWeekend = function(dateStr) {
+  if (!dateStr) return false;
+  const d = new Date(dateStr + "T00:00:00");
+  const day = d.getDay();
+  return day === 0 || day === 6; // Sun=0, Sat=6
+};
+
+window.isBlocked = function(dateStr, state) {
+  return window.isWeekend(dateStr) || window.isHoliday(dateStr, state);
+};
+
+window.nextWorkingDay = function(dateStr, state, forward = true) {
+  if (!dateStr) return "";
+  let d = new Date(dateStr + "T00:00:00");
+  let tries = 0;
+  while (window.isBlocked(d.toISOString().slice(0,10), state) && tries < 60) {
+    d.setDate(d.getDate() + (forward ? 1 : -1));
+    tries++;
+  }
+  return d.toISOString().slice(0,10);
+};
+
+window.addWorkingDays = function(startStr, days, state) {
+  // Add `days` calendar days then advance to nearest working day
+  if (!startStr) return "";
+  let d = new Date(startStr + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return window.nextWorkingDay(d.toISOString().slice(0,10), state, true);
+};
+
+window.computeSchedule = function(uploadDate, callNumber, preBid, state) {
+  // callNumber: 1, 2, 3
+  // preBid: true/false
+  // Returns object with all dates
+  if (!uploadDate || !state) return null;
+
+  const minBidDays = preBid ? 28 : 21; // GFR + 7 days extra for pre-bid
+  // For 2nd and 3rd call we keep same logic — shorter tendering period not GFR
+  // (re-tender still must meet minimum; courts have upheld this)
+
+  // Day 0 = upload date (must itself be a working day)
+  const upload = window.nextWorkingDay(uploadDate, state, true);
+
+  // Pre-bid queries close: Day 7 (working)
+  const queryClose = window.addWorkingDays(upload, 7, state);
+
+  let preBidDate = null;
+  let bidStart = null;
+  let bidEnd = null;
+  let techOpen = null;
+
+  if (preBid) {
+    // Pre-bid meeting: Day 10 (working)
+    preBidDate = window.addWorkingDays(upload, 10, state);
+    // Bid submission opens: Day 11 (working)
+    bidStart   = window.addWorkingDays(upload, 11, state);
+    // Bid submission closes: upload + minBidDays (working) — GFR min 28 days from upload
+    bidEnd     = window.addWorkingDays(upload, minBidDays, state);
+    // Tech opening: next working day after bid close
+    techOpen   = window.addWorkingDays(bidEnd, 1, state);
+  } else {
+    // No pre-bid
+    bidStart   = window.addWorkingDays(upload, 3, state);
+    bidEnd     = window.addWorkingDays(upload, minBidDays, state);
+    techOpen   = window.addWorkingDays(bidEnd, 1, state);
+  }
+
+  return { upload, queryClose, preBidDate, bidStart, bidEnd, techOpen };
+};
+
+window.daysBetween = function(a, b) {
+  if (!a || !b) return 0;
+  return Math.round((new Date(b) - new Date(a)) / 86400000);
+};
+
+window.fmtD = function(s) {
+  if (!s) return "—";
+  const d = new Date(s + "T00:00:00");
+  return d.toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" });
+};
+
+// ── SchedulePanel component ───────────────────────────────────────────────────
+function SchedulePanel({ allData, onChange }) {
+  const { useState: uS, useEffect: uE } = React;
+  const [call,    setCall]    = uS(allData._tenderCall    || "1");
+  const [preBid,  setPreBid]  = uS(allData._preBid        !== undefined ? allData._preBid : true);
+  const [state,   setState]   = uS(allData._tenderState   || "");
+  const [upload,  setUpload]  = uS(allData.tenderUploadDate || "");
+  const [sched,   setSched]   = uS(null);
+  const [warn,    setWarn]    = uS("");
+
+  // Recompute whenever inputs change
+  uE(() => {
+    if (!upload || !state) { setSched(null); return; }
+    const correctedUpload = window.nextWorkingDay(upload, state, true);
+    if (correctedUpload !== upload) {
+      setWarn(`⚠️ ${window.fmtD(upload)} is a ${window.isWeekend(upload) ? "weekend" : "holiday"} — upload date moved to next working day: ${window.fmtD(correctedUpload)}`);
+    } else {
+      setWarn("");
+    }
+    const s = window.computeSchedule(correctedUpload, parseInt(call), preBid, state);
+    setSched(s);
+    // Push computed dates back to parent data
+    if (s) {
+      onChange("_tenderCall",      call);
+      onChange("_preBid",          preBid);
+      onChange("_tenderState",     state);
+      onChange("tenderUploadDate", s.upload);
+      onChange("queryLastDate",    s.queryClose);
+      onChange("preBidDate",       s.preBidDate || "");
+      onChange("bidStartDate",     s.bidStart);
+      onChange("bidEndDate",       s.bidEnd);
+      onChange("techOpenDate",     s.techOpen);
+    }
+  }, [upload, call, preBid, state]);
+
+  const C2 = window.C;
+  const rowStyle = { display:"flex", gap:10, flexWrap:"wrap", marginBottom:14 };
+  const lblStyle = { fontSize:11, color:C2.muted, marginBottom:3, fontWeight:600, textTransform:"uppercase", letterSpacing:".06em" };
+  const inputS   = { ...window.inputStyleObj(), fontSize:13 };
+  const badge    = (label, dateStr) => {
+    const blocked = dateStr && window.isBlocked(dateStr, state);
+    return React.createElement("div", { style:{ flex:"1 1 160px", minWidth:140 } },
+      React.createElement("div", { style: lblStyle }, label),
+      React.createElement("div", { style:{
+        padding:"8px 12px", borderRadius:7, fontSize:13, fontWeight:600,
+        background: blocked ? "#FFF3F3" : "#F0FBF4",
+        border: `1.5px solid ${blocked ? "#E57373" : "#4CAF50"}`,
+        color: blocked ? C2.danger : C2.success
+      }},
+        dateStr ? window.fmtD(dateStr) : "—",
+        blocked ? " 🚫" : " ✓"
+      )
+    );
+  };
+
+  const minDays = preBid ? 28 : 21;
+  const actualDays = sched ? window.daysBetween(sched.upload, sched.bidEnd) : 0;
+
+  return React.createElement("div", { style:{ display:"flex", flexDirection:"column", gap:0 } },
+
+    // ── Controls row ──────────────────────────────────────────────────────
+    React.createElement("div", { style:{ ...rowStyle, alignItems:"flex-end", gap:14 } },
+
+      // State dropdown
+      React.createElement("div", { style:{ flex:"1 1 160px" } },
+        React.createElement("div", { style: lblStyle }, "State"),
+        React.createElement("select", {
+          style:{ ...inputS, border:`1.5px solid ${C2.blue}`, background:"#F0F7FF", cursor:"pointer" },
+          value: state,
+          onChange: e => setState(e.target.value)
+        },
+          React.createElement("option", { value:"" }, "— Select State —"),
+          React.createElement("option", { value:"Maharashtra" }, "Maharashtra"),
+          React.createElement("option", { value:"Uttar Pradesh" }, "Uttar Pradesh")
+        )
+      ),
+
+      // Call number
+      React.createElement("div", { style:{ flex:"1 1 140px" } },
+        React.createElement("div", { style: lblStyle }, "Tender Call"),
+        React.createElement("select", {
+          style:{ ...inputS, border:`1.5px solid ${C2.gold}`, background:"#FFFDF0", cursor:"pointer" },
+          value: call,
+          onChange: e => setCall(e.target.value)
+        },
+          React.createElement("option", { value:"1" }, "1st Call"),
+          React.createElement("option", { value:"2" }, "2nd Call"),
+          React.createElement("option", { value:"3" }, "3rd Call")
+        )
+      ),
+
+      // Pre-bid toggle
+      React.createElement("div", { style:{ flex:"1 1 160px" } },
+        React.createElement("div", { style: lblStyle }, "Pre-Bid Meeting"),
+        React.createElement("div", { style:{ display:"flex", gap:0, borderRadius:7, overflow:"hidden", border:`1.5px solid ${C2.border}` } },
+          ...[["Yes", true],["No", false]].map(([lab, val]) =>
+            React.createElement("button", {
+              key: lab,
+              onClick: () => setPreBid(val),
+              style:{
+                flex:1, padding:"9px 0", fontSize:13, fontWeight:600, cursor:"pointer",
+                border:"none", outline:"none",
+                background: preBid === val ? C2.blue : C2.white,
+                color:       preBid === val ? C2.white : C2.text,
+                transition:  "background .18s"
+              }
+            }, lab)
+          )
+        )
+      ),
+
+      // Upload date
+      React.createElement("div", { style:{ flex:"1 1 160px" } },
+        React.createElement("div", { style: lblStyle }, "Tender Upload Date"),
+        React.createElement("input", {
+          type:"date",
+          style:{ ...inputS, border:`1.5px solid ${C2.blue}`, background:"#F0F7FF" },
+          value: upload,
+          onChange: e => setUpload(e.target.value)
+        })
+      )
+    ),
+
+    // ── Warning bar ───────────────────────────────────────────────────────
+    warn ? React.createElement("div", {
+      style:{ padding:"8px 12px", borderRadius:7, background:"#FFF8E1", border:"1.5px solid #FFB300",
+              fontSize:12, color:"#7A5800", marginBottom:12 }
+    }, warn) : null,
+
+    // ── Audit logic note ──────────────────────────────────────────────────
+    state && React.createElement("div", {
+      style:{ padding:"8px 12px", borderRadius:7, background:"#EEF6FF",
+              border:`1px solid ${C2.border}`, fontSize:11.5, color:C2.muted, marginBottom:12 }
+    },
+      `📋 Basis: GFR 2017 Rule 161 — minimum ${minDays} days bid period from upload date `,
+      `(${preBid ? "28 days with pre-bid meeting" : "21 days without pre-bid"}).`,
+      ` All critical dates advanced past weekends & ${state} public holidays (2026 list).`,
+      call !== "1" ? ` [${call === "2" ? "2nd" : "3rd"} call — same minimum period applies per GFR.]` : ""
+    ),
+
+    // ── Computed dates grid ───────────────────────────────────────────────
+    sched ? React.createElement("div", null,
+      React.createElement("div", { style:{ ...rowStyle } },
+        badge("Upload / Release Date",    sched.upload),
+        badge("Last Date — Pre-bid Queries", sched.queryClose),
+        preBid ? badge("Pre-Bid Conference",       sched.preBidDate) : null
+      ),
+      React.createElement("div", { style:{ ...rowStyle } },
+        badge("Bid Submission Opens",     sched.bidStart),
+        badge("Bid Submission Closes (PDD)", sched.bidEnd),
+        badge("Technical Bid Opening",   sched.techOpen)
+      ),
+      React.createElement("div", {
+        style:{ padding:"10px 14px", borderRadius:7, marginBottom:4,
+                background: actualDays >= minDays ? "#F0FBF4" : "#FFF3F3",
+                border:`1.5px solid ${actualDays >= minDays ? "#4CAF50" : C2.danger}`,
+                fontSize:12.5, fontWeight:600,
+                color: actualDays >= minDays ? C2.success : C2.danger }
+      },
+        `📅 Upload → PDD = ${actualDays} calendar days  (GFR minimum: ${minDays} days) `,
+        actualDays >= minDays ? "✓ COMPLIANT" : "✗ BELOW MINIMUM — extend PDD"
+      )
+    ) : React.createElement("div", {
+      style:{ padding:"16px", textAlign:"center", color:C2.muted,
+              fontSize:13, background:C2.smoke, borderRadius:8 }
+    }, "Select state and upload date to auto-compute schedule")
+  );
+}
+
 function FieldInput({
   field,
   value,
@@ -22147,6 +22418,17 @@ function FieldInput({
         },
         value: value || "",
         onChange: e => onChange(e.target.value)
+      });
+
+    case "schedulepanel":
+      return React.createElement(SchedulePanel, {
+        allData: allData,
+        onChange: (fieldId, val) => {
+          // SchedulePanel pushes multiple fields; we use a special callback
+          if (allData._schedulePanelOnChange) {
+            allData._schedulePanelOnChange(fieldId, val);
+          }
+        }
       });
 
     case "emd":
@@ -22289,7 +22571,7 @@ function SectionCard({
     }
   }, section.fields.map(field => /*#__PURE__*/React.createElement("div", {
     key: field.id
-  }, /*#__PURE__*/React.createElement("label", {
+  }, field.type !== "schedulepanel" && /*#__PURE__*/React.createElement("label", {
     style: {
       display: "block",
       fontSize: 12,
@@ -22302,7 +22584,7 @@ function SectionCard({
     field: field,
     value: data[field.id],
     onChange: val => onChange(field.id, val),
-    allData: data
+    allData: { ...data, _schedulePanelOnChange: onChange }
   })))));
 }
 
