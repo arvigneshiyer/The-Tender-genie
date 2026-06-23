@@ -210,10 +210,10 @@
 
     .tools-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       gap: 24px;
       padding: 8px 40px 60px;
-      max-width: 900px;
+      max-width: 1200px;
       margin: 0 auto;
       width: 100%;
     }
@@ -319,6 +319,10 @@
     }
 
     .logout-btn:hover { color: rgba(255,255,255,0.55); }
+
+    @media (max-width: 900px) {
+      .tools-grid { grid-template-columns: 1fr 1fr; max-width: 900px; }
+    }
 
     @media (max-width: 600px) {
       header { padding: 20px; }
