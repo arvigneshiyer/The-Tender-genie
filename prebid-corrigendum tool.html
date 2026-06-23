@@ -1,0 +1,2243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pre-Bid Query &amp; Corrigendum Tool</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Georgia','Times New Roman',serif; background:#EEF1F6; color:#1A1F2E; margin:0; padding:24px; }
+  .wrap { max-width: 1300px; margin: 0 auto; }
+  h1 { color:#0B1F3A; font-size:24px; margin-bottom:4px; }
+  .sub { color:#5B6478; font-size:13px; margin-bottom:20px; }
+  .card { background:#fff; border-radius:10px; padding:20px; margin-bottom:20px; box-shadow:0 2px 8px rgba(11,31,58,.08); }
+  .card h2 { color:#1A5CA8; font-size:17px; margin-top:0; margin-bottom:12px; border-bottom:2px solid #E8BB4A; padding-bottom:6px; }
+  .row { display:flex; gap:16px; flex-wrap:wrap; }
+  .col { flex:1; min-width:260px; }
+  label { font-size:12px; color:#5B6478; display:block; margin-bottom:4px; font-weight:bold; }
+  input[type=text], input[type=file], textarea, select {
+    width:100%; padding:8px; border:1px solid #CBD3E1; border-radius:6px; font-family:inherit; font-size:13px; background:#fff; color:#1A1F2E;
+  }
+  textarea { resize: vertical; }
+  button { background:#1A5CA8; color:#fff; border:none; padding:10px 18px; border-radius:6px; font-size:14px; cursor:pointer; font-family:inherit; }
+  button:hover { background:#0B1F3A; }
+  button.secondary { background:#E8BB4A; color:#0B1F3A; }
+  button.secondary:hover { background:#d4a83d; }
+  button.danger { background:#c0392b; }
+  button.danger:hover { background:#922b21; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th, td { border:1px solid #CBD3E1; padding:6px; vertical-align:top; text-align:left; }
+  th { background:#0B1F3A; color:#E8BB4A; font-size:12px; }
+  td textarea, td input { border:none; background:transparent; width:100%; font-family:inherit; font-size:12.5px; padding:4px; }
+  td textarea:focus, td input:focus, td select:focus { background:#FFF9E8; outline:1px solid #E8BB4A; }
+  .col-num { width:30px; text-align:center; }
+  .col-clause { width:14%; }
+  .col-rfp { width:20%; }
+  .col-query { width:24%; }
+  .col-resp { width:24%; }
+  .col-action { width:60px; text-align:center; }
+  .status { font-size:12px; padding:8px 12px; border-radius:6px; margin-top:8px; }
+  .status.ok { background:#E6F4EA; color:#1E7E34; }
+  .status.err { background:#FBE8E6; color:#C0392B; }
+  .status.info { background:#E8F0FB; color:#1A5CA8; }
+  .toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+  .badge { display:inline-block; background:#E8BB4A; color:#0B1F3A; border-radius:10px; padding:2px 10px; font-size:11px; font-weight:bold; }
+  .empty-note { color:#9AA5B8; font-size:12px; padding:14px; text-align:center; }
+
+  /* ── Tender Type Badge ── */
+  #tenderTypeBadgeWrap {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 8px 14px;
+    background: #F5F7FA;
+    border: 1px solid #E0E6F0;
+    border-radius: 8px;
+  }
+  .tender-type-label { font-size:12px; color:#5B6478; font-weight:600; }
+  .tender-type-badge {
+    font-size: 12px; font-weight: 700; padding: 3px 12px;
+    border-radius: 20px; letter-spacing:.03em;
+  }
+  .badge-works    { background: #E8F4FD; color: #1565C0; border: 1px solid #90CAF9; }
+  .badge-services { background: #E8F5E9; color: #2E7D32; border: 1px solid #A5D6A7; }
+  .auto-detected-note { font-size:11px; color:#9AA5B8; margin-left:auto; }
+
+  /* ── Clause Search Modal ── */
+  #clauseModal {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(11,31,58,0.55);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  #clauseModal.open { display: flex; }
+  .cm-box {
+    background: #fff;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 760px;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 40px rgba(11,31,58,0.28);
+    overflow: hidden;
+  }
+  .cm-header {
+    background: linear-gradient(135deg, #0B1F3A 0%, #1A3A5C 100%);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .cm-header-title { color:#fff; font-weight:700; font-size:15px; flex:1; }
+  .cm-close {
+    background: none; border: none; color: #8FA8C8;
+    font-size: 20px; cursor: pointer; padding: 0 4px; line-height:1;
+  }
+  .cm-close:hover { color:#fff; background:none; }
+  .cm-body { padding: 18px 20px; overflow-y: auto; flex: 1; }
+  .cm-query-box {
+    background: #F5F7FA;
+    border: 1px solid #CBD3E1;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #1A1F2E;
+    margin-bottom: 14px;
+    line-height: 1.5;
+  }
+  .cm-query-label { font-size:11px; font-weight:700; color:#5B6478; margin-bottom:4px; text-transform:uppercase; letter-spacing:.05em; }
+  .cm-searching {
+    display: flex; align-items: center; gap: 10px;
+    color: #1A5CA8; font-size: 13px; padding: 20px 0;
+  }
+  .cm-spinner {
+    width: 18px; height: 18px;
+    border: 2px solid #CBD3E1;
+    border-top-color: #1A5CA8;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .cm-results { display: flex; flex-direction: column; gap: 10px; }
+  .cm-result {
+    border: 1px solid #CBD3E1;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .cm-result:hover { border-color: #1A5CA8; box-shadow: 0 2px 10px rgba(26,92,168,0.12); }
+  .cm-result.selected { border-color: #1A5CA8; background: #EEF4FC; }
+  .cm-result-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px;
+    background: #F5F7FA;
+    border-bottom: 1px solid #E8EDF4;
+  }
+  .cm-result.selected .cm-result-head { background: #D6E8FA; }
+  .cm-clause-ref {
+    font-weight: 700; font-size: 12px; color: #0B1F3A;
+    background: #E8BB4A; padding: 2px 8px; border-radius: 4px;
+  }
+  .cm-confidence {
+    font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+    margin-left: auto;
+  }
+  .cm-confidence.high { background: #E6F4EA; color: #1E7E34; }
+  .cm-confidence.medium { background: #FFF8E1; color: #A06000; }
+  .cm-confidence.low { background: #FBE8E6; color: #C0392B; }
+  .cm-match-reason {
+    font-size: 11px; color: #5B6478; font-style: italic;
+  }
+  .cm-result-body {
+    padding: 10px 12px;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: #1A1F2E;
+  }
+  .cm-page-tag { font-size:11px; color:#8FA8C8; margin-bottom:4px; }
+  .cm-footer {
+    padding: 12px 20px;
+    border-top: 1px solid #E8EDF4;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    background: #F9FAFB;
+  }
+  .cm-no-tender {
+    text-align: center; padding: 30px 20px;
+    color: #9AA5B8; font-size: 13px; line-height: 1.7;
+  }
+  .cm-error { background:#FBE8E6; color:#C0392B; border-radius:6px; padding:10px 14px; font-size:13px; }
+
+  /* ── Landing Page ── */
+  #landingPage {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 16px 60px;
+  }
+  .lp-header {
+    background: linear-gradient(135deg, #0B1F3A 0%, #1A3A5C 100%);
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border-radius: 10px 10px 0 0;
+    box-shadow: 0 2px 12px rgba(11,31,58,0.18);
+  }
+  .lp-header-title { color:#fff; font-weight:700; font-size:16px; letter-spacing:.04em; }
+  .lp-header-sub { margin-left:auto; font-size:11px; color:#8FA8C8; letter-spacing:.06em; }
+  .lp-body {
+    background:#fff;
+    border-radius: 0 0 12px 12px;
+    box-shadow: 0 4px 20px rgba(11,31,58,0.10);
+    padding: 48px 36px;
+    text-align: center;
+  }
+  .lp-icon { font-size:60px; margin-bottom:16px; }
+  .lp-title { color:#0B1F3A; font-size:26px; margin: 0 0 10px; font-family: 'Georgia', serif; }
+  .lp-desc { color:#5B6478; font-size:15px; max-width:520px; margin: 0 auto 12px; line-height:1.7; }
+  .lp-note { color:#5B6478; font-size:13px; max-width:500px; margin: 0 auto 32px; line-height:1.6; }
+  .lp-tags { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-bottom:36px; }
+  .lp-tag {
+    font-size:12px; padding:4px 12px; border-radius:20px;
+    background: rgba(26,92,168,0.07);
+    color:#1A5CA8; border:1px solid rgba(26,92,168,0.2);
+    font-weight:600;
+  }
+  .lp-features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 14px;
+    max-width: 560px;
+    margin: 0 auto 36px;
+  }
+  .lp-feature {
+    padding: 12px 8px;
+    border-radius: 8px;
+    border: 1px solid #CBD3E1;
+    background: #F5F7FA;
+    text-align: center;
+  }
+  .lp-feature-icon { font-size:22px; margin-bottom:4px; }
+  .lp-feature-label { font-size:12px; color:#1A1F2E; font-weight:600; }
+  .lp-cta {
+    background: #E8BB4A;
+    color: #0B1F3A;
+    border: none;
+    border-radius: 8px;
+    padding: 14px 36px;
+    font-size:15px;
+    font-weight:700;
+    cursor:pointer;
+    font-family: inherit;
+    letter-spacing:.02em;
+  }
+  .lp-cta:hover { background: #d4a83d; }
+  #mainApp { display: none; }
+</style>
+</head>
+<body>
+
+<!-- ── LANDING PAGE ── -->
+<div id="landingPage">
+  <div class="lp-header">
+    <span style="font-size:22px">📋</span>
+    <span class="lp-header-title">PRE-BID QUERY &amp; CORRIGENDUM TOOL</span>
+    <span class="lp-header-sub">PRE-BID QUERY MANAGEMENT</span>
+  </div>
+  <div class="lp-body">
+    <div class="lp-icon">📋</div>
+    <h2 class="lp-title">Pre-Bid Query &amp; Corrigendum Generator</h2>
+    <p class="lp-desc">
+      Capture pre-bid queries from bidders, craft responses, and automatically generate the Corrigendum/Addendum — exported in the standard SDA format.
+    </p>
+    <p class="lp-note">
+      Upload the Tender PDF and the pre-bid queries PDF to get started. Supports clause search, response drafting, and one-click Excel export.
+    </p>
+    <div class="lp-tags">
+      <span class="lp-tag">PDF Upload</span>
+      <span class="lp-tag">Auto Clause Lookup</span>
+      <span class="lp-tag">Corrigendum Auto-link</span>
+      <span class="lp-tag">Excel Export</span>
+    </div>
+    <div class="lp-features">
+      <div class="lp-feature">
+        <div class="lp-feature-icon">🏛</div>
+        <div class="lp-feature-label">Tender Details</div>
+      </div>
+      <div class="lp-feature">
+        <div class="lp-feature-icon">📤</div>
+        <div class="lp-feature-label">Upload Queries PDF</div>
+      </div>
+      <div class="lp-feature">
+        <div class="lp-feature-icon">🔍</div>
+        <div class="lp-feature-label">Clause Lookup</div>
+      </div>
+      <div class="lp-feature">
+        <div class="lp-feature-icon">✏️</div>
+        <div class="lp-feature-label">Draft Responses</div>
+      </div>
+      <div class="lp-feature">
+        <div class="lp-feature-icon">📝</div>
+        <div class="lp-feature-label">Corrigendum Table</div>
+      </div>
+      <div class="lp-feature">
+        <div class="lp-feature-icon">📊</div>
+        <div class="lp-feature-label">Export to Excel</div>
+      </div>
+    </div>
+    <button class="lp-cta" onclick="startTool()">Start Tool ✦</button>
+  </div>
+</div>
+
+<!-- ── MAIN APP ── -->
+<div id="mainApp">
+<div class="wrap">
+  <h1>📋 Pre-Bid Query Response &amp; Corrigendum Generator</h1>
+  <div class="sub">Upload the tender, capture pre-bid queries, decide on responses and auto-build the Corrigendum.</div>
+
+  <!-- STEP 1: TENDER -->
+  <div class="card">
+    <h2>Step 1 — Tender / RFP Details</h2>
+    <div class="row">
+      <div class="col">
+        <label>Authority / Client Name</label>
+        <input type="text" id="authorityName" placeholder="e.g. Saharanpur Development Authority (SDA)" />
+      </div>
+      <div class="col">
+        <label>Tender ID</label>
+        <input type="text" id="tenderId" placeholder="e.g. 2025_BDAB_1057365_1" />
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <div class="col">
+        <label>RFP Title</label>
+        <input type="text" id="rfpTitle" placeholder="e.g. Request for Proposal for Appointment of Consultant" />
+      </div>
+      <div class="col">
+        <label>Upload Tender PDF <span style="color:#C0392B;font-weight:700;">*</span> <span style="color:#C0392B;font-size:11px;">(required — enables clause search &amp; corrigendum response)</span></label>
+        <input type="file" id="tenderPdf" accept="application/pdf" />
+      </div>
+    </div>
+    <div id="tenderStatus"></div>
+    <div id="tenderTypeBadgeWrap">
+      <span class="tender-type-label">🏷 Detected Tender Type:</span>
+      <span id="detectedTenderType" class="tender-type-badge"></span>
+      <span class="auto-detected-note">✦ auto-detected from document</span>
+      <button onclick="openRegistryViewer()" style="margin-left:auto;padding:4px 12px;font-size:11px;font-weight:600;border-radius:6px;cursor:pointer;background:#F0F4FA;color:#1A3A5C;border:1px solid #CBD3E1;">🏛 View Registry</button>
+    </div>
+    <div style="margin-top:8px;text-align:right;">
+      <button onclick="openRegistryViewer()" style="padding:4px 12px;font-size:11px;font-weight:600;border-radius:6px;cursor:pointer;background:#F0F4FA;color:#1A3A5C;border:1px solid #CBD3E1;">🏛 View Authority Registry</button>
+    </div>
+  </div>
+
+  <!-- STEP 2: QUERIES -->
+  <div class="card">
+    <h2>Step 2 — Pre-Bid Queries</h2>
+    <div class="row">
+      <div class="col">
+        <label>Upload Queries PDF</label>
+        <input type="file" id="queryPdf" accept="application/pdf" />
+      </div>
+      <div class="col">
+        <label>...or Paste Queries from Email / Document</label>
+        <textarea id="queryPaste" rows="3" placeholder="Paste raw text of bidder queries here"></textarea>
+      </div>
+    </div>
+    <div class="toolbar">
+      <button onclick="parsePastedQueries()">Parse Pasted Text</button>
+      <button class="secondary" onclick="addQueryRow()">+ Add Row Manually</button>
+      <button class="secondary" onclick="runDiagnostic()" id="diagBtn" style="display:none">🔍 Show PDF Diagnostic</button>
+      <span id="queryStatus"></span>
+    </div>
+    <div id="diagPanel" style="display:none;margin-top:12px;">
+      <div style="font-size:12px;font-weight:700;color:#5B6478;margin-bottom:6px;">PDF DIAGNOSTIC — first 80 lines &amp; first 100 raw items from page 1 (copy and share this)</div>
+      <textarea id="diagOutput" rows="18" style="width:100%;font-family:monospace;font-size:11px;background:#F5F7FA;border:1px solid #CBD3E1;border-radius:6px;padding:8px;" readonly></textarea>
+    </div>
+  </div>
+
+  <!-- STEP 3: TABLE -->
+  <div class="card">
+    <h2>Step 3 — Response to Pre-Bid Queries <span class="badge" id="qCount">0 queries</span></h2>
+    <div style="overflow-x:auto;">
+    <table id="queryTable">
+      <thead>
+        <tr>
+          <th class="col-num">#</th>
+          <th style="width:12%;">Bidder</th>
+          <th class="col-clause">Page &amp; Clause No.</th>
+          <th class="col-rfp">Clause in RFP</th>
+          <th class="col-query">Query / Point of Clarification</th>
+          <th class="col-resp">Response Type</th>
+          <th class="col-action">Action</th>
+        </tr>
+      </thead>
+      <tbody id="queryBody">
+      </tbody>
+    </table>
+    <div id="queryEmpty" class="empty-note">No queries yet. Upload a PDF, paste text, or add a row manually above.</div>
+    </div>
+  </div>
+
+  <!-- STEP 4: CORRIGENDUM -->
+  <div class="card">
+    <h2>Step 4 — Corrigendum No. 1 <span class="badge" id="cCount">0 items</span></h2>
+    <div class="row">
+      <div class="col">
+        <label>Corrigendum Title</label>
+        <input type="text" id="corrigTitle" placeholder="e.g. ... Corrigendum / Addendum (No.1)" />
+      </div>
+    </div>
+    <div style="overflow-x:auto; margin-top:10px;">
+    <table id="corrigTable">
+      <thead>
+        <tr>
+          <th class="col-num">Sr. No.</th>
+          <th style="width:40%;">Clause in RFP</th>
+          <th style="width:50%;">Corrigendum / Addendum</th>
+          <th class="col-action">Action</th>
+        </tr>
+      </thead>
+      <tbody id="corrigBody"></tbody>
+    </table>
+    <div id="corrigEmpty" class="empty-note">Items marked "Refer Corrigendum 1" in the query table will appear here automatically. You can also add items manually.</div>
+    </div>
+    <div class="toolbar">
+      <button class="secondary" onclick="addCorrigRow()">+ Add Row Manually</button>
+    </div>
+  </div>
+
+  <!-- STEP 5: EXPORT -->
+  <div class="card">
+    <h2>Step 5 — Export</h2>
+    <div class="toolbar">
+      <button onclick="exportExcel()">⬇ Download Excel (.xlsx)</button>
+      <button class="secondary" onclick="saveProgress()">💾 Save Progress (JSON)</button>
+      <input type="file" id="loadFile" accept="application/json" style="display:none" onchange="loadProgress(event)" />
+      <button class="secondary" onclick="document.getElementById('loadFile').click()">📂 Load Saved Progress</button>
+    </div>
+    <div id="exportStatus"></div>
+  </div>
+</div>
+
+<script>
+let tenderClauses = []; // [{ref, text}]
+let queryRows = []; // {id, num, clause, rfpClause, query, responseType, responseText}
+let corrigRows = []; // {id, srNo, clause, corrigendum, sourceQueryId}
+let rowCounter = 0;
+
+// ---------- TENDER PDF ----------
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+async function extractPdfText(file) {
+  const data = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data}).promise;
+  let pages = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    // Reconstruct real line breaks using each item's vertical position.
+    // (content.items has no inherent line info — naively joining with a
+    // single space collapses the whole page into one line, which breaks
+    // every line-anchored regex used downstream for metadata + clause detection.)
+    let lines = [];
+    let currentLine = [];
+    let lastY = null;
+    for (const item of content.items) {
+      const y = item.transform[5];
+      if (lastY !== null && Math.abs(y - lastY) > 2) {
+        lines.push(currentLine.join(' '));
+        currentLine = [];
+      }
+      currentLine.push(item.str);
+      lastY = y;
+    }
+    if (currentLine.length) lines.push(currentLine.join(' '));
+    const text = lines.join('\n');
+    pages.push({page: i, text});
+  }
+  return pages;
+}
+
+document.getElementById('tenderPdf').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('tenderStatus');
+  statusEl.innerHTML = '<div class="status info">⏳ Reading tender PDF…</div>';
+  try {
+    const pages = await extractPdfText(file);
+    tenderClauses = pages;
+    buildSearchIndex(pages);
+
+    // ── Auto-detect tender metadata ──────────────────────────────
+    const firstText = pages.slice(0, 4).map(p => p.text).join('\n');
+    const detected  = detectTenderMetadata(firstText);
+
+    let fills = [];
+
+    if (detected.client) {
+      const el = document.getElementById('authorityName');
+      if (!el.value.trim()) {
+        el.value = detected.client;
+        el.style.background = '#FFFDE7';
+        fills.push('Client Name');
+      }
+    }
+    if (detected.title) {
+      const el = document.getElementById('rfpTitle');
+      if (!el.value.trim()) {
+        el.value = detected.title;
+        el.style.background = '#FFFDE7';
+        fills.push('RFP Title');
+      }
+    }
+    if (detected.tenderType) {
+      document.getElementById('detectedTenderType').textContent = detected.tenderType;
+      document.getElementById('detectedTenderType').className =
+        'tender-type-badge ' + (detected.tenderType === 'Works Contract' ? 'badge-works' : 'badge-services');
+      document.getElementById('tenderTypeBadgeWrap').style.display = 'flex';
+    }
+
+    // If registry matched, suggest known RFPs
+    if (detected.registryMatch) {
+      applyRegistryRfpSuggestion(detected.registryMatch);
+    }
+
+    const autoNote = fills.length
+      ? ` Auto-filled: <strong>${fills.join(', ')}</strong> (highlighted).` : '';
+
+    statusEl.innerHTML = `<div class="status ok">✓ Tender PDF indexed — ${clauseSegments.length} clause segments across ${pages.length} pages.${autoNote} Use <strong>🔍 Search Clauses</strong> in any query row.</div>`;
+  } catch(err) {
+    statusEl.innerHTML = `<div class="status err">Could not read PDF: ${err.message}</div>`;
+  }
+});
+
+// ── Tender metadata detection ────────────────────────────────────
+function detectTenderMetadataBase(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const full = text.replace(/\s+/g, ' ');
+
+  // ── Client / Authority ──────────────────────────────────────────
+  let client = '';
+
+  // 1. Org-suffix scan line by line (most reliable now that real line
+  //    breaks are preserved — cover pages usually have the authority
+  //    name as its own clean line/heading)
+  const orgRe = /([A-Z][A-Za-z\s&(),.]{4,80}(?:Development\s+Authority|Municipal\s+Corporation|Nagar\s+Nigam|Nagar\s+Palika|Nagar\s+Panchayat|Port\s+Trust|Housing\s+Board|Smart\s+City|Urban\s+Development\s+Authority|Industrial\s+Development\s+Authority|Improvement\s+Trust|Metropolitan\s+Authority|CPWD|NHAI|PWD|Railway\s+Board|Authority|Corporation|Board|Department|Council|Trust|Commission|Agency|Bureau))\b/;
+  for (const line of lines.slice(0, 40)) {
+    const m = line.match(orgRe);
+    if (m) { client = cleanExtract(m[1]); break; }
+  }
+
+  // 2. ALL-CAPS standalone line fallback
+  if (!client) {
+    for (const line of lines.slice(0, 30)) {
+      if (/^[A-Z][A-Z\s&(),.]{10,80}$/.test(line) &&
+          !/^(REQUEST|TENDER|RFP|RFQ|INVITATION|NOTICE|EXPRESSION|PROPOSAL|FOR |TO |OF |AND |THE )/.test(line)) {
+        client = toTitleCase(line);
+        break;
+      }
+    }
+  }
+
+  // 3. Explicit label patterns — scoped to a single line at a time so a
+  //    wrapped "Issued by: <multi-line address block>" can't swallow
+  //    unrelated text from later in the document.
+  if (!client) {
+    const clientLabelPatterns = [
+      /(?:issued\s+by|prepared\s+by|floated\s+by|on\s+behalf\s+of)\s*[:\-\u2013]\s*([A-Z][^.]{8,100})/i,
+      /^\s*(?:client|employer|procuring\s+entity|authority\s+name)\s*[:\-\u2013]\s*([A-Z][^.]{5,100})/i,
+    ];
+    outer:
+    for (const line of lines.slice(0, 40)) {
+      for (const re of clientLabelPatterns) {
+        const m = line.match(re);
+        if (m) { client = cleanExtract(m[1]); break outer; }
+      }
+    }
+  }
+
+  // ── RFP Title ───────────────────────────────────────────────────
+  // Govt RFP titles often span multiple lines — collect trigger + continuations
+  let title = '';
+  const titleTriggerRe = /^(request\s+for\s+proposal|rfp\s*[:–\-]|request\s+for\s+quotation|rfq|notice\s+inviting\s+tender|nit\s*[:–\-]|tender\s+(?:document\s+)?for|expression\s+of\s+interest|eoi|appointment\s+of|name\s+of\s+work|subject\s*:)/i;
+  const titleStopRe = /^(data\s+sheet|section\s+\d|clause\s+\d|chapter\s+\d|page\s+\d|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|date\s*:|tender\s+id|ref\s*:|version\s*:|table\s+of\s+contents|www\.|http|©|prepared\s+by|issued\s+by)/i;
+
+  for (let i = 0; i < Math.min(lines.length, 60); i++) {
+    if (titleTriggerRe.test(lines[i])) {
+      const parts = [lines[i]];
+      for (let k = i + 1; k < Math.min(i + 8, lines.length); k++) {
+        const next = lines[k];
+        if (!next || titleStopRe.test(next) || /^\d{4}$/.test(next)) break;
+        if (/^[A-Z\s]{6,40}$/.test(next) && next.length < 35 && k > i + 2) break;
+        parts.push(next);
+        // A title line that doesn't end in a connector (of/for/and/&/etc.)
+        // is almost certainly the end of the title — stop before we start
+        // absorbing the next paragraph of body text.
+        const endsWithConnector = /[&\-–,:]\s*$/.test(next) ||
+          /\b(of|for|and|to|the|in|on|by|with|under|appointment|consultant\s+for)\s*$/i.test(next);
+        if (parts.length >= 2 && !endsWithConnector) break;
+      }
+      title = cleanExtract(parts.join(' '));
+      title = title.replace(/^(rfp|nit|rfq|eoi)\s*[:\-\u2013]\s*/i, '').trim();
+      if (title.length > 15) break;
+    }
+  }
+
+  // Fallback: longest mixed-case line in first 30 lines
+  if (!title) {
+    const candidate = lines.slice(0, 30)
+      .filter(l => l.length > 25 && l.length < 250 && /[a-z]/.test(l) && /[A-Z]/.test(l))
+      .sort((a, b) => b.length - a.length)[0];
+    if (candidate) title = cleanExtract(candidate);
+  }
+
+  // ── Tender Type ─────────────────────────────────────────────────
+  let tenderType = '';
+  const worksRe = /\b(civil\s+work|construction|building\s+work|road\s+work|bridge|dam|canal|drainage|sewage|water\s+supply|electrification|laying\s+of|erection|BOQ|bill\s+of\s+quantities|schedule\s+of\s+rates|item\s+rate|percentage\s+rate)\b/gi;
+  const servicesRe = /\b(consultancy|consulting\s+services|advisory|PMC|project\s+management\s+consultant|DPR|feasibility|operational\s+efficiency|planning\s+consultant|monitoring\s+consultant|manpower|IT\s+services|capacity\s+building|AMC|facility\s+management)\b/gi;
+  const wHits = (full.match(worksRe) || []).length;
+  const sHits = (full.match(servicesRe) || []).length;
+  if (wHits > 0 || sHits > 0) {
+    tenderType = wHits > sHits ? 'Works Contract' : 'Services Contract';
+  }
+
+  return { client, title, tenderType };
+}
+
+function cleanExtract(str) {
+  return (str || '').replace(/\s+/g, ' ').replace(/^[\s:\u2013\-]+|[\s:\u2013\-]+$/g, '').substring(0, 220).trim();
+}
+
+function toTitleCase(str) {
+  return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CLAUSE SEGMENTATION + TF-IDF SEARCH ENGINE
+// ═══════════════════════════════════════════════════════════════
+
+let clauseSegments = []; // [{ref, heading, text, page, score}]
+let idfMap = {};         // word → idf weight
+let segTfVectors = [];   // per-segment tf map
+
+// Standard stopwords to ignore during scoring
+const STOPWORDS = new Set([
+  'the','a','an','and','or','of','to','in','is','it','be','as','at','so','we',
+  'he','by','on','do','if','me','my','up','no','us','am','are','was','were',
+  'has','had','not','but','with','this','that','from','they','have','will',
+  'would','been','which','their','there','when','what','can','more','also',
+  'into','than','then','its','all','for','any','may','such','said','shall',
+  'per','each','above','below','under','over','shall','should','must','only',
+  'both','between','within','without','after','before','during','through',
+  'however','therefore','whereas','hereby','herein','thereof'
+]);
+
+// Clause-like heading patterns found in Indian government RFP documents
+const CLAUSE_HEADING_RE = /^(?:\s*)(?:(\d+(?:\.\d+){0,3})\s+([A-Z][^\n]{3,80})|(?:CLAUSE|SECTION|ARTICLE|PART|SCHEDULE|ANNEXURE|APPENDIX)\s+[\dA-Z]+[^\n]{0,60})/m;
+
+function tokenize(text) {
+  return text.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !STOPWORDS.has(w));
+}
+
+function buildTfVector(tokens) {
+  const tf = {};
+  for (const t of tokens) tf[t] = (tf[t] || 0) + 1;
+  const max = Math.max(...Object.values(tf), 1);
+  for (const t in tf) tf[t] = tf[t] / max;
+  return tf;
+}
+
+// Split extracted page texts into clause-level segments.
+// Two-pass: first split on numbered headings, then within each segment
+// also extract sub-clauses (Roman numerals i/ii/iii and letter items a/b/c)
+// so the clause modal can offer drill-down to individual table rows.
+function segmentTenderText(pages) {
+  const segments = [];
+
+  for (const { page, text } of pages) {
+    const lines = text.split(/\n/);
+    let currentRef = '';
+    let currentHeading = '';
+    let buffer = [];
+
+    const flushBuffer = () => {
+      if (!buffer.length) return;
+      const raw = buffer.join(' ').trim();
+      if (raw.length > 40) {
+        const seg = { ref: currentRef, heading: currentHeading, text: raw, page };
+        // Pass 2: extract sub-clauses from this segment
+        seg.subClauses = extractSubClauses(raw, currentRef, currentHeading);
+        segments.push(seg);
+      }
+      buffer = [];
+    };
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      const numMatch = trimmed.match(/^(\d{1,2}(?:\.\d{1,2}){0,3})[\s.\-–:]+([A-Z][^\n]{2,70})/);
+      const secMatch = trimmed.match(/^(CLAUSE|SECTION|ARTICLE|PART|SCHEDULE|ANNEXURE|APPENDIX)\s+([\dA-Z][\w\-]*)\s*[:\-–]?\s*(.*)/i);
+
+      if (numMatch || secMatch) {
+        flushBuffer();
+        if (numMatch) {
+          currentRef = numMatch[1];
+          currentHeading = numMatch[2].trim();
+        } else {
+          currentRef = secMatch[1] + ' ' + secMatch[2];
+          currentHeading = secMatch[3].trim();
+        }
+        buffer = [trimmed];
+      } else {
+        buffer.push(trimmed);
+        if (buffer.join(' ').length > 1200 && buffer.length > 5) {
+          flushBuffer();
+          currentRef = currentRef ? currentRef + ' (cont.)' : '';
+          currentHeading = currentHeading ? currentHeading + ' (cont.)' : '';
+        }
+      }
+    }
+    flushBuffer();
+  }
+
+  return segments;
+}
+
+// Extract individual sub-clauses (Roman numerals, letters, numbered items)
+// from a section's text. Returns array of {key, label, text} objects.
+function extractSubClauses(sectionText, parentRef, parentHeading) {
+  const subClauses = [];
+
+  // Patterns for sub-clause markers (Roman numerals, letters, numbers in parens/dots)
+  // e.g.: "i.", "ii.", "iii.", "(i)", "(ii)", "a.", "b.", "(a)", "1.", "1)"
+  const subRe = /(?:^|\n)\s*(?:\(([ivxlcdmIVXLCDM]{1,6}|[a-z]|\d{1,2})\)|([ivxlcdmIVXLCDM]{1,6}|[a-z]|\d{1,2})[\.\)])\s+(.+?)(?=(?:\n\s*(?:\((?:[ivxlcdmIVXLCDM]{1,6}|[a-z]|\d{1,2})\)|(?:[ivxlcdmIVXLCDM]{1,6}|[a-z]|\d{1,2})[\.\)])\s)|$)/gs;
+
+  let match;
+  while ((match = subRe.exec(sectionText)) !== null) {
+    const key = (match[1] || match[2] || '').trim();
+    const rawText = match[3].replace(/\s+/g, ' ').trim();
+    if (rawText.length < 8) continue; // skip trivial matches
+
+    // Derive a short label from the first bold-looking part (up to first colon or 60 chars)
+    const colonIdx = rawText.indexOf(':');
+    const label = colonIdx > 0 && colonIdx < 70
+      ? rawText.substring(0, colonIdx).trim()
+      : rawText.substring(0, 60).trim();
+
+    subClauses.push({
+      key,            // e.g. "i", "ii", "a"
+      label,          // short descriptive label
+      text: rawText,  // full verbatim text of this sub-clause
+      parentRef,
+      parentHeading
+    });
+  }
+
+  return subClauses;
+}
+
+// Build IDF map across all segments
+function buildIdf(segments) {
+  const df = {};
+  const N = segments.length || 1;
+  for (const seg of segments) {
+    const unique = new Set(tokenize(seg.text));
+    for (const w of unique) df[w] = (df[w] || 0) + 1;
+  }
+  const idf = {};
+  for (const w in df) idf[w] = Math.log((N + 1) / (df[w] + 1)) + 1;
+  return idf;
+}
+
+// Cosine similarity between two tf vectors using idf weights
+function cosineSim(queryTf, segTf, idf) {
+  let dot = 0, qNorm = 0, sNorm = 0;
+  const allWords = new Set([...Object.keys(queryTf), ...Object.keys(segTf)]);
+  for (const w of allWords) {
+    const wt = idf[w] || 1;
+    const qv = (queryTf[w] || 0) * wt;
+    const sv = (segTf[w] || 0) * wt;
+    dot += qv * sv;
+    qNorm += qv * qv;
+    sNorm += sv * sv;
+  }
+  if (qNorm === 0 || sNorm === 0) return 0;
+  return dot / (Math.sqrt(qNorm) * Math.sqrt(sNorm));
+}
+
+// Boost score if the clause reference explicitly appears in the query
+function refBoost(query, ref) {
+  if (!ref) return 0;
+  const q = query.toLowerCase();
+  const r = ref.toLowerCase();
+  // exact ref number match (e.g. "3.2")
+  if (r && q.includes(r)) return 0.35;
+  // partial: first part of ref (e.g. "3" in "3.2.1")
+  const parts = r.split('.');
+  if (parts.length > 1 && q.includes(parts[0] + '.' + parts[1])) return 0.15;
+  return 0;
+}
+
+// Highlight query terms in a text snippet
+function highlightTerms(text, queryTokens) {
+  const qSet = new Set(queryTokens.filter(t => !STOPWORDS.has(t)));
+  if (!qSet.size) return esc(text);
+  const escaped = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const pattern = new RegExp('\\b(' + [...qSet].map(t => t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|') + ')\\b', 'gi');
+  return escaped.replace(pattern, '<mark style="background:#FFF176;padding:0 1px;border-radius:2px;">$1</mark>');
+}
+
+// Search: given a query string, return top N scored segments
+function searchClauses(queryText, topN = 5) {
+  if (!clauseSegments.length) return [];
+  const qTokens = tokenize(queryText);
+  if (!qTokens.length) return [];
+  const qTf = buildTfVector(qTokens);
+
+  const results = clauseSegments.map((seg, i) => {
+    const sim = cosineSim(qTf, segTfVectors[i], idfMap);
+    const boost = refBoost(queryText, seg.ref);
+    return { ...seg, score: Math.min(1, sim + boost), qTokens };
+  });
+
+  results.sort((a, b) => b.score - a.score);
+  return results.slice(0, topN).filter(r => r.score > 0.02);
+}
+
+// Rebuild index whenever tender PDF is loaded
+function buildSearchIndex(pages) {
+  clauseSegments = segmentTenderText(pages);
+  idfMap = buildIdf(clauseSegments);
+  segTfVectors = clauseSegments.map(seg => buildTfVector(tokenize(seg.text)));
+}
+
+// Legacy simple lookup still used by auto-parse flow
+function findClauseText(ref) {
+  if (!clauseSegments.length || !ref) return '';
+  const results = searchClauses(ref, 1);
+  if (!results.length) return '';
+  const r = results[0];
+  const snippet = r.text.length > 400 ? r.text.substring(0, 400) + '…' : r.text;
+  return (r.ref ? '[' + r.ref + '] ' : '') + '(Page ' + r.page + ') ' + snippet;
+}
+
+// ---------- QUERY PARSING ----------
+let _lastQueryPages = null; // stored for diagnostic
+
+document.getElementById('queryPdf').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('queryStatus');
+  statusEl.innerHTML = '<span class="status info">Reading queries PDF…</span>';
+  try {
+    const pages = await extractPdfTextWithItems(file);
+    _lastQueryPages = pages;
+    document.getElementById('diagBtn').style.display = '';
+
+    // PRIMARY: Try column-position aware extraction (handles multi-column tables)
+    const colRows = extractTableByColumns(pages);
+    if (colRows.length >= 2) {
+      colRows.forEach(r => {
+        addQueryRow({
+          bidder: r.bidder, clause: r.section,
+          rfpClause: r.rfpClauseText, query: r.query,
+          responseType:'', responseText:''
+        });
+      });
+      renderQueryTable();
+      statusEl.innerHTML = `<span class="status ok">✓ ${colRows.length} queries extracted from PDF. Review and fill responses below — selecting "Refer Corrigendum 1" will automatically add an entry to the Corrigendum table in Step 4.</span>`;
+      return;
+    }
+
+    // FALLBACK: line-text based parser
+    const fullText = pages.map(p => p.text).join('\n');
+    parseQueryText(fullText);
+    statusEl.innerHTML = '<span class="status ok">Queries extracted from PDF. If count looks wrong, click 🔍 Show PDF Diagnostic and share the output.</span>';
+  } catch(err) {
+    statusEl.innerHTML = `<span class="status err">Could not read PDF: ${err.message}</span>`;
+  }
+});
+
+// Extract text AND raw items (x, y, str) for diagnostic + column-aware parsing
+async function extractPdfTextWithItems(file) {
+  const data = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data}).promise;
+  const pages = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const rawItems = content.items
+      .filter(it => it.str && it.str.trim())
+      .map(it => ({ str: it.str, x: Math.round(it.transform[4]), y: Math.round(it.transform[5]) }));
+
+    // Build line text using Y-break logic (for fallback + corrigendum parsing)
+    let lines = [], currentLine = [], lastY = null;
+    for (const it of content.items) {
+      const y = it.transform[5];
+      if (lastY !== null && Math.abs(y - lastY) > 2) {
+        if (currentLine.length) lines.push(currentLine.join(' '));
+        currentLine = [];
+      }
+      currentLine.push(it.str);
+      lastY = y;
+    }
+    if (currentLine.length) lines.push(currentLine.join(' '));
+    pages.push({ page: i, text: lines.filter(Boolean).join('\n'), rawItems });
+  }
+  return pages;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  COLUMN-POSITION AWARE TABLE EXTRACTOR
+//
+//  This PDF has a 6-column table: S.No | Bidder | Page No. |
+//  Section | RFP Clause/Subject | Query
+//
+//  Key facts from the actual PDF (pdf.js coordinates, page height=792):
+//   - S.No  column:  x ≈ 115–140  (serial numbers live here)
+//   - Bidder column: x ≈ 140–190
+//   - Page   column: x ≈ 190–225
+//   - Section column:x ≈ 224–305
+//   - RFP Clause col:x ≈ 295–400
+//   - Query  column: x ≈ 400–540
+//
+//  The header is split across 3 Y-bands (the "S." "No." are at
+//  different vertical offsets from "Bidder" "Section" etc.) so
+//  header-detection by single-row scan fails. We skip header
+//  detection entirely and use hard-coded column boundaries instead,
+//  then scan every page for consecutive serial numbers 1..N.
+// ═══════════════════════════════════════════════════════════════
+function extractTableByColumns(pages) {
+  // Column X boundaries calibrated from the actual PDF coordinate data
+  // (pdf.js transform[4] matches pdfplumber x0 for this document)
+  // Verified against real item positions: serial x≈121, bidder x≈142–189,
+  // page x≈191–208, section x≈224–290, rfp x≈296–381, query x≈401+
+  const COL_SERIAL  = { min: 110, max: 140 };
+  const COL_BIDDER  = { min: 140, max: 190 };
+  const COL_PAGE    = { min: 188, max: 224 };
+  const COL_SECTION = { min: 222, max: 292 };
+  const COL_RFP     = { min: 290, max: 399 };
+  const COL_QUERY   = { min: 398, max: 600 };
+
+  // Bucket size: 3pt — fine enough to separate adjacent lines in this PDF
+  // (minimum row gap observed is ~8pt, lines within a cell are ~8–10pt apart)
+  const BUCKET = 3;
+
+  // Process each page independently so page-break continuation works
+  const dataRows = [];
+  let currentRow = null;
+  let prevSerial = 0;
+  const MAX_SERIAL = 200; // safety cap
+
+  for (const pg of pages) {
+    // Build Y-bucket map for this page
+    // In pdf.js, transform[5] is Y from bottom of page.
+    // We want reading order = descending Y (top of page = high Y).
+    const byY = new Map();
+    for (const it of pg.rawItems) {
+      if (!it.str || !it.str.trim()) continue;
+      const yk = Math.round(it.y / BUCKET) * BUCKET;
+      if (!byY.has(yk)) byY.set(yk, []);
+      byY.get(yk).push(it);
+    }
+
+    // Sort Y buckets top-to-bottom = descending Y value
+    const sortedYs = [...byY.keys()].sort((a, b) => b - a);
+
+    for (const yk of sortedYs) {
+      const rowItems = byY.get(yk).slice().sort((a, b) => a.x - b.x);
+
+      // Find leftmost item that sits in the serial column
+      const serialItem = rowItems.find(it =>
+        it.x >= COL_SERIAL.min && it.x <= COL_SERIAL.max &&
+        /^\d{1,3}$/.test(it.str.trim())
+      );
+
+      if (serialItem) {
+        const serialNum = parseInt(serialItem.str.trim());
+
+        // Valid next serial? (consecutive, or serial=1 to start)
+        if (serialNum === 1 && prevSerial === 0) {
+          // Starting row
+        } else if (serialNum === prevSerial + 1) {
+          // Next row
+        } else {
+          // Not consecutive — this is a stray number (page numbers,
+          // corrigendum section, etc.). Skip it as a serial start
+          // but still accumulate non-serial items into currentRow.
+          if (currentRow) {
+            for (const it of rowItems) {
+              if (it !== serialItem) accumulateItem(currentRow, it, COL_BIDDER, COL_PAGE, COL_SECTION, COL_RFP, COL_QUERY);
+            }
+          }
+          continue;
+        }
+
+        // Flush previous row
+        if (currentRow) {
+          const r = finaliseRow(currentRow);
+          if (r.query.length > 5) dataRows.push(r);
+        }
+
+        currentRow = { serial: serialNum, bidderParts: [], pageParts: [], sectionParts: [], rfpParts: [], queryParts: [] };
+        prevSerial = serialNum;
+
+        // Assign non-serial items from this Y band
+        for (const it of rowItems) {
+          if (it === serialItem) continue;
+          accumulateItem(currentRow, it, COL_BIDDER, COL_PAGE, COL_SECTION, COL_RFP, COL_QUERY);
+        }
+      } else if (currentRow) {
+        // Continuation band — no serial item, accumulate into current row
+        for (const it of rowItems) {
+          accumulateItem(currentRow, it, COL_BIDDER, COL_PAGE, COL_SECTION, COL_RFP, COL_QUERY);
+        }
+      }
+    }
+  }
+
+  // Flush final row
+  if (currentRow) {
+    const r = finaliseRow(currentRow);
+    if (r.query.length > 5) dataRows.push(r);
+  }
+
+  return dataRows;
+}
+
+function accumulateItem(row, it, COL_BIDDER, COL_PAGE, COL_SECTION, COL_RFP, COL_QUERY) {
+  const x = it.x;
+  const str = it.str.trim();
+  if (!str) return;
+  if      (x >= COL_BIDDER.min  && x < COL_BIDDER.max)  row.bidderParts.push(str);
+  else if (x >= COL_PAGE.min    && x < COL_PAGE.max)     row.pageParts.push(str);
+  else if (x >= COL_SECTION.min && x < COL_SECTION.max)  row.sectionParts.push(str);
+  else if (x >= COL_RFP.min     && x < COL_RFP.max)      row.rfpParts.push(str);
+  else if (x >= COL_QUERY.min   && x < COL_QUERY.max)    row.queryParts.push(str);
+  // items outside all columns (borders, decoration) are silently ignored
+}
+
+function finaliseRow(r) {
+  const bidder = normaliseBidderName(r.bidderParts.join(' ').trim());
+  const page   = r.pageParts.join(' ').trim();
+  const section = r.sectionParts.join(' ').trim() || page;
+  const rfpClauseText = r.rfpParts.join(' ').trim();
+  const query  = r.queryParts.join(' ').trim();
+  return { serial: r.serial, bidder, page, section, rfpClauseText, query };
+}
+
+function runDiagnostic() {
+  if (!_lastQueryPages || !_lastQueryPages.length) return;
+  const pg1 = _lastQueryPages[0];
+  const lines = pg1.text.split('\n');
+
+  let out = `=== COLUMN EXTRACTOR RESULTS (${queryRows.length} rows found) ===\n`;
+  queryRows.slice(0, 5).forEach((r, i) => {
+    out += `Row ${i+1}: bidder="${r.bidder}" | clause="${r.clause}" | query="${(r.query||'').substring(0,80)}"\n`;
+  });
+
+  out += `\n=== PAGE 1 RAW ITEMS — X positions (first 120 of ${pg1.rawItems.length}) ===\n`;
+  out += `${'#'.padEnd(4)} ${'x'.padEnd(6)} ${'y'.padEnd(6)} text\n`;
+  out += `${'─'.repeat(70)}\n`;
+  pg1.rawItems.slice(0, 120).forEach((it, i) => {
+    out += `${String(i+1).padEnd(4)} ${String(it.x).padEnd(6)} ${String(it.y).padEnd(6)} ${it.str}\n`;
+  });
+
+  out += `\n=== PAGE 1 TEXT LINES (first 60) ===\n`;
+  lines.slice(0, 60).forEach((l, i) => { out += `L${String(i+1).padStart(3,'0')}: ${l}\n`; });
+
+  if (_lastQueryPages.length > 1) {
+    const pg2 = _lastQueryPages[1];
+    out += `\n=== PAGE 2 RAW ITEMS (first 60) ===\n`;
+    pg2.rawItems.slice(0, 60).forEach((it, i) => {
+      out += `${String(i+1).padEnd(4)} ${String(it.x).padEnd(6)} ${String(it.y).padEnd(6)} ${it.str}\n`;
+    });
+  }
+
+  const panel = document.getElementById('diagPanel');
+  document.getElementById('diagOutput').value = out;
+  panel.style.display = '';
+  panel.scrollIntoView({ behavior: 'smooth' });
+}
+
+function parsePastedQueries() {
+  const text = document.getElementById('queryPaste').value;
+  if (!text.trim()) {
+    document.getElementById('queryStatus').innerHTML = '<span class="status err">Paste some text first.</span>';
+    return;
+  }
+  parseQueryText(text);
+  document.getElementById('queryStatus').innerHTML = '<span class="status ok">Pasted text parsed into table below. Please review/edit columns.</span>';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  STRUCTURED PRE-BID QUERY PARSER
+//  Handles the SDA consolidated pre-bid format:
+//  Table: S.No | Bidder | Page No. | Section | RFP Clause/Subject | Query
+//  Also detects corrigendum table and auto-populates Step 4
+// ═══════════════════════════════════════════════════════════════
+
+const KNOWN_BIDDERS = [
+  'N K BUILDCON','NK BUILDCON','KNIGHT FRANK','BDO INDIA','PRICEWATERHOUSECOOPERS',
+  'PRICEWATER HOUSE COOPERS','PWC','KPMG','ERNST & YOUNG','ERNST AND YOUNG',
+  'EY INDIA','DELOITTE','GRANT THORNTON','CRISIL','ICRA',
+  'QUALITY COUNCIL OF INDIA','QCI','MOTT MACDONALD','AECOM',
+  'LOUIS BERGER','STUP CONSULTANTS','WAPCOS','RITES','REPL',
+  'ERNST','YOUNG','PRICEWATERHOUSE','COOPERS','INFRASTRUCTURE'
+];
+
+function normaliseBidderName(raw) {
+  const cleaned = raw.replace(/\s+/g,' ').trim();
+  const map = [
+    [/pricewaterhouse\s*coopers?|pricewater\s+house/i,'PricewaterhouseCoopers India Pvt Ltd'],
+    [/pwc/i,'PricewaterhouseCoopers India Pvt Ltd'],
+    [/ernst\s*[&and]+\s*young|ey\s*india/i,'Ernst & Young (EY) India'],
+    [/knight\s*frank/i,'Knight Frank (India) Pvt Ltd'],
+    [/bdo\s*india/i,'BDO India Services Pvt Ltd'],
+    [/kpmg/i,'KPMG Advisory Services Pvt Ltd'],
+    [/n\.?\s*k\.?\s*build/i,'N K Buildcon Pvt Ltd'],
+    [/quality\s*council/i,'Quality Council of India'],
+    [/deloitte/i,'Deloitte'],
+  ];
+  for (const [re,name] of map) { if (re.test(cleaned)) return name; }
+  return cleaned;
+}
+
+function looksLikeBidder(text) {
+  const up = text.toUpperCase();
+  return KNOWN_BIDDERS.some(b => up.includes(b)) ||
+    /\b(PVT|LTD|LIMITED|PRIVATE|LLP|INDIA|SERVICES|ADVISORY|CONSULTING|CONSULTANTS|COUNCIL)\b/.test(up);
+}
+
+function looksLikePage(text) {
+  return /^(pg\.?|page|p\.\s*[\d–]|pages?\s*[\d–]|general)/i.test(text.trim());
+}
+
+function looksLikeSerialNo(text) {
+  return /^\s*\d{1,3}\s*$/.test(text.trim());
+}
+
+function looksLikeQueryStart(text) {
+  return /^(we\s|it\s+is\s+|kindly\s|please\s|request\s|clarif|confirm|we\s+request|we\s+seek|we\s+would|as\s+per\s+the\s+rfp.*we|as\s+per\s+our|this\s+is\s+to|we\s+are|in\s+view|considering|in\s+line)/i.test(text.trim());
+}
+
+function parseQueryText(text) {
+  text = text.replace(/\r/g,'').replace(/\t/g,' ');
+  const rows = parseStructuredTable(text);
+  if (rows.length >= 2) {
+    rows.forEach(r => {
+      addQueryRow({
+        bidder: r.bidder, clause: r.section,
+        rfpClause: r.rfpClauseText, query: r.query,
+        responseType:'', responseText:''
+      });
+    });
+    renderQueryTable();
+    return;
+  }
+  fallbackParseQueries(text);
+}
+
+function parseStructuredTable(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const rows = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    if (!looksLikeSerialNo(lines[i])) continue;
+    const serial = parseInt(lines[i].trim());
+    // Guard: skip if next row serial already exists (avoid re-parsing)
+    if (rows.length > 0 && serial !== rows[rows.length-1].serial + 1) continue;
+
+    const window = [];
+    let j = i + 1;
+    while (j < lines.length && window.length < 30) {
+      const next = lines[j].trim();
+      if (looksLikeSerialNo(next) && parseInt(next) === serial + 1) break;
+      window.push(next);
+      j++;
+    }
+
+    let wi = 0;
+    // Bidder: collect until non-bidder line
+    const bidderLines = [];
+    while (wi < window.length && (bidderLines.length === 0 || (looksLikeBidder(window[wi]) && window[wi].length < 60))) {
+      if (looksLikeBidder(window[wi])) { bidderLines.push(window[wi]); wi++; }
+      else break;
+    }
+    const bidder = normaliseBidderName(bidderLines.join(' '));
+
+    // Page
+    let page = '';
+    if (wi < window.length && looksLikePage(window[wi])) { page = window[wi]; wi++; }
+
+    // Section (1–2 short lines before RFP clause text)
+    const sectionLines = [];
+    while (wi < window.length && sectionLines.length < 3 &&
+           window[wi].length < 100 && !looksLikeQueryStart(window[wi])) {
+      sectionLines.push(window[wi]); wi++;
+    }
+    const section = sectionLines.join(' – ').trim();
+
+    // RFP clause text: factual, until query starts
+    const rfpLines = [];
+    while (wi < window.length && !looksLikeQueryStart(window[wi])) {
+      rfpLines.push(window[wi]); wi++;
+    }
+    const rfpClauseText = rfpLines.join(' ').trim();
+
+    // Query: remainder
+    const queryLines = [];
+    while (wi < window.length) { queryLines.push(window[wi]); wi++; }
+    const query = queryLines.join(' ').trim();
+
+    if (query.length > 10) {
+      rows.push({ serial, bidder, page, section, rfpClauseText, query });
+    }
+    i = j - 1;
+  }
+  return rows;
+}
+
+function parseCorrigendumTable(text) {
+  const items = [];
+  // Find the corrigendum / revised evaluation section
+  const corrigIdx = text.search(/REVISED\s+TECHNICAL\s+EVALUATION|B\.\s+REVISED\s+TECHNICAL|CORRIGENDUM\s+NO|Code\s+Criteria\s+Marks/i);
+  if (corrigIdx === -1) return items;
+
+  // Extract just the corrigendum section — stop at any new page header or
+  // "Note:" block which signals the end of the table
+  let corrigSection = text.substring(corrigIdx);
+  const stopMatch = corrigSection.search(/\nNote:\s+Method|TOTAL\s+\n?\s*100|^Saharanpur\s+Development/im);
+  if (stopMatch > 0) corrigSection = corrigSection.substring(0, stopMatch + 200); // include TOTAL line
+
+  const lines = corrigSection.split('\n').map(l => l.trim()).filter(Boolean);
+
+  // Criteria codes: A1, A2, A3, A4, A4(a), A4(b), A4a, A4b, B, C
+  const codeRe = /^(A\d+[a-z]?(?:\([a-z]\))?|B|C)\s+(.*)/i;
+  // Stop-words that signal end of corrigendum table proper
+  const stopRe = /^(TOTAL|Note:|Method\s+of|Final\s+Score|Minimum\s+Technical)/i;
+
+  let i = 0;
+  while (i < lines.length) {
+    if (stopRe.test(lines[i])) break;
+
+    const m = lines[i].match(codeRe);
+    if (m) {
+      const code = m[1].toUpperCase().replace(/\(([A-Z])\)/i, (_, c) => c.toLowerCase()); // normalise A4(a)→A4a
+      const bodyLines = [m[2]];
+      let j = i + 1;
+      // Collect continuation lines until next code or stop-word
+      while (j < lines.length && !codeRe.test(lines[j]) && !stopRe.test(lines[j])) {
+        bodyLines.push(lines[j]);
+        j++;
+      }
+      const full = bodyLines.join(' ').replace(/\s+/g, ' ').trim();
+      // Extract trailing marks number (e.g. "... 15" at the end)
+      const marksMatch = full.match(/\s(\d{1,3})\s*$/);
+      const marks = marksMatch ? marksMatch[1] : '';
+      const corrigendum = full.replace(/\s\d{1,3}\s*$/, '').trim();
+
+      // Map code to a readable clause label
+      const codeLabels = {
+        'A1': 'Section 3.2 – Criteria A1',
+        'A2': 'Section 3.2 – Criteria A2',
+        'A3': 'Section 3.2 – Criteria A3',
+        'A4': 'Section 3.2 – Criteria A4',
+        'A4a': 'Section 3.2 – Criteria A4(a) – UP-Specific Experience',
+        'A4b': 'Section 3.2 – Criteria A4(b) – All-India Experience',
+        'B':   'Section 3.2 – Criteria B – Team CVs',
+        'C':   'Section 3.2 – Criteria C – Technical Presentation',
+      };
+      const clauseLabel = codeLabels[code] || `Section 3.2 – Criteria ${code}`;
+      items.push({
+        srNo: code,
+        clause: clauseLabel,
+        corrigendum: corrigendum + (marks ? ` [Marks: ${marks}]` : '')
+      });
+      i = j;
+    } else {
+      i++;
+    }
+  }
+  return items;
+}
+
+function fallbackParseQueries(text) {
+  let blocks = text.split(/\n(?=\s*(?:\d{1,3}[\.\)]\s|Query\s*\d|Q\d+[:.)]|S\.?No\.?\s*\d))/i);
+  blocks = blocks.map(b => b.trim()).filter(b => b.length > 15);
+  if (blocks.length <= 1) blocks = text.split(/\n\s*\n/).map(b => b.trim()).filter(b => b.length > 15);
+  blocks.forEach(block => {
+    let clauseRef = '';
+    const cm = block.match(/((?:Clause|Section|Page|Point|Sr\.?\s*No\.?|S\.?No\.?)[^\n]{0,60})/i);
+    if (cm) clauseRef = cm[1].trim();
+    const queryText = block.replace(/^\s*(?:\d{1,3}[\.\)]\s*|Query\s*\d+[:.)]?\s*|Q\d+[:.)]|S\.?No\.?\s*\d+[:.)]?\s*)/i,'').trim();
+    addQueryRow({ clause:clauseRef, rfpClause:findClauseText(clauseRef), query:queryText, responseType:'', responseText:'' });
+  });
+  renderQueryTable();
+}
+
+
+// ---------- QUERY TABLE ----------
+function addQueryRow(prefill) {
+  rowCounter++;
+  queryRows.push(Object.assign({
+    id: rowCounter,
+    bidder: '',
+    clause: '',
+    rfpClause: '',
+    query: '',
+    responseType: '',
+    responseText: ''
+  }, prefill || {}));
+  renderQueryTable();
+}
+
+function removeQueryRow(id) {
+  // also remove any linked corrigendum row
+  corrigRows = corrigRows.filter(c => c.sourceQueryId !== id);
+  queryRows = queryRows.filter(r => r.id !== id);
+  renderQueryTable();
+  renderCorrigTable();
+}
+
+function updateQueryField(id, field, value) {
+  const row = queryRows.find(r => r.id === id);
+  if (!row) return;
+  row[field] = value;
+
+  if (field === 'responseType') {
+    if (value === 'Refer Corrigendum 1') {
+      // create / update linked corrigendum row
+      let cr = corrigRows.find(c => c.sourceQueryId === id);
+      if (!cr) {
+        // CRITICAL: use verbatim rfpClause (from Tender PDF) as the clause in corrigendum
+        cr = { id: ++rowCounter, srNo: corrigRows.length + 1, clause: row.rfpClause || row.clause, corrigendum: '', sourceQueryId: id };
+        corrigRows.push(cr);
+      } else {
+        // Already exists — re-sync clause in case rfpClause was updated since last time
+        cr.clause = row.rfpClause || row.clause;
+      }
+      renderCorrigTable();
+    } else {
+      // remove linked corrigendum row if no longer referred
+      corrigRows = corrigRows.filter(c => c.sourceQueryId !== id);
+      renderCorrigTable();
+    }
+    renderQueryTable();
+  }
+
+  // CRITICAL: if rfpClause is edited and this row is linked to a corrigendum,
+  // keep the corrigendum clause in sync with the verbatim tender text
+  if (field === 'rfpClause') {
+    const linkedCorrig = corrigRows.find(c => c.sourceQueryId === id);
+    if (linkedCorrig) {
+      linkedCorrig.clause = value;
+      renderCorrigTable();
+    }
+  }
+}
+
+// ── CLAUSE SEARCH MODAL ─────────────────────────────────────────
+let modalTargetRowId = null;
+
+function openClauseSearch(rowId) {
+  modalTargetRowId = rowId;
+  const row = queryRows.find(r => r.id === rowId);
+  if (!row) return;
+
+  if (!clauseSegments.length) {
+    document.getElementById('cmBody').innerHTML = `
+      <div class="cm-no-tender">
+        <div style="font-size:36px;margin-bottom:12px">📄</div>
+        <strong>No tender PDF indexed yet.</strong><br>
+        Upload the Tender PDF in Step 1 first, then use Search Clauses to find matches.
+      </div>`;
+    document.getElementById('cmQueryBox').textContent = '';
+    document.getElementById('clauseModal').classList.add('open');
+    return;
+  }
+
+  // Seed search: prefer existing clause ref, then fall back to the bidder's query text
+  const seedClause = (row.clause || '').trim();
+  const seedQuery  = (row.query  || '').trim();
+  // Show the bidder query in the context box so user knows what they are searching for
+  document.getElementById('cmQueryBox').textContent = seedQuery || '(no query text yet)';
+  // Pre-fill search box: clause ref if already typed, otherwise the query keywords
+  const searchSeed = seedClause || seedQuery;
+  document.getElementById('cmSearchInput').value = searchSeed;
+  document.getElementById('clauseModal').classList.add('open');
+  runClauseSearch(searchSeed);
+}
+
+function runClauseSearch(queryText) {
+  const body = document.getElementById('cmBody');
+  if (!queryText.trim()) {
+    body.innerHTML = '<div class="cm-no-tender">Type a search term above to find matching clauses.</div>';
+    return;
+  }
+  const results = searchClauses(queryText, 6);
+  _lastSearchResults = results;
+  if (!results.length) {
+    body.innerHTML = '<div class="cm-no-tender">No matching clauses found. Try different keywords.</div>';
+    return;
+  }
+
+  body.innerHTML = '';
+  const container = document.createElement('div');
+  container.className = 'cm-results';
+
+  results.forEach((r, i) => {
+    const pct = Math.round(r.score * 100);
+    const confClass = pct >= 55 ? 'high' : pct >= 30 ? 'medium' : 'low';
+    const confLabel = pct >= 55 ? 'Strong match' : pct >= 30 ? 'Possible match' : 'Weak match';
+
+    const clauseRefParts = [];
+    if (r.ref) clauseRefParts.push(r.ref.match(/^\d/) ? 'Section ' + r.ref : r.ref);
+    if (r.heading) clauseRefParts.push(r.heading);
+    if (r.page) clauseRefParts.push('Page ' + r.page);
+    const clausePreview = clauseRefParts.join(', ');
+
+    const hasSubClauses = r.subClauses && r.subClauses.length > 0;
+
+    // Section-level card
+    const card = document.createElement('div');
+    card.className = 'cm-result';
+    card.dataset.idx = i;
+
+    // Sub-clause rows HTML (built if available)
+    let subClauseHTML = '';
+    if (hasSubClauses) {
+      const subRows = r.subClauses.map((sc, si) => {
+        return '<div class="sub-clause-row" data-section-idx="' + i + '" data-sub-idx="' + si + '" ' +
+          'style="display:flex;align-items:flex-start;gap:8px;padding:7px 10px;border-radius:6px;border:1px solid #E0E6F0;background:#fff;cursor:pointer;" ' +
+          'onclick="event.stopPropagation();selectSubClause(' + i + ',' + si + ',this)">' +
+          '<span style="flex-shrink:0;font-weight:700;font-size:12px;background:#0B1F3A;color:#E8BB4A;border-radius:4px;padding:2px 7px;min-width:28px;text-align:center;">' + esc(sc.key) + '</span>' +
+          '<div style="flex:1;min-width:0;">' +
+            '<div style="font-size:12px;font-weight:600;color:#0B1F3A;margin-bottom:2px;">' + esc(sc.label) + '</div>' +
+            '<div style="font-size:11.5px;color:#3A4A5C;line-height:1.5;">' + highlightTerms(sc.text, r.qTokens) + '</div>' +
+          '</div>' +
+          '<span style="flex-shrink:0;font-size:10px;background:#E8F5E9;color:#2E7D32;border-radius:4px;padding:2px 6px;font-weight:600;">Select</span>' +
+          '</div>';
+      }).join('');
+      subClauseHTML =
+        '<div style="border-top:1px solid #E8EDF4;background:#F9FAFB;padding:8px 12px;">' +
+          '<div style="font-size:11px;font-weight:700;color:#5B6478;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">📋 Select individual sub-clause to apply exact text:</div>' +
+          '<div class="sub-clause-list" style="display:flex;flex-direction:column;gap:4px;">' + subRows + '</div>' +
+        '</div>';
+    }
+
+    card.innerHTML = `
+      <div class="cm-result-head" style="cursor:pointer;" onclick="event.stopPropagation();selectSectionClause(${i},this.closest('.cm-result'))">
+        ${r.ref ? `<span class="cm-clause-ref">${esc(r.ref)}</span>` : ''}
+        ${r.heading ? `<span style="font-size:12px;font-weight:600;color:#1A1F2E;">${esc(r.heading)}</span>` : ''}
+        <span class="cm-confidence ${confClass}" style="margin-left:auto">${confLabel} · ${pct}%</span>
+      </div>
+      <div class="cm-result-body">
+        <div class="cm-page-tag" style="display:flex;gap:12px;align-items:baseline;margin-bottom:6px;flex-wrap:wrap;">
+          <span>📄 Page ${r.page}</span>
+          ${clausePreview ? `<span style="font-size:11px;background:#EEF4FC;color:#1A5CA8;padding:2px 7px;border-radius:4px;font-weight:600;">→ fills: ${esc(clausePreview)}</span>` : ''}
+        </div>
+        ${hasSubClauses
+          ? `<div style="font-size:12px;color:#5B6478;font-style:italic;">↓ Pick a specific sub-clause below — or click the header bar to select the whole section.</div>`
+          : `<div style="white-space:pre-wrap;line-height:1.6;font-size:12px;">${highlightTerms(r.text, r.qTokens)}</div>`
+        }
+      </div>
+      ${subClauseHTML}`;
+
+    // If no sub-clauses, clicking the whole card selects the section
+    if (!hasSubClauses) {
+      card.addEventListener('click', () => selectSectionClause(i, card));
+    }
+
+    container.appendChild(card);
+  });
+
+  body.appendChild(container);
+}
+
+// Store search results for reference in selectSubClause/selectSectionClause
+let _lastSearchResults = [];
+
+function selectSectionClause(resultIdx, cardEl) {
+  // Select the whole section (no sub-clause drill-in)
+  document.querySelectorAll('.cm-result').forEach(c => {
+    c.classList.remove('selected');
+    c.querySelectorAll('.sub-clause-row.sub-selected').forEach(s => {
+      s.classList.remove('sub-selected');
+      s.style.background = '#fff'; s.style.borderColor = '#E0E6F0';
+    });
+  });
+  cardEl.classList.add('selected');
+  const r = _lastSearchResults[resultIdx];
+  if (!r) return;
+  const btn = document.getElementById('cmApplyBtn');
+  btn.dataset.text = r.text;
+  btn.dataset.ref = r.ref || '';
+  btn.dataset.page = r.page;
+  btn.dataset.heading = r.heading || '';
+  btn.disabled = false;
+}
+
+function selectSubClause(resultIdx, subIdx, rowEl) {
+  // Deselect everything first
+  document.querySelectorAll('.cm-result').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.sub-clause-row.sub-selected').forEach(s => {
+    s.classList.remove('sub-selected');
+    s.style.background = '#fff'; s.style.borderColor = '#E0E6F0';
+  });
+
+  rowEl.classList.add('sub-selected');
+  rowEl.style.background = '#EEF4FC';
+  rowEl.style.borderColor = '#1A5CA8';
+  rowEl.closest('.cm-result').classList.add('selected');
+
+  const r = _lastSearchResults[resultIdx];
+  if (!r || !r.subClauses) return;
+  const sc = r.subClauses[subIdx];
+  if (!sc) return;
+
+  // Build the clause ref: "Section 3.1, Eligibility Criteria (iii), Page N"
+  const refParts = [];
+  if (r.ref) refParts.push(r.ref.match(/^\d/) ? 'Section ' + r.ref : r.ref);
+  if (r.heading) refParts.push(r.heading);
+  if (sc.key) refParts.push('(' + sc.key + ')');
+  if (r.page) refParts.push('Page ' + r.page);
+
+  const btn = document.getElementById('cmApplyBtn');
+  btn.dataset.text = sc.text;           // verbatim sub-clause text → Clause in RFP
+  btn.dataset.ref = r.ref || '';
+  btn.dataset.page = r.page;
+  btn.dataset.heading = (r.heading ? r.heading + ' (' + sc.key + ')' : sc.key);
+  btn.dataset.clauseref = refParts.join(', '); // override full clause ref
+  btn.disabled = false;
+}
+
+function applyClauseResult() {
+  const btn = document.getElementById('cmApplyBtn');
+  const text    = btn.dataset.text    || '';
+  const ref     = btn.dataset.ref     || '';
+  const page    = btn.dataset.page    || '';
+  const heading = btn.dataset.heading || '';
+  // clauseref is pre-built for sub-clause selections; build it for section-level
+  const clauseref = btn.dataset.clauseref || '';
+  if (!text || modalTargetRowId == null) return;
+
+  const row = queryRows.find(r => r.id === modalTargetRowId);
+  if (row) {
+    if (clauseref) {
+      // Sub-clause was selected — use the pre-built ref string directly
+      row.clause = clauseref;
+    } else {
+      // Whole section selected — build ref from parts
+      const parts = [];
+      if (ref) parts.push(ref.match(/^\d/) ? 'Section ' + ref : ref);
+      if (heading) parts.push(heading);
+      if (page) parts.push('Page ' + page);
+      row.clause = parts.join(', ');
+    }
+    // Clause in RFP → full verbatim text (sub-clause or full section)
+    row.rfpClause = text;
+    // CRITICAL: if this row is already linked to a corrigendum entry,
+    // sync the verbatim clause text into that corrigendum row too
+    const linkedCorrig = corrigRows.find(c => c.sourceQueryId === row.id);
+    if (linkedCorrig) {
+      linkedCorrig.clause = text;
+      renderCorrigTable();
+    }
+    renderQueryTable();
+  }
+  closeClauseModal();
+}
+
+function closeClauseModal() {
+  document.getElementById('clauseModal').classList.remove('open');
+  modalTargetRowId = null;
+  const btn = document.getElementById('cmApplyBtn');
+  btn.disabled = true;
+  btn.dataset.text = '';
+  btn.dataset.ref = '';
+  btn.dataset.page = '';
+  btn.dataset.heading = '';
+  btn.dataset.clauseref = '';
+}
+
+// ── QUERY TABLE ──────────────────────────────────────────────────
+let expandedRowId = null;
+
+function toggleExpandRow(id) {
+  expandedRowId = (expandedRowId === id) ? null : id;
+  renderQueryTable();
+  // Scroll the expanded row into view
+  if (expandedRowId !== null) {
+    setTimeout(() => {
+      const el = document.querySelector(`tr[data-rowid="${id}"]`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 50);
+  }
+}
+
+function findClauseForRow(id) {
+  openClauseSearch(id);
+}
+
+function renderQueryTable() {
+  const body = document.getElementById('queryBody');
+  body.innerHTML = '';
+  queryRows.forEach((row, i) => {
+    row.num = i + 1;
+    const isExpanded = expandedRowId === row.id;
+    const tr = document.createElement('tr');
+    tr.dataset.rowid = row.id;
+    tr.style.cssText = isExpanded
+      ? 'background:#F0F6FF;outline:2px solid #1A5CA8;outline-offset:-1px;cursor:pointer;'
+      : 'cursor:pointer;';
+    tr.title = isExpanded ? 'Click to collapse' : 'Click row to expand';
+
+    // textareas: collapsed=3 rows, expanded=auto (fit content)
+    const taStyle = isExpanded
+      ? 'width:100%;border:none;background:transparent;font-family:inherit;font-size:12.5px;padding:4px;resize:none;height:auto;min-height:60px;'
+      : 'width:100%;border:none;background:transparent;font-family:inherit;font-size:12.5px;padding:4px;resize:none;height:60px;overflow:hidden;';
+
+    const expandIcon = isExpanded ? '▲' : '▼';
+
+    tr.innerHTML = `
+      <td class="col-num" style="vertical-align:top;padding-top:10px;">
+        <div style="font-weight:600;">${row.num}</div>
+        <div style="font-size:10px;color:#9AA5B8;margin-top:4px;">${expandIcon}</div>
+      </td>
+      <td style="font-size:11px;color:#1A3A5C;font-weight:600;vertical-align:top;padding-top:8px;">${esc(row.bidder||'')}</td>
+      <td>
+        <textarea style="${taStyle}" oninput="updateQueryField(${row.id},'clause',this.value)" onclick="event.stopPropagation()">${esc(row.clause)}</textarea>
+        <button style="margin-top:4px;font-size:10px;padding:3px 6px;" class="secondary" onclick="event.stopPropagation();findClauseForRow(${row.id})">🔍 Search Clauses</button>
+      </td>
+      <td><textarea style="${taStyle}" oninput="updateQueryField(${row.id},'rfpClause',this.value)" onclick="event.stopPropagation()">${esc(row.rfpClause)}</textarea></td>
+      <td><textarea style="${taStyle}" oninput="updateQueryField(${row.id},'query',this.value)" onclick="event.stopPropagation()">${esc(row.query)}</textarea></td>
+      <td onclick="event.stopPropagation()">
+        <select onchange="updateQueryField(${row.id},'responseType',this.value)">
+          <option value="" ${row.responseType===''?'selected':''}>-- Select --</option>
+          <option value="Tender conditions prevail" ${row.responseType==='Tender conditions prevail'?'selected':''}>Tender Conditions Prevail</option>
+          <option value="Refer Corrigendum 1" ${row.responseType==='Refer Corrigendum 1'?'selected':''}>Refer Corrigendum 1</option>
+          <option value="Response" ${row.responseType==='Response'?'selected':''}>Response (type below)</option>
+        </select>
+        ${row.responseType==='Response' ? `<textarea style="${taStyle}" placeholder="Type response..." oninput="updateQueryField(${row.id},'responseText',this.value)">${esc(row.responseText)}</textarea>` : ''}
+        ${row.responseType==='Refer Corrigendum 1' ? `<div style="font-size:11px;color:#1A5CA8;margin-top:4px;">↪ Sent to Corrigendum table (Step 4)</div>` : ''}
+      </td>
+      <td class="col-action" onclick="event.stopPropagation()">
+        <button class="danger" style="font-size:11px;padding:4px 6px;" onclick="removeQueryRow(${row.id})">✕</button>
+      </td>
+    `;
+
+    // Click anywhere on row toggles expand (textareas/buttons stop propagation)
+    tr.addEventListener('click', () => toggleExpandRow(row.id));
+
+    // After inserting, auto-size expanded textareas to fit their content
+    if (isExpanded) {
+      setTimeout(() => {
+        tr.querySelectorAll('textarea').forEach(ta => {
+          ta.style.height = 'auto';
+          ta.style.height = Math.max(ta.scrollHeight, 80) + 'px';
+        });
+      }, 0);
+    }
+
+    body.appendChild(tr);
+  });
+  document.getElementById('qCount').textContent = queryRows.length + ' queries';
+  document.getElementById('queryEmpty').style.display = queryRows.length ? 'none' : 'block';
+}
+
+// ---------- CORRIGENDUM TABLE ----------
+function addCorrigRow() {
+  rowCounter++;
+  corrigRows.push({ id: rowCounter, srNo: corrigRows.length + 1, clause: '', corrigendum: '', sourceQueryId: null });
+  renderCorrigTable();
+}
+
+function removeCorrigRow(id) {
+  const cr = corrigRows.find(c => c.id === id);
+  // If linked to a query, revert that query's response type
+  if (cr && cr.sourceQueryId) {
+    const qr = queryRows.find(r => r.id === cr.sourceQueryId);
+    if (qr) { qr.responseType = ''; }
+  }
+  corrigRows = corrigRows.filter(c => c.id !== id);
+  renderCorrigTable();
+  renderQueryTable();
+}
+
+function updateCorrigField(id, field, value) {
+  const row = corrigRows.find(c => c.id === id);
+  if (!row) return;
+  row[field] = value;
+}
+
+function renderCorrigTable() {
+  const body = document.getElementById('corrigBody');
+  body.innerHTML = '';
+  corrigRows.forEach((row, i) => {
+    row.srNo = i + 1;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="col-num">${row.srNo}</td>
+      <td><textarea rows="3" oninput="updateCorrigField(${row.id},'clause',this.value)">${esc(row.clause)}</textarea></td>
+      <td><textarea rows="3" placeholder="Enter the revised / corrigendum text" oninput="updateCorrigField(${row.id},'corrigendum',this.value)">${esc(row.corrigendum)}</textarea></td>
+      <td class="col-action"><button class="danger" style="font-size:11px;padding:4px 6px;" onclick="removeCorrigRow(${row.id})">✕</button></td>
+    `;
+    body.appendChild(tr);
+  });
+  document.getElementById('cCount').textContent = corrigRows.length + ' items';
+  document.getElementById('corrigEmpty').style.display = corrigRows.length ? 'none' : 'block';
+}
+
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ---------- EXPORT ----------
+// Uses ExcelJS (loaded dynamically) for full style support:
+// borders, fill, wrap text, font size, alignment — all render correctly in Excel/LibreOffice.
+async function exportExcel() {
+  const authority   = document.getElementById('authorityName').value || '';
+  const tenderId    = document.getElementById('tenderId').value  || '';
+  const rfpTitle    = document.getElementById('rfpTitle').value  || '';
+  const corrigTitle = document.getElementById('corrigTitle').value ||
+                      (rfpTitle + ' Corrigendum/ Addendum (No.1)');
+
+  // Dynamically load ExcelJS from CDN if not already loaded
+  if (!window.ExcelJS) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Pre-Bid Tool';
+
+  // ── Shared styles ─────────────────────────────────────────────
+  // Header fill: dark navy blue matching reference file
+  const HDR_FILL   = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF1F3864' } };
+  const HDR_FONT   = { name:'Calibri', size:11, bold:true, color:{ argb:'FFFFFFFF' } };
+  const DATA_FONT  = { name:'Calibri', size:11 };
+  const TITLE_FONT = { name:'Calibri', size:12 };
+  const THIN = { style:'thin', color:{ argb:'FF000000' } };
+  const ALL_BORDERS = { top:THIN, left:THIN, bottom:THIN, right:THIN };
+  const WRAP_TOP    = { wrapText:true, vertical:'top' };
+  const WRAP_CENTER = { wrapText:true, vertical:'middle', horizontal:'center' };
+  const CENTER_TOP  = { wrapText:true, vertical:'top', horizontal:'center' };
+
+  function applyHdr(cell, value) {
+    cell.value = value;
+    cell.font  = HDR_FONT;
+    cell.fill  = HDR_FILL;
+    cell.alignment = WRAP_CENTER;
+    cell.border = ALL_BORDERS;
+  }
+
+  function applyData(cell, value, align) {
+    cell.value = value || '';
+    cell.font  = DATA_FONT;
+    cell.alignment = align || WRAP_TOP;
+    cell.border = ALL_BORDERS;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // SHEET 1 — Response to pre-bid queries
+  // ═══════════════════════════════════════════════════════════════
+  const ws1 = workbook.addWorksheet('Response to pre-bid queries');
+
+  // Column widths (character units)
+  ws1.columns = [
+    { key:'a', width: 2.8  },   // A unused
+    { key:'b', width: 6.7  },   // B  #
+    { key:'c', width: 22.3 },   // C  Page & Clause No.
+    { key:'d', width: 51.6 },   // D  Clause in RFP
+    { key:'e', width: 63.3 },   // E  Queries
+    { key:'f', width: 26.5 }    // F  Response
+  ];
+
+  // Row 1 — blank spacer
+  ws1.getRow(1).height = 6;
+
+  // Row 2 — Title (merged B2:F2)
+  const titleVal = 'PRE-BID POINTS\nTender ID: ' + tenderId + '\n' + rfpTitle;
+  ws1.mergeCells('B2:F2');
+  const titleCell = ws1.getCell('B2');
+  titleCell.value = titleVal;
+  titleCell.font  = { name:'Calibri', size:12 };
+  titleCell.alignment = { wrapText:true, vertical:'top', horizontal:'left' };
+  ws1.getRow(2).height = 88;
+
+  // Row 3 — spacer
+  ws1.getRow(3).height = 15;
+
+  // Row 4 — Headers
+  const respHeader = authority ? authority + "'s Response" : 'Response';
+  applyHdr(ws1.getCell('B4'), '#');
+  applyHdr(ws1.getCell('C4'), 'Page and Clause No.');
+  applyHdr(ws1.getCell('D4'), 'Clause in RFP');
+  applyHdr(ws1.getCell('E4'), 'Queries / Points of Clarification');
+  applyHdr(ws1.getCell('F4'), respHeader);
+  ws1.getRow(4).height = 22.25;
+
+  // Data rows
+  queryRows.forEach((r, i) => {
+    const rowNum = 5 + i;
+    const resp = r.responseType === 'Response' ? (r.responseText || '') : (r.responseType || '');
+    applyData(ws1.getCell('B' + rowNum), String(r.num || i+1), CENTER_TOP);
+    applyData(ws1.getCell('C' + rowNum), r.clause   || '');
+    applyData(ws1.getCell('D' + rowNum), r.rfpClause|| '');
+    applyData(ws1.getCell('E' + rowNum), r.query    || '');
+    applyData(ws1.getCell('F' + rowNum), resp);
+    ws1.getRow(rowNum).height = 80;
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // SHEET 2 — Corrigendum No. 1
+  // ═══════════════════════════════════════════════════════════════
+  const ws2 = workbook.addWorksheet('Corrigendum No. 1');
+
+  ws2.columns = [
+    { key:'a', width: 5.3  },   // A  Sr. No.
+    { key:'b', width: 62.0 },   // B  Clause in RFP
+    { key:'c', width: 60.9 }    // C  Corrigendum
+  ];
+
+  // Row 1 — Authority name (merged A1:C1)
+  ws2.mergeCells('A1:C1');
+  const auth1 = ws2.getCell('A1');
+  auth1.value = authority;
+  auth1.font  = { name:'Calibri', size:13, bold:true };
+  auth1.alignment = { horizontal:'center', vertical:'middle', wrapText:true };
+  ws2.getRow(1).height = 24;
+
+  // Row 2 — Corrigendum title (merged A2:C2)
+  ws2.mergeCells('A2:C2');
+  const corrig2 = ws2.getCell('A2');
+  corrig2.value = corrigTitle || (rfpTitle + ' Corrigendum/ Addendum (No.1)');
+  corrig2.font  = { name:'Calibri', size:13, bold:true };
+  corrig2.alignment = { horizontal:'center', vertical:'middle', wrapText:true };
+  ws2.getRow(2).height = 36;
+
+  // Row 3 — "may be read with following modifications" (merged A3:C3)
+  ws2.mergeCells('A3:C3');
+  const mod3 = ws2.getCell('A3');
+  mod3.value = rfpTitle + ',\n may be read with the following modifications';
+  mod3.font  = { name:'Calibri', size:11 };
+  mod3.alignment = { horizontal:'center', vertical:'middle', wrapText:true };
+  ws2.getRow(3).height = 37.5;
+
+  // Row 4 — Headers
+  applyHdr(ws2.getCell('A4'), 'Sr.\nNo.');
+  applyHdr(ws2.getCell('B4'), 'Clause in RFP');
+  applyHdr(ws2.getCell('C4'), 'Corrigendum/ Addendum');
+  ws2.getRow(4).height = 34;
+
+  // Data rows
+  corrigRows.forEach((r, i) => {
+    const rowNum = 5 + i;
+    applyData(ws2.getCell('A' + rowNum), String(r.srNo || i+1), CENTER_TOP);
+    applyData(ws2.getCell('B' + rowNum), r.clause      || '');
+    applyData(ws2.getCell('C' + rowNum), r.corrigendum || '');
+    ws2.getRow(rowNum).height = 80;
+  });
+
+  // ── Download ──────────────────────────────────────────────────
+  const today = new Date();
+  const dd = String(today.getDate()).padStart(2,'0');
+  const mm = String(today.getMonth()+1).padStart(2,'0');
+  const yy = String(today.getFullYear()).slice(-2);
+  const fileName = yy + mm + dd + '_Corrigendum_1_Response_Prebid_queries.xlsx';
+
+  const buf  = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = fileName; a.click();
+  URL.revokeObjectURL(url);
+
+  document.getElementById('exportStatus').innerHTML =
+    '<div class="status ok">✓ Downloaded: ' + fileName + '</div>';
+}
+
+// ---------- SAVE / LOAD PROGRESS ----------
+function saveProgress() {
+  const data = {
+    authorityName: document.getElementById('authorityName').value,
+    tenderId: document.getElementById('tenderId').value,
+    rfpTitle: document.getElementById('rfpTitle').value,
+    corrigTitle: document.getElementById('corrigTitle').value,
+    queryRows, corrigRows, rowCounter
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'prebid-progress.json';
+  a.click();
+}
+
+function loadProgress(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      document.getElementById('authorityName').value = data.authorityName || '';
+      document.getElementById('tenderId').value = data.tenderId || '';
+      document.getElementById('rfpTitle').value = data.rfpTitle || '';
+      document.getElementById('corrigTitle').value = data.corrigTitle || '';
+      queryRows = data.queryRows || [];
+      corrigRows = data.corrigRows || [];
+      rowCounter = data.rowCounter || 0;
+      renderQueryTable();
+      renderCorrigTable();
+      document.getElementById('exportStatus').innerHTML = '<div class="status ok">Progress loaded.</div>';
+    } catch(err) {
+      document.getElementById('exportStatus').innerHTML = '<div class="status err">Invalid file.</div>';
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  AUTHORITY INTELLIGENCE REGISTRY
+//  Seed known authorities; learn new ones from every confirmed use
+// ═══════════════════════════════════════════════════════════════
+
+const REGISTRY_KEY = 'prebid_authority_registry_v1';
+
+// Seed data — grows automatically as users confirm new entries
+const SEED_REGISTRY = [
+  {
+    client: 'Saharanpur Development Authority',
+    abbr: 'SDA',
+    state: 'Uttar Pradesh',
+    type: 'Development Authority',
+    knownRfps: [
+      'Request for Proposal (RFP) for Appointment of Planning, Monitoring & Operational Efficiency Consultant'
+    ]
+  },
+  { client: 'Bulandshahr Khurja Development Authority', abbr: 'BKDA', state: 'Uttar Pradesh', type: 'Development Authority', knownRfps: [] },
+  { client: 'Agra Development Authority', abbr: 'ADA', state: 'Uttar Pradesh', type: 'Development Authority', knownRfps: [] },
+  { client: 'Lucknow Development Authority', abbr: 'LDA', state: 'Uttar Pradesh', type: 'Development Authority', knownRfps: [] },
+  { client: 'Meerut Development Authority', abbr: 'MDA', state: 'Uttar Pradesh', type: 'Development Authority', knownRfps: [] },
+  { client: 'Varanasi Development Authority', abbr: 'VDA', state: 'Uttar Pradesh', type: 'Development Authority', knownRfps: [] },
+  { client: 'Allahabad Development Authority', abbr: 'ADA', state: 'Uttar Pradesh', type: 'Development Authority', knownRfps: [] },
+  { client: 'Kanpur Development Authority', abbr: 'KDA', state: 'Uttar Pradesh', type: 'Development Authority', knownRfps: [] },
+  { client: 'Greater Noida Industrial Development Authority', abbr: 'GNIDA', state: 'Uttar Pradesh', type: 'Development Authority', knownRfps: [] },
+  { client: 'Yamuna Expressway Industrial Development Authority', abbr: 'YEIDA', state: 'Uttar Pradesh', type: 'Development Authority', knownRfps: [] },
+  { client: 'Delhi Development Authority', abbr: 'DDA', state: 'Delhi', type: 'Development Authority', knownRfps: [] },
+  { client: 'Mumbai Metropolitan Region Development Authority', abbr: 'MMRDA', state: 'Maharashtra', type: 'Development Authority', knownRfps: [] },
+  { client: 'Pune Metropolitan Region Development Authority', abbr: 'PMRDA', state: 'Maharashtra', type: 'Development Authority', knownRfps: [] },
+  { client: 'Chennai Metropolitan Development Authority', abbr: 'CMDA', state: 'Tamil Nadu', type: 'Development Authority', knownRfps: [] },
+  { client: 'Bangalore Development Authority', abbr: 'BDA', state: 'Karnataka', type: 'Development Authority', knownRfps: [] },
+  { client: 'Hyderabad Metropolitan Development Authority', abbr: 'HMDA', state: 'Telangana', type: 'Development Authority', knownRfps: [] },
+  { client: 'Jaipur Development Authority', abbr: 'JDA', state: 'Rajasthan', type: 'Development Authority', knownRfps: [] },
+  { client: 'Ahmedabad Urban Development Authority', abbr: 'AUDA', state: 'Gujarat', type: 'Development Authority', knownRfps: [] },
+  { client: 'Central Public Works Department', abbr: 'CPWD', state: 'Central', type: 'Government Department', knownRfps: [] },
+  { client: 'National Highways Authority of India', abbr: 'NHAI', state: 'Central', type: 'National Authority', knownRfps: [] },
+  { client: 'National Buildings Construction Corporation', abbr: 'NBCC', state: 'Central', type: 'PSU', knownRfps: [] },
+  { client: 'Housing and Urban Development Corporation', abbr: 'HUDCO', state: 'Central', type: 'PSU', knownRfps: [] },
+];
+
+function loadRegistry() {
+  try {
+    const raw = localStorage.getItem(REGISTRY_KEY);
+    if (!raw) return SEED_REGISTRY.map(e => ({...e}));
+    const saved = JSON.parse(raw);
+    // Merge: seed entries not in saved get added; saved entries preserved
+    const savedClients = new Set(saved.map(e => normaliseClient(e.client)));
+    const merged = [...saved];
+    for (const seed of SEED_REGISTRY) {
+      if (!savedClients.has(normaliseClient(seed.client))) merged.push({...seed});
+    }
+    return merged;
+  } catch(e) { return SEED_REGISTRY.map(e => ({...e})); }
+}
+
+function saveRegistry(registry) {
+  try { localStorage.setItem(REGISTRY_KEY, JSON.stringify(registry)); } catch(e) {}
+}
+
+function normaliseClient(name) {
+  return (name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+// Fuzzy match: returns best registry entry for a detected client string
+function matchRegistry(detectedClient) {
+  if (!detectedClient) return null;
+  const registry = loadRegistry();
+  const norm = normaliseClient(detectedClient);
+  // 1. Exact match
+  for (const e of registry) {
+    if (normaliseClient(e.client) === norm) return e;
+  }
+  // 2. Abbreviation match (e.g. "SDA" inside detected string)
+  for (const e of registry) {
+    if (e.abbr && norm.includes(e.abbr.toLowerCase())) return e;
+  }
+  // 3. Token overlap score
+  const dTokens = norm.split('');
+  let best = null, bestScore = 0;
+  for (const e of registry) {
+    const eNorm = normaliseClient(e.client);
+    let overlap = 0;
+    for (let i = 0; i < Math.min(norm.length, eNorm.length); i++) {
+      if (norm[i] === eNorm[i]) overlap++;
+    }
+    // also check if detected name contains the authority's key words
+    const eWords = e.client.toLowerCase().split(/\s+/);
+    const dWords = detectedClient.toLowerCase().split(/\s+/);
+    const wordHits = eWords.filter(w => w.length > 3 && dWords.some(d => d.includes(w) || w.includes(d))).length;
+    const score = wordHits / Math.max(eWords.length, 1);
+    if (score > bestScore && score > 0.4) { bestScore = score; best = e; }
+  }
+  return best;
+}
+
+// Learn a new authority from confirmed user input and save to registry
+function learnAuthority(client, rfpTitle, tenderType) {
+  if (!client || client.length < 5) return;
+  const registry = loadRegistry();
+  const norm = normaliseClient(client);
+  const existing = registry.find(e => normaliseClient(e.client) === norm);
+  if (existing) {
+    // Update: add RFP if new
+    if (rfpTitle && !existing.knownRfps.includes(rfpTitle)) {
+      existing.knownRfps.push(rfpTitle);
+    }
+    if (tenderType) existing.lastTenderType = tenderType;
+  } else {
+    // New entry
+    const words = client.split(/\s+/);
+    const abbr = words.filter(w => /^[A-Z]/.test(w) && w.length > 1).map(w => w[0]).join('');
+    registry.unshift({
+      client,
+      abbr: abbr || '',
+      state: '',
+      type: 'Unknown',
+      knownRfps: rfpTitle ? [rfpTitle] : [],
+      lastTenderType: tenderType || ''
+    });
+  }
+  saveRegistry(registry);
+  showRegistrySavedToast(client);
+}
+
+function showRegistrySavedToast(client) {
+  let toast = document.getElementById('registryToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'registryToast';
+    toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#1A3A5C;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2);transition:opacity .4s;';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = `✦ "${client}" saved to registry`;
+  toast.style.opacity = '1';
+  setTimeout(() => { toast.style.opacity = '0'; }, 3000);
+}
+
+// Called when user confirms / edits the authority field — triggers learning
+document.getElementById('authorityName').addEventListener('blur', function() {
+  const client = this.value.trim();
+  const rfpTitle = document.getElementById('rfpTitle').value.trim();
+  const tenderType = document.getElementById('detectedTenderType').textContent.trim();
+  if (client) learnAuthority(client, rfpTitle, tenderType);
+});
+
+// When RFP title is confirmed, update the registry entry too
+document.getElementById('rfpTitle').addEventListener('blur', function() {
+  const client = document.getElementById('authorityName').value.trim();
+  const rfpTitle = this.value.trim();
+  const tenderType = document.getElementById('detectedTenderType').textContent.trim();
+  if (client && rfpTitle) learnAuthority(client, rfpTitle, tenderType);
+});
+
+// Override detectTenderMetadata to also use registry for better client matching
+function detectTenderMetadata(text) {
+  const result = detectTenderMetadataBase(text);
+  // Try to improve client match using registry
+  if (result.client) {
+    const match = matchRegistry(result.client);
+    if (match) {
+      result.client = match.client; // use canonical name from registry
+      result.registryMatch = match;
+    }
+  }
+  return result;
+}
+
+// Patch the upload handler's auto-fill to also suggest known RFPs
+const _origUploadHandler = document.getElementById('tenderPdf').onchange;
+// Extend apply logic in the upload handler to suggest known RFPs from registry
+function applyRegistryRfpSuggestion(match) {
+  if (!match || !match.knownRfps || !match.knownRfps.length) return;
+  const rfpEl = document.getElementById('rfpTitle');
+  if (rfpEl.value.trim()) return; // already filled
+  if (match.knownRfps.length === 1) {
+    rfpEl.value = match.knownRfps[0];
+    rfpEl.style.background = '#FFFDE7';
+  } else {
+    // Show a small suggestion dropdown
+    showRfpSuggestions(match.knownRfps, rfpEl);
+  }
+}
+
+function showRfpSuggestions(rfps, inputEl) {
+  let existing = document.getElementById('rfpSuggestBox');
+  if (existing) existing.remove();
+  const box = document.createElement('div');
+  box.id = 'rfpSuggestBox';
+  box.style.cssText = 'background:#fff;border:1px solid #CBD3E1;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.1);margin-top:4px;z-index:200;';
+  box.innerHTML = '<div style="font-size:11px;color:#5B6478;padding:6px 10px 2px;font-weight:700;">Known RFPs for this authority:</div>';
+  rfps.forEach(rfp => {
+    const opt = document.createElement('div');
+    opt.style.cssText = 'padding:6px 10px;font-size:12px;cursor:pointer;color:#1A1F2E;border-top:1px solid #F0F0F0;';
+    opt.textContent = rfp;
+    opt.onmouseenter = () => opt.style.background = '#EEF4FC';
+    opt.onmouseleave = () => opt.style.background = '';
+    opt.onclick = () => { inputEl.value = rfp; inputEl.style.background = '#FFFDE7'; box.remove(); };
+    box.appendChild(opt);
+  });
+  inputEl.parentNode.appendChild(box);
+  // dismiss on outside click
+  setTimeout(() => document.addEventListener('click', function h(e) {
+    if (!box.contains(e.target) && e.target !== inputEl) { box.remove(); document.removeEventListener('click', h); }
+  }), 100);
+}
+
+// ── Registry Viewer Modal ────────────────────────────────────────
+function openRegistryViewer() {
+  const registry = loadRegistry();
+  const modal = document.getElementById('registryModal');
+  const body = document.getElementById('registryBody');
+  body.innerHTML = '';
+  registry.forEach((e, i) => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td style="font-size:12px;font-weight:600;color:#0B1F3A;">${esc(e.client)}</td>
+      <td style="font-size:12px;text-align:center;">${esc(e.abbr||'—')}</td>
+      <td style="font-size:12px;">${esc(e.state||'—')}</td>
+      <td style="font-size:12px;">${e.knownRfps.length ? e.knownRfps.map(r=>`<div style="border-bottom:1px solid #f0f0f0;padding:2px 0">${esc(r)}</div>`).join('') : '<span style="color:#9AA5B8">—</span>'}</td>
+      <td style="text-align:center;">
+        <button onclick="deleteRegistryEntry(${i})" style="background:none;border:none;color:#E74C3C;cursor:pointer;font-size:13px;">✕</button>
+      </td>`;
+    body.appendChild(row);
+  });
+  modal.style.display = 'flex';
+}
+
+function deleteRegistryEntry(idx) {
+  const registry = loadRegistry();
+  registry.splice(idx, 1);
+  saveRegistry(registry);
+  openRegistryViewer();
+}
+
+function closeRegistryModal() {
+  document.getElementById('registryModal').style.display = 'none';
+}
+
+// init
+renderQueryTable();
+renderCorrigTable();
+</script>
+
+</div><!-- end #mainApp -->
+
+<!-- ── REGISTRY VIEWER MODAL ── -->
+<div id="registryModal" style="display:none;position:fixed;inset:0;background:rgba(11,31,58,.5);z-index:1001;align-items:center;justify-content:center;padding:20px;" class="reg-modal">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:860px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(11,31,58,.28);overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#0B1F3A,#1A3A5C);padding:14px 20px;display:flex;align-items:center;gap:10px;">
+      <span style="font-size:18px">🏛</span>
+      <span style="color:#fff;font-weight:700;font-size:15px;flex:1;">Authority Intelligence Registry</span>
+      <button onclick="closeRegistryModal()" style="background:none;border:none;color:#8FA8C8;font-size:20px;cursor:pointer;line-height:1;">✕</button>
+    </div>
+    <div style="padding:10px 16px;background:#F5F7FA;border-bottom:1px solid #E8EDF4;font-size:12px;color:#5B6478;">
+      Every authority you confirm is saved here and auto-matched on future tender uploads. Edits and new entries persist across sessions.
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:16px;">
+      <table style="width:100%;border-collapse:collapse;font-family:inherit;">
+        <thead>
+          <tr style="background:#F0F4FA;">
+            <th style="text-align:left;padding:8px 10px;font-size:11px;color:#5B6478;font-weight:700;border-bottom:2px solid #CBD3E1;">AUTHORITY NAME</th>
+            <th style="text-align:center;padding:8px 10px;font-size:11px;color:#5B6478;font-weight:700;border-bottom:2px solid #CBD3E1;">ABBR</th>
+            <th style="text-align:left;padding:8px 10px;font-size:11px;color:#5B6478;font-weight:700;border-bottom:2px solid #CBD3E1;">STATE</th>
+            <th style="text-align:left;padding:8px 10px;font-size:11px;color:#5B6478;font-weight:700;border-bottom:2px solid #CBD3E1;">KNOWN RFPs</th>
+            <th style="border-bottom:2px solid #CBD3E1;"></th>
+          </tr>
+        </thead>
+        <tbody id="registryBody"></tbody>
+      </table>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid #E8EDF4;background:#F9FAFB;display:flex;gap:10px;align-items:center;">
+      <span style="font-size:12px;color:#9AA5B8;">Registry is stored locally in your browser and grows with each tender you process.</span>
+      <button onclick="closeRegistryModal()" style="margin-left:auto;padding:7px 18px;font-size:13px;border-radius:6px;cursor:pointer;background:#F5F7FA;color:#5B6478;border:1px solid #CBD3E1;">Close</button>
+    </div>
+  </div>
+</div>
+<div id="clauseModal">
+  <div class="cm-box">
+    <div class="cm-header">
+      <span style="font-size:18px">🔍</span>
+      <span class="cm-header-title">Search Tender Clauses — select to fill Page &amp; Clause No. + Clause in RFP</span>
+      <button class="cm-close" onclick="closeClauseModal()">✕</button>
+    </div>
+    <div style="padding:14px 20px 0; border-bottom:1px solid #E8EDF4;">
+      <div class="cm-query-label">Bidder query context (used to auto-seed search)</div>
+      <div class="cm-query-box" id="cmQueryBox"></div>
+      <div style="display:flex;gap:8px;padding-bottom:12px;">
+        <input id="cmSearchInput" type="text" placeholder="Refine search terms…"
+          style="flex:1;font-size:13px;padding:7px 10px;border:1px solid #CBD3E1;border-radius:6px;font-family:inherit;"
+          oninput="runClauseSearch(this.value)" />
+        <button onclick="runClauseSearch(document.getElementById('cmSearchInput').value)"
+          style="padding:7px 14px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;background:#1A3A5C;color:#fff;border:none;">Search</button>
+      </div>
+    </div>
+    <div class="cm-body" id="cmBody">
+      <div class="cm-no-tender">Results will appear here.</div>
+    </div>
+    <div class="cm-footer">
+      <span style="font-size:12px;color:#5B6478;"><strong>Applying fills:</strong> Page &amp; Clause No. ← clause ref &amp; heading &nbsp;|&nbsp; Clause in RFP ← full text</span>
+      <button id="cmApplyBtn" disabled onclick="applyClauseResult()"
+        style="margin-left:auto;padding:8px 20px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;background:#E8BB4A;color:#0B1F3A;border:none;">
+        ✓ Apply to Row
+      </button>
+      <button onclick="closeClauseModal()"
+        style="padding:8px 14px;font-size:13px;border-radius:6px;cursor:pointer;background:#F5F7FA;color:#5B6478;border:1px solid #CBD3E1;">
+        Cancel
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+function startTool() {
+  document.getElementById('landingPage').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+}
+// Close modal on backdrop click
+document.getElementById('clauseModal').addEventListener('click', function(e) {
+  if (e.target === this) closeClauseModal();
+});
+</script>
+</body>
+</html>
