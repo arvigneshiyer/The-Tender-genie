@@ -178,6 +178,94 @@
   }
   .cm-error { background:#FBE8E6; color:#C0392B; border-radius:6px; padding:10px 14px; font-size:13px; }
 
+  /* ── Procurement Reference Modal ── */
+  #refModal {
+    display: none; position: fixed; inset: 0;
+    background: rgba(11,31,58,0.55);
+    z-index: 1100; align-items: center; justify-content: center; padding: 20px;
+  }
+  #refModal.open { display: flex; }
+  .ref-box {
+    background: #fff; border-radius: 12px; width: 100%; max-width: 820px;
+    max-height: 90vh; display: flex; flex-direction: column;
+    box-shadow: 0 8px 40px rgba(11,31,58,0.28); overflow: hidden;
+  }
+  .ref-header {
+    background: linear-gradient(135deg, #1B4332 0%, #2D6A4F 100%);
+    padding: 14px 20px; display: flex; align-items: center; gap: 10px;
+  }
+  .ref-header-title { color:#fff; font-weight:700; font-size:15px; flex:1; }
+  .ref-source-tabs {
+    display: flex; gap: 6px; padding: 12px 20px 0;
+    border-bottom: 1px solid #E8EDF4; flex-wrap: wrap;
+  }
+  .ref-tab {
+    font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: 6px 6px 0 0;
+    border: 1px solid #CBD3E1; border-bottom: none; cursor: pointer;
+    background: #F5F7FA; color: #5B6478; transition: all .15s;
+  }
+  .ref-tab.active { background: #1B4332; color: #fff; border-color: #1B4332; }
+  .ref-tab:hover:not(.active) { background: #E8F5E9; color: #1B4332; }
+  .ref-search-bar { padding: 12px 20px; border-bottom: 1px solid #E8EDF4; }
+  .ref-search-bar input {
+    width: 100%; padding: 8px 12px; border: 1px solid #CBD3E1; border-radius: 6px;
+    font-family: inherit; font-size: 13px;
+  }
+  .ref-body { padding: 14px 20px; overflow-y: auto; flex: 1; }
+  .ref-rule {
+    border: 1px solid #CBD3E1; border-radius: 8px; margin-bottom: 10px;
+    overflow: hidden; transition: border-color .15s;
+  }
+  .ref-rule:hover { border-color: #2D6A4F; }
+  .ref-rule.selected { border-color: #2D6A4F; background: #F0FAF4; }
+  .ref-rule-head {
+    display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px;
+    background: #F5F7FA; cursor: pointer;
+  }
+  .ref-rule.selected .ref-rule-head { background: #D4EDDA; }
+  .ref-rule-source {
+    font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 10px;
+    white-space: nowrap; flex-shrink: 0; margin-top: 2px;
+  }
+  .src-gfr    { background: #DBEAFE; color: #1E40AF; }
+  .src-cvc    { background: #FEF3C7; color: #92400E; }
+  .src-manual { background: #FCE7F3; color: #9D174D; }
+  .src-gem    { background: #D1FAE5; color: #065F46; }
+  .src-works  { background: #FFF0E6; color: #9A3412; }
+  .src-consult{ background: #EDE9FE; color: #5B21B6; }
+  .src-nonconsult { background: #F0FDFA; color: #134E4A; }
+  .src-mse  { background: #FFF7ED; color: #9A3412; }
+  .src-dfpr { background: #F3F4F6; color: #374151; }
+  .ref-rule-meta { flex: 1; min-width: 0; }
+  .ref-rule-id   { font-size: 12px; font-weight: 700; color: #0B1F3A; margin-bottom: 2px; }
+  .ref-rule-title{ font-size: 13px; color: #1A1F2E; line-height: 1.4; }
+  .ref-rule-body {
+    padding: 10px 14px; font-size: 12px; color: #374151; line-height: 1.7;
+    border-top: 1px solid #E8EDF4; display: none;
+  }
+  .ref-rule.open .ref-rule-body { display: block; }
+  .ref-rule-tags {
+    display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px;
+  }
+  .ref-tag {
+    font-size: 10px; background: #F3F4F6; color: #6B7280;
+    border-radius: 10px; padding: 1px 8px; border: 1px solid #E5E7EB;
+  }
+  .ref-select-btn {
+    flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 4px 12px;
+    border-radius: 6px; border: none; cursor: pointer;
+    background: #2D6A4F; color: #fff; align-self: center;
+    transition: background .15s;
+  }
+  .ref-select-btn:hover { background: #1B4332; }
+  .ref-select-btn.deselect { background: #6B7280; }
+  .ref-footer {
+    padding: 12px 20px; border-top: 1px solid #E8EDF4;
+    display: flex; gap: 10px; align-items: center; background: #F9FAFB;
+  }
+  .ref-selected-count { font-size: 12px; color: #2D6A4F; font-weight: 700; }
+  .ref-no-results { text-align:center; padding:30px; color:#9AA5B8; font-size:13px; }
+
   /* ── Landing Page ── */
   #landingPage {
     max-width: 860px;
@@ -333,10 +421,6 @@
       <span class="tender-type-label">🏷 Detected Tender Type:</span>
       <span id="detectedTenderType" class="tender-type-badge"></span>
       <span class="auto-detected-note">✦ auto-detected from document</span>
-      <button onclick="openRegistryViewer()" style="margin-left:auto;padding:4px 12px;font-size:11px;font-weight:600;border-radius:6px;cursor:pointer;background:#F0F4FA;color:#1A3A5C;border:1px solid #CBD3E1;">🏛 View Registry</button>
-    </div>
-    <div style="margin-top:8px;text-align:right;">
-      <button onclick="openRegistryViewer()" style="padding:4px 12px;font-size:11px;font-weight:600;border-radius:6px;cursor:pointer;background:#F0F4FA;color:#1A3A5C;border:1px solid #CBD3E1;">🏛 View Authority Registry</button>
     </div>
   </div>
 
@@ -345,8 +429,24 @@
     <h2>Step 2 — Pre-Bid Queries</h2>
     <div class="row">
       <div class="col">
-        <label>Upload Queries PDF</label>
-        <input type="file" id="queryPdf" accept="application/pdf" />
+        <label>Upload Queries PDFs <span style="color:#1A5CA8;font-weight:700;">(multiple bidders supported)</span></label>
+        <div id="uploadDropZone" style="border:2px dashed #CBD3E1;border-radius:8px;padding:16px 14px;background:#F9FAFB;cursor:pointer;transition:border-color .15s,background .15s;"
+          onclick="document.getElementById('queryPdf').click()"
+          ondragover="event.preventDefault();this.style.borderColor='#1A5CA8';this.style.background='#EEF4FC';"
+          ondragleave="this.style.borderColor='#CBD3E1';this.style.background='#F9FAFB';"
+          ondrop="event.preventDefault();this.style.borderColor='#CBD3E1';this.style.background='#F9FAFB';handleQueryPdfDrop(event.dataTransfer.files);">
+          <div style="text-align:center;">
+            <div style="font-size:26px;margin-bottom:6px;">📂</div>
+            <div style="font-size:13px;font-weight:600;color:#1A5CA8;">Click to upload or drag &amp; drop PDFs here</div>
+            <div style="font-size:11px;color:#9AA5B8;margin-top:4px;">Upload one PDF per bidder — all queries will be consolidated into a single table</div>
+          </div>
+        </div>
+        <input type="file" id="queryPdf" accept="application/pdf" multiple style="display:none;" />
+        <!-- Uploaded files tracker -->
+        <div id="uploadedFilesList" style="display:none;margin-top:10px;">
+          <div style="font-size:11px;font-weight:700;color:#5B6478;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;">Uploaded PDFs</div>
+          <div id="uploadedFilesItems" style="display:flex;flex-direction:column;gap:4px;"></div>
+        </div>
       </div>
       <div class="col">
         <label>...or Paste Queries from Email / Document</label>
@@ -434,6 +534,7 @@ let tenderClauses = []; // [{ref, text}]
 let queryRows = []; // {id, num, clause, rfpClause, query, responseType, responseText}
 let corrigRows = []; // {id, srNo, clause, corrigendum, sourceQueryId}
 let rowCounter = 0;
+let pdfBuffers = {}; // {fileName: ArrayBuffer} — kept for Document Viewer
 
 // ---------- TENDER PDF ----------
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -477,10 +578,14 @@ document.getElementById('tenderPdf').addEventListener('change', async (e) => {
     const pages = await extractPdfText(file);
     tenderClauses = pages;
     buildSearchIndex(pages);
+    // Store buffer for Document Viewer
+    file.arrayBuffer().then(buf => { pdfBuffers['__tender__'] = {buffer: new Uint8Array(buf), name: file.name}; });
 
     // ── Auto-detect tender metadata ──────────────────────────────
     const firstText = pages.slice(0, 4).map(p => p.text).join('\n');
+    const fullText  = pages.map(p => p.text).join('\n');
     const detected  = detectTenderMetadata(firstText);
+    const dates     = extractTenderDates(fullText);
 
     let fills = [];
 
@@ -507,15 +612,24 @@ document.getElementById('tenderPdf').addEventListener('change', async (e) => {
       document.getElementById('tenderTypeBadgeWrap').style.display = 'flex';
     }
 
-    // If registry matched, suggest known RFPs
-    if (detected.registryMatch) {
-      applyRegistryRfpSuggestion(detected.registryMatch);
-    }
+    // Auto-insert date extension row at Sr. No. 1 of corrigendum table
+    insertDateExtensionRow(dates.proposalDue, dates.techOpening);
 
     const autoNote = fills.length
       ? ` Auto-filled: <strong>${fills.join(', ')}</strong> (highlighted).` : '';
 
-    statusEl.innerHTML = `<div class="status ok">✓ Tender PDF indexed — ${clauseSegments.length} clause segments across ${pages.length} pages.${autoNote} Use <strong>🔍 Search Clauses</strong> in any query row.</div>`;
+    let dateNote = '';
+    if (dates.proposalDue && dates.techOpening) {
+      dateNote = ` 📅 Dates extracted → Proposal due: <strong>${dates.proposalDue}</strong> | Technical bid opening: <strong>${dates.techOpening}</strong>. Check Corrigendum Sr. No. 1.`;
+    } else if (dates.proposalDue) {
+      dateNote = ` 📅 Proposal due date found: <strong>${dates.proposalDue}</strong>. Technical bid opening date <em>not detected</em> — fill manually in Corrigendum Sr. No. 1.`;
+    } else if (dates.techOpening) {
+      dateNote = ` 📅 Technical bid opening date found: <strong>${dates.techOpening}</strong>. Proposal due date <em>not detected</em> — fill manually in Corrigendum Sr. No. 1.`;
+    } else {
+      dateNote = ` <em>⚠ Dates not detected in this PDF — please fill manually in Corrigendum Sr. No. 1.</em>`;
+    }
+
+    statusEl.innerHTML = `<div class="status ok">✓ Tender PDF indexed — ${clauseSegments.length} clause segments across ${pages.length} pages.${autoNote}${dateNote} Use <strong>🔍 Search Clauses</strong> in any query row.</div>`;
   } catch(err) {
     statusEl.innerHTML = `<div class="status err">Could not read PDF: ${err.message}</div>`;
   }
@@ -612,6 +726,85 @@ function detectTenderMetadataBase(text) {
   }
 
   return { client, title, tenderType };
+}
+
+// ── Extract key tender dates from PDF text ───────────────────────
+// Handles Indian govt RFP formats: inline, table rows, Data Sheet layouts.
+// Looks for Proposal Due / Bid Submission date AND Technical Bid Opening date.
+function extractTenderDates(text) {
+  const lines = text.split('\n');
+  let proposalDue = '';
+  let techOpening = '';
+
+  // ── Core date pattern ─────────────────────────────────────────
+  // Covers: 25/06/2025  |  25-06-2025  |  25.06.2025  |  25 June 2025
+  // Plus optional time suffix: "up to 3:00 PM", "by 15:00 hrs", "at 1500 hrs"
+  const DATE_CORE = String.raw`(?:\d{1,2}[\.\-\/]\d{1,2}[\.\-\/]\d{2,4}|\d{1,2}\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{4})`;
+  const TIME_SUFFIX = String.raw`(?:\s*(?:up\s+to|upto|by|till|at|before)\s*[\d]{1,2}[:\.][\d]{2}\s*(?:AM|PM|hrs?|hours?)?)?`;
+  const dateRe = new RegExp(DATE_CORE + TIME_SUFFIX, 'i');
+
+  // ── Label patterns — broad to cover all common Indian RFP wordings ──
+  // Proposal / submission / due date
+  const proposalRe = /(?:proposal\s+due\s+date|last\s+date[\s\w]{0,15}(?:submission|receipt|bid)|bid\s+submission\s+(?:date|deadline|close)|submission\s+(?:of\s+)?(?:proposal|bid|tender|rfp|rfq)|due\s+date[\s\w]{0,10}(?:submission|proposal|bid)|closing\s+date|end\s+date[\s\w]{0,10}(?:bid|submission)|deadline[\s\w]{0,15}(?:bid|proposal|submission)|last\s+date\s+and\s+time|date\s+of\s+(?:receipt|submission)|tender\s+(?:submission|close|closing)\s+date|bid\s+closing\s+date)/i;
+
+  // Technical bid opening — also covers "Opening of Bids", "Price Bid Opening"
+  const techOpenRe = /(?:opening\s+of\s+(?:technical\s+)?bid|technical\s+bid\s+open(?:ing)?|date\s+of\s+open(?:ing)?(?:\s+of)?\s+(?:technical\s+)?bid|opening\s+(?:date|of)\s+(?:technical|bids?)|technical\s+(?:and\s+financial\s+)?bid\s+open|bids?\s+open(?:ing)?\s+date|date\s+&\s+time\s+of\s+open(?:ing)?(?:\s+of)?\s+bid|tender\s+open(?:ing)?\s+date)/i;
+
+  // ── Pass 1: label and date on the SAME line ───────────────────
+  for (const line of lines) {
+    const dm = line.match(dateRe);
+    if (!dm) continue;
+    const dateStr = dm[0].trim();
+    if (!proposalDue && proposalRe.test(line)) proposalDue = dateStr;
+    if (!techOpening && techOpenRe.test(line)) techOpening = dateStr;
+    if (proposalDue && techOpening) return { proposalDue, techOpening };
+  }
+
+  // ── Pass 2: label and date on ADJACENT lines (table-cell layout) ──
+  // PDF.js often puts the label on one line and the value on the next 1-3 lines.
+  for (let i = 0; i < lines.length; i++) {
+    if (!proposalDue && proposalRe.test(lines[i])) {
+      for (let j = i; j <= Math.min(i + 4, lines.length - 1); j++) {
+        const dm = lines[j].match(dateRe);
+        if (dm) { proposalDue = dm[0].trim(); break; }
+      }
+    }
+    if (!techOpening && techOpenRe.test(lines[i])) {
+      for (let j = i; j <= Math.min(i + 4, lines.length - 1); j++) {
+        const dm = lines[j].match(dateRe);
+        if (dm) { techOpening = dm[0].trim(); break; }
+      }
+    }
+    if (proposalDue && techOpening) return { proposalDue, techOpening };
+  }
+
+  // ── Pass 3: scan collapsed/single-space text (PDF.js sometimes joins lines) ──
+  // Collapse the full text, then search for label…date proximity within 120 chars
+  const flat = text.replace(/\s+/g, ' ');
+  const flatDateRe = new RegExp(DATE_CORE + TIME_SUFFIX, 'ig');
+  const labelProposalFlatRe = /proposal\s+due\s+date|last\s+date\s+(?:of\s+)?(?:submission|receipt)|bid\s+submission\s+date|submission\s+of\s+(?:proposal|bid|tender)|due\s+date\s+(?:for\s+)?(?:submission|proposal)|closing\s+date|last\s+date\s+and\s+time|tender\s+(?:submission|close|closing)\s+date/gi;
+  const labelTechFlatRe = /opening\s+of\s+(?:technical\s+)?bid|technical\s+bid\s+open(?:ing)?|opening\s+(?:date|of)\s+(?:technical|bid)|bids?\s+open(?:ing)?\s+date|tender\s+open(?:ing)?\s+date/gi;
+
+  if (!proposalDue) {
+    let m;
+    labelProposalFlatRe.lastIndex = 0;
+    while ((m = labelProposalFlatRe.exec(flat)) !== null) {
+      const window = flat.substring(m.index, m.index + 160);
+      const dm = window.match(flatDateRe);
+      if (dm) { proposalDue = dm[0].trim(); break; }
+    }
+  }
+  if (!techOpening) {
+    let m;
+    labelTechFlatRe.lastIndex = 0;
+    while ((m = labelTechFlatRe.exec(flat)) !== null) {
+      const window = flat.substring(m.index, m.index + 160);
+      const dm = window.match(flatDateRe);
+      if (dm) { techOpening = dm[0].trim(); break; }
+    }
+  }
+
+  return { proposalDue, techOpening };
 }
 
 function cleanExtract(str) {
@@ -779,17 +972,32 @@ function cosineSim(queryTf, segTf, idf) {
   return dot / (Math.sqrt(qNorm) * Math.sqrt(sNorm));
 }
 
-// Boost score if the clause reference explicitly appears in the query
-function refBoost(query, ref) {
-  if (!ref) return 0;
+// Boost score if the clause reference or heading explicitly appears in the query
+function refBoost(query, ref, heading) {
+  let boost = 0;
   const q = query.toLowerCase();
-  const r = ref.toLowerCase();
-  // exact ref number match (e.g. "3.2")
-  if (r && q.includes(r)) return 0.35;
-  // partial: first part of ref (e.g. "3" in "3.2.1")
-  const parts = r.split('.');
-  if (parts.length > 1 && q.includes(parts[0] + '.' + parts[1])) return 0.15;
-  return 0;
+
+  if (ref) {
+    const r = ref.toLowerCase();
+    // exact ref number match (e.g. "3.2") — strong signal
+    if (q.includes(r)) boost += 0.45;
+    else {
+      // partial: first two parts of ref (e.g. "3.2" in "3.2.1")
+      const parts = r.split('.');
+      if (parts.length > 1 && q.includes(parts[0] + '.' + parts[1])) boost += 0.20;
+      // single part (e.g. "3" in "3.2") — weak signal, only if standalone number
+      else if (new RegExp('\\b' + parts[0] + '\\b').test(q)) boost += 0.05;
+    }
+  }
+
+  if (heading) {
+    const h = heading.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+    const hWords = h.split(/\s+/).filter(w => w.length > 3 && !STOPWORDS.has(w));
+    const matchCount = hWords.filter(w => q.includes(w)).length;
+    if (hWords.length > 0) boost += 0.25 * (matchCount / hWords.length);
+  }
+
+  return Math.min(boost, 0.60); // cap total boost
 }
 
 // Highlight query terms in a text snippet
@@ -801,21 +1009,69 @@ function highlightTerms(text, queryTokens) {
   return escaped.replace(pattern, '<mark style="background:#FFF176;padding:0 1px;border-radius:2px;">$1</mark>');
 }
 
+// ── Query-to-clause seed extraction ─────────────────────────────
+// Bidder queries are written in question language:
+//   "We request clarification on whether consortium is allowed under clause 3.2"
+// RFP clauses are written in subject language:
+//   "3.2 Eligibility Criteria — Consortium"
+// This function strips question noise and returns subject keywords + any
+// clause ref numbers found, so TF-IDF searches clause language not question language.
+function extractClauseSearchSeed(queryText) {
+  let text = queryText;
+
+  // 1. Pull out any clause/section ref numbers first — these are gold
+  const refMatches = text.match(/\b(\d{1,2}(?:\.\d{1,2}){0,3})\b/g) || [];
+  const sectionKeywords = [];
+  const secLabelMatch = text.match(/(?:clause|section|para(?:graph)?|article|schedule|annexure|appendix)\s+([\d\.A-Za-z]+)/gi) || [];
+  secLabelMatch.forEach(m => sectionKeywords.push(m.trim()));
+
+  // 2. Strip question/request preamble noise
+  const noisePhrases = [
+    /^(we\s+)?(request|seek|require|need|want|wish|would\s+like)\s+(a\s+)?(clarif\w+|confirm\w+|clarif\w*|to\s+know|to\s+understand|to\s+seek|guidance|information)\s*(on|about|regarding|with\s+respect\s+to|pertaining\s+to|for)?\s*/i,
+    /^(kindly|please|request\s+you\s+to|we\s+request\s+you\s+to)\s*(clarify|confirm|advise|provide|let\s+us\s+know|inform\s+us)\s*/i,
+    /^(it\s+is\s+)?(requested|suggested|proposed|submitted)\s+that\s*/i,
+    /^(as\s+per\s+the\s+rfp[,\s]*|as\s+mentioned\s+in\s+the\s+rfp[,\s]*|as\s+per\s+clause\s+[\d\.]+[,\s]*|referring\s+to\s+clause\s+[\d\.]+[,\s]*)/i,
+    /^(with\s+reference\s+to|with\s+regard\s+to|in\s+reference\s+to|in\s+view\s+of|considering\s+that|in\s+line\s+with)\s*/i,
+    /^(we\s+)?(understand|note|observe|see)\s+that\s*/i,
+    /\?.*$/,  // strip trailing question
+    /\b(whether|if\s+the|can\s+the|may\s+the|is\s+it|are\s+there|will\s+the|does\s+the|do\s+the|what\s+is|what\s+are|how\s+is|how\s+are|how\s+will)\b.*/i,
+  ];
+  for (const re of noisePhrases) text = text.replace(re, ' ');
+
+  // 3. Strip filler/connector words specific to query language
+  const fillerRe = /\b(bidder|tenderer|applicant|firm|company|agency|party|consortium|jv|joint\s+venture|we|us|our|please|kindly|confirm|clarify|whether|if|that|this|the|same|also|further|additionally|hereby|herewith|accordingly|therein|thereof|hereunder)\b/gi;
+  text = text.replace(fillerRe, ' ');
+
+  // 4. Collapse whitespace and trim
+  text = text.replace(/\s+/g, ' ').trim();
+
+  // 5. Combine: section keywords + ref numbers + cleaned subject text
+  const combined = [...sectionKeywords, ...refMatches, text].join(' ').replace(/\s+/g, ' ').trim();
+  return combined.length > 4 ? combined : queryText; // fallback to raw if nothing left
+}
+
 // Search: given a query string, return top N scored segments
 function searchClauses(queryText, topN = 5) {
   if (!clauseSegments.length) return [];
-  const qTokens = tokenize(queryText);
-  if (!qTokens.length) return [];
-  const qTf = buildTfVector(qTokens);
+
+  // Extract subject-language seed from bidder question language
+  const seedText = extractClauseSearchSeed(queryText);
+  const qTokens = tokenize(seedText);
+  // Also tokenize raw query for ref/heading boost (ref numbers stripped by extractClauseSearchSeed)
+  const rawTokens = tokenize(queryText);
+  if (!qTokens.length && !rawTokens.length) return [];
+
+  const qTf = buildTfVector(qTokens.length ? qTokens : rawTokens);
 
   const results = clauseSegments.map((seg, i) => {
     const sim = cosineSim(qTf, segTfVectors[i], idfMap);
-    const boost = refBoost(queryText, seg.ref);
-    return { ...seg, score: Math.min(1, sim + boost), qTokens };
+    // Pass raw query for ref/heading boost — ref numbers live in the original question
+    const boost = refBoost(queryText, seg.ref, seg.heading);
+    return { ...seg, score: Math.min(1, sim + boost), qTokens: qTokens.length ? qTokens : rawTokens };
   });
 
   results.sort((a, b) => b.score - a.score);
-  return results.slice(0, topN).filter(r => r.score > 0.02);
+  return results.slice(0, topN).filter(r => r.score > 0.01);
 }
 
 // Rebuild index whenever tender PDF is loaded
@@ -837,40 +1093,169 @@ function findClauseText(ref) {
 
 // ---------- QUERY PARSING ----------
 let _lastQueryPages = null; // stored for diagnostic
+let _uploadedFiles = [];    // track {name, count, status} for each uploaded PDF
+
+// Drag-drop entry point
+function handleQueryPdfDrop(files) {
+  if (!files || !files.length) return;
+  processQueryFiles(Array.from(files).filter(f => f.type === 'application/pdf'));
+}
 
 document.getElementById('queryPdf').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const statusEl = document.getElementById('queryStatus');
-  statusEl.innerHTML = '<span class="status info">Reading queries PDF…</span>';
-  try {
-    const pages = await extractPdfTextWithItems(file);
-    _lastQueryPages = pages;
-    document.getElementById('diagBtn').style.display = '';
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+  await processQueryFiles(files);
+  // Reset input so same file can be re-added if needed
+  e.target.value = '';
+});
 
-    // PRIMARY: Try column-position aware extraction (handles multi-column tables)
-    const colRows = extractTableByColumns(pages);
-    if (colRows.length >= 2) {
-      colRows.forEach(r => {
-        addQueryRow({
-          bidder: r.bidder, clause: r.section,
-          rfpClause: r.rfpClauseText, query: r.query,
-          responseType:'', responseText:''
-        });
-      });
-      renderQueryTable();
-      statusEl.innerHTML = `<span class="status ok">✓ ${colRows.length} queries extracted from PDF. Review and fill responses below — selecting "Refer Corrigendum 1" will automatically add an entry to the Corrigendum table in Step 4.</span>`;
-      return;
+// Normalise query text for duplicate detection
+// Two queries are considered duplicates if their normalised text is ≥85% similar
+function normaliseForDedup(text) {
+  return (text || '').toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function querySimilarity(a, b) {
+  const na = normaliseForDedup(a);
+  const nb = normaliseForDedup(b);
+  if (!na || !nb) return 0;
+  if (na === nb) return 1;
+  // Jaccard similarity on word sets
+  const wa = new Set(na.split(' ').filter(w => w.length > 2));
+  const wb = new Set(nb.split(' ').filter(w => w.length > 2));
+  if (!wa.size || !wb.size) return 0;
+  let inter = 0;
+  for (const w of wa) { if (wb.has(w)) inter++; }
+  return inter / (wa.size + wb.size - inter);
+}
+
+function isDuplicateQuery(newQuery) {
+  const THRESHOLD = 0.82;
+  return queryRows.some(existing =>
+    querySimilarity(existing.query, newQuery) >= THRESHOLD
+  );
+}
+
+async function processQueryFiles(files) {
+  const statusEl = document.getElementById('queryStatus');
+  let totalAdded = 0, totalDupes = 0, errors = [];
+
+  for (const file of files) {
+    // Check not already processed
+    if (_uploadedFiles.some(f => f.name === file.name && f.size === file.size)) {
+      addFileChip(file.name, 0, 'already uploaded');
+      continue;
     }
 
-    // FALLBACK: line-text based parser
-    const fullText = pages.map(p => p.text).join('\n');
-    parseQueryText(fullText);
-    statusEl.innerHTML = '<span class="status ok">Queries extracted from PDF. If count looks wrong, click 🔍 Show PDF Diagnostic and share the output.</span>';
-  } catch(err) {
-    statusEl.innerHTML = `<span class="status err">Could not read PDF: ${err.message}</span>`;
+    statusEl.innerHTML = `<span class="status info">⏳ Reading <strong>${esc(file.name)}</strong>…</span>`;
+    try {
+      const pages = await extractPdfTextWithItems(file);
+      _lastQueryPages = pages;
+      document.getElementById('diagBtn').style.display = '';
+      // Store buffer for Document Viewer
+      file.arrayBuffer().then(buf => { pdfBuffers[file.name] = {buffer: new Uint8Array(buf), name: file.name}; });
+
+      // Extract rows from this PDF
+      let newRows = [];
+      const colRows = extractTableByColumns(pages);
+      if (colRows.length >= 2) {
+        newRows = colRows.map(r => ({
+          bidder: r.bidder, clause: r.section,
+          rfpClause: r.rfpClauseText, query: r.query,
+          responseType: '', responseText: '',
+          sourceFile: file.name
+        }));
+      } else {
+        // Fallback: line parser — collect without adding yet
+        newRows = extractRowsFromText(pages.map(p => p.text).join('\n'), file.name);
+      }
+
+      let added = 0;
+      for (const r of newRows) {
+        if (!r.query || r.query.length < 5) continue;
+        addQueryRow(r);
+        added++;
+      }
+
+      totalAdded += added;
+      _uploadedFiles.push({ name: file.name, size: file.size, count: added });
+      addFileChip(file.name, added, 'ok');
+
+    } catch(err) {
+      errors.push(file.name + ': ' + err.message);
+      addFileChip(file.name, 0, 'error');
+    }
   }
-});
+
+  renderQueryTable();
+
+  // Summary status
+  let msg = `<span class="status ok">✓ <strong>${totalAdded}</strong> quer${totalAdded===1?'y':'ies'} added`;
+  if (totalDupes > 0) msg += ` &nbsp;|&nbsp; <strong>${totalDupes}</strong> duplicate${totalDupes>1?'s':''} skipped`;
+  msg += ` &nbsp;|&nbsp; <strong>${queryRows.length}</strong> total in table</span>`;
+  if (errors.length) msg += ` <span class="status err" style="margin-top:4px;">${errors.map(esc).join('<br>')}</span>`;
+  statusEl.innerHTML = msg;
+}
+
+// Add a chip to the uploaded files list
+function addFileChip(name, count, note) {
+  const wrap = document.getElementById('uploadedFilesList');
+  const items = document.getElementById('uploadedFilesItems');
+  wrap.style.display = '';
+  const isError = note === 'error';
+  const isOk    = note === 'ok';
+  const chip = document.createElement('div');
+  chip.style.cssText = 'display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:6px;font-size:12px;background:' +
+    (isError ? '#FBE8E6' : '#F0F6FF') + ';border:1px solid ' + (isError ? '#F5C6C2' : '#CBD3E1') + ';';
+  chip.innerHTML =
+    `<span style="font-size:14px;">${isError ? '⚠️' : '📄'}</span>` +
+    `<span style="flex:1;font-weight:600;color:#0B1F3A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(name)}">${esc(name)}</span>` +
+    (count > 0 ? `<span style="background:#1A5CA8;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;">${count} quer${count===1?'y':'ies'}</span>` : '') +
+    (note && note !== 'ok' ? `<span style="color:#5B6478;font-size:11px;font-style:italic;">${esc(note)}</span>` : '') +
+    `<button onclick="removeUploadedFile(this,'${esc(name)}')" style="background:none;border:none;color:#C0392B;cursor:pointer;font-size:13px;padding:0 2px;line-height:1;" title="Remove queries from this file">✕</button>`;
+  items.appendChild(chip);
+}
+
+// Remove all queries sourced from a specific file
+function removeUploadedFile(btnEl, fileName) {
+  queryRows = queryRows.filter(r => r.sourceFile !== fileName);
+  _uploadedFiles = _uploadedFiles.filter(f => f.name !== fileName);
+  btnEl.closest('div[style]').remove();
+  if (!document.getElementById('uploadedFilesItems').children.length) {
+    document.getElementById('uploadedFilesList').style.display = 'none';
+  }
+  renderQueryTable();
+  renderCorrigTable();
+  const statusEl = document.getElementById('queryStatus');
+  statusEl.innerHTML = `<span class="status info">Removed queries from <strong>${esc(fileName)}</strong>. ${queryRows.length} quer${queryRows.length===1?'y':'ies'} remain.</span>`;
+}
+
+// Fallback row extractor that returns rows without adding them (for dedup pipeline)
+function extractRowsFromText(text, sourceFile) {
+  text = text.replace(/\r/g,'').replace(/\t/g,' ');
+  const rows = parseStructuredTable(text);
+  if (rows.length >= 2) {
+    return rows.map(r => ({
+      bidder: r.bidder, clause: r.section,
+      rfpClause: r.rfpClauseText, query: r.query,
+      responseType: '', responseText: '', sourceFile
+    }));
+  }
+  // Further fallback: block split
+  let blocks = text.split(/\n(?=\s*(?:\d{1,3}[\.\)]\s|Query\s*\d|Q\d+[:.)]|S\.?No\.?\s*\d))/i);
+  blocks = blocks.map(b => b.trim()).filter(b => b.length > 15);
+  if (blocks.length <= 1) blocks = text.split(/\n\s*\n/).map(b => b.trim()).filter(b => b.length > 15);
+  return blocks.map(block => {
+    let clauseRef = '';
+    const cm = block.match(/((?:Clause|Section|Page|Point|Sr\.?\s*No\.?|S\.?No\.?)[^\n]{0,60})/i);
+    if (cm) clauseRef = cm[1].trim();
+    const queryText = block.replace(/^\s*(?:\d{1,3}[\.\)]\s*|Query\s*\d+[:.)]?\s*|Q\d+[:.)]|S\.?No\.?\s*\d+[:.)]?\s*)/i,'').trim();
+    return { clause: clauseRef, rfpClause: findClauseText(clauseRef), query: queryText, responseType: '', responseText: '', sourceFile };
+  }).filter(r => r.query && r.query.length > 10);
+}
 
 // Extract text AND raw items (x, y, str) for diagnostic + column-aware parsing
 async function extractPdfTextWithItems(file) {
@@ -1080,8 +1465,18 @@ function parsePastedQueries() {
     document.getElementById('queryStatus').innerHTML = '<span class="status err">Paste some text first.</span>';
     return;
   }
-  parseQueryText(text);
-  document.getElementById('queryStatus').innerHTML = '<span class="status ok">Pasted text parsed into table below. Please review/edit columns.</span>';
+  const rows = extractRowsFromText(text, 'pasted text');
+  let added = 0, dupes = 0;
+  for (const r of rows) {
+    if (!r.query || r.query.length < 5) continue;
+    if (isDuplicateQuery(r.query)) { dupes++; }
+    else { addQueryRow(r); added++; }
+  }
+  renderQueryTable();
+  let msg = `<span class="status ok">✓ <strong>${added}</strong> quer${added===1?'y':'ies'} added from pasted text`;
+  if (dupes > 0) msg += ` &nbsp;|&nbsp; <strong>${dupes}</strong> duplicate${dupes>1?'s':''} skipped`;
+  msg += `</span>`;
+  document.getElementById('queryStatus').innerHTML = msg;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1371,13 +1766,27 @@ function openClauseSearch(rowId) {
     return;
   }
 
-  // Seed search: prefer existing clause ref, then fall back to the bidder's query text
-  const seedClause = (row.clause || '').trim();
   const seedQuery  = (row.query  || '').trim();
-  // Show the bidder query in the context box so user knows what they are searching for
+  // Check if clause field contains a raw ref number (e.g. "3.2") vs a
+  // formatted fill string ("Page 14, Clause 3.2, Eligibility Criteria").
+  // Only use the clause field as seed if it looks like a bare section ref.
+  const rawClause = (row.clause || '').trim();
+  const looksLikeRawRef = rawClause && /^\d{1,2}(\.\d{1,2}){0,3}$/.test(rawClause);
+
+  // Show the bidder query in the context box
   document.getElementById('cmQueryBox').textContent = seedQuery || '(no query text yet)';
-  // Pre-fill search box: clause ref if already typed, otherwise the query keywords
-  const searchSeed = seedClause || seedQuery;
+
+  // Seed priority:
+  // 1. If user typed a bare clause number like "3.2" — strong signal, use it
+  // 2. Otherwise extract subject keywords from the bidder query (always preferred
+  //    over a formatted fill string like "Page 14, Clause 3.2, Eligibility Criteria")
+  let searchSeed = '';
+  if (looksLikeRawRef) {
+    searchSeed = rawClause;
+  } else if (seedQuery) {
+    searchSeed = extractClauseSearchSeed(seedQuery);
+  }
+
   document.getElementById('cmSearchInput').value = searchSeed;
   document.getElementById('clauseModal').classList.add('open');
   runClauseSearch(searchSeed);
@@ -1389,10 +1798,10 @@ function runClauseSearch(queryText) {
     body.innerHTML = '<div class="cm-no-tender">Type a search term above to find matching clauses.</div>';
     return;
   }
-  const results = searchClauses(queryText, 6);
+  const results = searchClauses(queryText, 8);
   _lastSearchResults = results;
   if (!results.length) {
-    body.innerHTML = '<div class="cm-no-tender">No matching clauses found. Try different keywords.</div>';
+    body.innerHTML = '<div class="cm-no-tender">No matching clauses found. Try different keywords — e.g. "eligibility", "bid security", "consortium".</div>';
     return;
   }
 
@@ -1400,65 +1809,74 @@ function runClauseSearch(queryText) {
   const container = document.createElement('div');
   container.className = 'cm-results';
 
+  // Helper: build the "Page & Clause No." string exactly as it will fill the table cell
+  function buildClauseNo(r) {
+    const parts = [];
+    if (r.page) parts.push('Page ' + r.page);
+    if (r.ref)  parts.push(r.ref.match(/^\d/) ? 'Cl. ' + r.ref : r.ref);
+    return parts.join(' | ');
+  }
+
   results.forEach((r, i) => {
     const pct = Math.round(r.score * 100);
     const confClass = pct >= 55 ? 'high' : pct >= 30 ? 'medium' : 'low';
-    const confLabel = pct >= 55 ? 'Strong match' : pct >= 30 ? 'Possible match' : 'Weak match';
+    const confLabel = pct >= 55 ? '✦ Strong' : pct >= 30 ? '~ Possible' : '· Weak';
 
-    const clauseRefParts = [];
-    if (r.ref) clauseRefParts.push(r.ref.match(/^\d/) ? 'Section ' + r.ref : r.ref);
-    if (r.heading) clauseRefParts.push(r.heading);
-    if (r.page) clauseRefParts.push('Page ' + r.page);
-    const clausePreview = clauseRefParts.join(', ');
-
+    const clauseNo = buildClauseNo(r);
     const hasSubClauses = r.subClauses && r.subClauses.length > 0;
 
-    // Section-level card
     const card = document.createElement('div');
     card.className = 'cm-result';
     card.dataset.idx = i;
 
-    // Sub-clause rows HTML (built if available)
+    // Sub-clause rows HTML
     let subClauseHTML = '';
     if (hasSubClauses) {
       const subRows = r.subClauses.map((sc, si) => {
         return '<div class="sub-clause-row" data-section-idx="' + i + '" data-sub-idx="' + si + '" ' +
-          'style="display:flex;align-items:flex-start;gap:8px;padding:7px 10px;border-radius:6px;border:1px solid #E0E6F0;background:#fff;cursor:pointer;" ' +
+          'style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:6px;border:1px solid #E0E6F0;background:#fff;cursor:pointer;transition:background .12s;" ' +
           'onclick="event.stopPropagation();selectSubClause(' + i + ',' + si + ',this)">' +
           '<span style="flex-shrink:0;font-weight:700;font-size:12px;background:#0B1F3A;color:#E8BB4A;border-radius:4px;padding:2px 7px;min-width:28px;text-align:center;">' + esc(sc.key) + '</span>' +
           '<div style="flex:1;min-width:0;">' +
-            '<div style="font-size:12px;font-weight:600;color:#0B1F3A;margin-bottom:2px;">' + esc(sc.label) + '</div>' +
+            '<div style="font-size:12px;font-weight:600;color:#0B1F3A;margin-bottom:3px;">' + esc(sc.label) + '</div>' +
             '<div style="font-size:11.5px;color:#3A4A5C;line-height:1.5;">' + highlightTerms(sc.text, r.qTokens) + '</div>' +
           '</div>' +
-          '<span style="flex-shrink:0;font-size:10px;background:#E8F5E9;color:#2E7D32;border-radius:4px;padding:2px 6px;font-weight:600;">Select</span>' +
+          '<span style="flex-shrink:0;font-size:10px;background:#E8F5E9;color:#2E7D32;border-radius:4px;padding:3px 8px;font-weight:700;align-self:center;">Select ▶</span>' +
           '</div>';
       }).join('');
       subClauseHTML =
-        '<div style="border-top:1px solid #E8EDF4;background:#F9FAFB;padding:8px 12px;">' +
-          '<div style="font-size:11px;font-weight:700;color:#5B6478;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">📋 Select individual sub-clause to apply exact text:</div>' +
-          '<div class="sub-clause-list" style="display:flex;flex-direction:column;gap:4px;">' + subRows + '</div>' +
+        '<div style="border-top:1px solid #E8EDF4;background:#F9FAFB;padding:10px 14px;">' +
+          '<div style="font-size:11px;font-weight:700;color:#5B6478;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">📋 Or pick a specific sub-clause:</div>' +
+          '<div class="sub-clause-list" style="display:flex;flex-direction:column;gap:5px;">' + subRows + '</div>' +
         '</div>';
     }
 
     card.innerHTML = `
-      <div class="cm-result-head" style="cursor:pointer;" onclick="event.stopPropagation();selectSectionClause(${i},this.closest('.cm-result'))">
-        ${r.ref ? `<span class="cm-clause-ref">${esc(r.ref)}</span>` : ''}
-        ${r.heading ? `<span style="font-size:12px;font-weight:600;color:#1A1F2E;">${esc(r.heading)}</span>` : ''}
-        <span class="cm-confidence ${confClass}" style="margin-left:auto">${confLabel} · ${pct}%</span>
-      </div>
-      <div class="cm-result-body">
-        <div class="cm-page-tag" style="display:flex;gap:12px;align-items:baseline;margin-bottom:6px;flex-wrap:wrap;">
-          <span>📄 Page ${r.page}</span>
-          ${clausePreview ? `<span style="font-size:11px;background:#EEF4FC;color:#1A5CA8;padding:2px 7px;border-radius:4px;font-weight:600;">→ fills: ${esc(clausePreview)}</span>` : ''}
+      <div class="cm-result-head" style="cursor:pointer;gap:8px;" onclick="event.stopPropagation();selectSectionClause(${i},this.closest('.cm-result'))">
+        <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            ${r.ref ? `<span class="cm-clause-ref" style="font-size:13px;">${esc(r.ref)}</span>` : ''}
+            ${r.heading ? `<span style="font-size:13px;font-weight:700;color:#0B1F3A;">${esc(r.heading)}</span>` : ''}
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span style="font-size:12px;font-weight:700;color:#1A5CA8;background:#EEF4FC;border-radius:4px;padding:2px 8px;">📄 Page ${r.page || '—'}</span>
+            ${r.ref ? `<span style="font-size:11px;color:#5B6478;">Clause&nbsp;No.&nbsp;<strong>${esc(r.ref)}</strong></span>` : ''}
+            <span style="font-size:11px;color:#8FA8C8;font-style:italic;">fills → Page &amp; Clause No. + Clause in RFP</span>
+          </div>
         </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
+          <span class="cm-confidence ${confClass}">${confLabel} ${pct}%</span>
+          ${!hasSubClauses ? `<span style="font-size:11px;font-weight:700;background:#E8BB4A;color:#0B1F3A;border-radius:4px;padding:2px 10px;cursor:pointer;">✓ Select whole clause</span>` : `<span style="font-size:11px;color:#5B6478;font-style:italic;">↓ pick sub-clause below</span>`}
+        </div>
+      </div>
+      <div class="cm-result-body" style="border-top:1px solid #F0F4FA;">
         ${hasSubClauses
-          ? `<div style="font-size:12px;color:#5B6478;font-style:italic;">↓ Pick a specific sub-clause below — or click the header bar to select the whole section.</div>`
-          : `<div style="white-space:pre-wrap;line-height:1.6;font-size:12px;">${highlightTerms(r.text, r.qTokens)}</div>`
+          ? `<div style="font-size:12px;color:#5B6478;font-style:italic;padding:6px 0 2px;">Select the whole section above, or drill into a specific sub-clause below.</div>`
+          : `<div style="white-space:pre-wrap;line-height:1.65;font-size:12px;max-height:140px;overflow:hidden;mask-image:linear-gradient(to bottom,#000 70%,transparent 100%);">${highlightTerms(r.text, r.qTokens)}</div>`
         }
       </div>
       ${subClauseHTML}`;
 
-    // If no sub-clauses, clicking the whole card selects the section
     if (!hasSubClauses) {
       card.addEventListener('click', () => selectSectionClause(i, card));
     }
@@ -1510,12 +1928,12 @@ function selectSubClause(resultIdx, subIdx, rowEl) {
   const sc = r.subClauses[subIdx];
   if (!sc) return;
 
-  // Build the clause ref: "Section 3.1, Eligibility Criteria (iii), Page N"
+  // Build the clause ref: "Page N, Clause 3.1, Heading (iii)"
   const refParts = [];
-  if (r.ref) refParts.push(r.ref.match(/^\d/) ? 'Section ' + r.ref : r.ref);
+  if (r.page) refParts.push('Page ' + r.page);
+  if (r.ref)  refParts.push('Clause ' + r.ref);
   if (r.heading) refParts.push(r.heading);
   if (sc.key) refParts.push('(' + sc.key + ')');
-  if (r.page) refParts.push('Page ' + r.page);
 
   const btn = document.getElementById('cmApplyBtn');
   btn.dataset.text = sc.text;           // verbatim sub-clause text → Clause in RFP
@@ -1532,27 +1950,25 @@ function applyClauseResult() {
   const ref     = btn.dataset.ref     || '';
   const page    = btn.dataset.page    || '';
   const heading = btn.dataset.heading || '';
-  // clauseref is pre-built for sub-clause selections; build it for section-level
   const clauseref = btn.dataset.clauseref || '';
   if (!text || modalTargetRowId == null) return;
 
   const row = queryRows.find(r => r.id === modalTargetRowId);
   if (row) {
     if (clauseref) {
-      // Sub-clause was selected — use the pre-built ref string directly
+      // Sub-clause selected — pre-built ref string (already has page + clause no)
       row.clause = clauseref;
     } else {
-      // Whole section selected — build ref from parts
+      // Whole section selected — build "Page X, Clause Y.Z – Heading" format
       const parts = [];
-      if (ref) parts.push(ref.match(/^\d/) ? 'Section ' + ref : ref);
-      if (heading) parts.push(heading);
       if (page) parts.push('Page ' + page);
+      if (ref)  parts.push('Clause ' + ref);
+      if (heading && heading !== ref) parts.push(heading);
       row.clause = parts.join(', ');
     }
-    // Clause in RFP → full verbatim text (sub-clause or full section)
+    // Clause in RFP → full verbatim text
     row.rfpClause = text;
-    // CRITICAL: if this row is already linked to a corrigendum entry,
-    // sync the verbatim clause text into that corrigendum row too
+    // Sync to linked corrigendum row if exists
     const linkedCorrig = corrigRows.find(c => c.sourceQueryId === row.id);
     if (linkedCorrig) {
       linkedCorrig.clause = text;
@@ -1614,18 +2030,32 @@ function renderQueryTable() {
 
     const expandIcon = isExpanded ? '▲' : '▼';
 
+    // Page & Clause No. display — auto-filled by search, editable manually
+    const clauseFilled = !!(row.clause && row.clause.trim());
+    const clauseCellStyle = clauseFilled
+      ? 'background:#EEF4FC;border-radius:4px;padding:4px 6px;font-size:12px;font-weight:600;color:#0B1F3A;line-height:1.5;min-height:32px;'
+      : 'color:#9AA5B8;font-size:11px;font-style:italic;padding:4px 6px;min-height:32px;';
+
     tr.innerHTML = `
       <td class="col-num" style="vertical-align:top;padding-top:10px;">
         <div style="font-weight:600;">${row.num}</div>
         <div style="font-size:10px;color:#9AA5B8;margin-top:4px;">${expandIcon}</div>
       </td>
       <td style="font-size:11px;color:#1A3A5C;font-weight:600;vertical-align:top;padding-top:8px;">${esc(row.bidder||'')}</td>
-      <td>
-        <textarea style="${taStyle}" oninput="updateQueryField(${row.id},'clause',this.value)" onclick="event.stopPropagation()">${esc(row.clause)}</textarea>
-        <button style="margin-top:4px;font-size:10px;padding:3px 6px;" class="secondary" onclick="event.stopPropagation();findClauseForRow(${row.id})">🔍 Search Clauses</button>
+      <td onclick="event.stopPropagation()">
+        <div style="${clauseCellStyle}" title="Auto-filled by clause search">${clauseFilled ? esc(row.clause) : 'Auto-filled on clause selection'}</div>
+        ${clauseFilled ? `<div style="font-size:10px;color:#1A5CA8;margin-top:3px;cursor:pointer;text-decoration:underline;" onclick="event.stopPropagation();findClauseForRow(${row.id})">🔍 Change</div>` : ''}
       </td>
-      <td><textarea style="${taStyle}" oninput="updateQueryField(${row.id},'rfpClause',this.value)" onclick="event.stopPropagation()">${esc(row.rfpClause)}</textarea></td>
-      <td><textarea style="${taStyle}" oninput="updateQueryField(${row.id},'query',this.value)" onclick="event.stopPropagation()">${esc(row.query)}</textarea></td>
+      <td onclick="event.stopPropagation()">
+        <textarea style="${taStyle}" oninput="updateQueryField(${row.id},'rfpClause',this.value)" onclick="event.stopPropagation()" placeholder="Select a clause using 🔍 Search Clauses below…">${esc(row.rfpClause)}</textarea>
+        <button style="margin-top:5px;font-size:11px;padding:4px 10px;font-weight:600;border-radius:5px;border:none;cursor:pointer;background:#1A5CA8;color:#fff;width:100%;" onclick="event.stopPropagation();findClauseForRow(${row.id})">🔍 Search Clauses in RFP</button>
+      </td>
+      <td onclick="event.stopPropagation()">
+        <textarea style="${taStyle}" oninput="updateQueryField(${row.id},'query',this.value)" onclick="event.stopPropagation()">${esc(row.query)}</textarea>
+        <div style="display:flex;gap:4px;margin-top:5px;">
+          <button style="font-size:11px;padding:4px 10px;font-weight:600;border-radius:5px;border:none;cursor:pointer;background:#2D6A4F;color:#fff;flex:1;" onclick="event.stopPropagation();openRefModal(${row.id})">🔎 Analyze</button>
+        </div>
+      </td>
       <td onclick="event.stopPropagation()">
         <select onchange="updateQueryField(${row.id},'responseType',this.value)">
           <option value="" ${row.responseType===''?'selected':''}>-- Select --</option>
@@ -1633,7 +2063,7 @@ function renderQueryTable() {
           <option value="Refer Corrigendum 1" ${row.responseType==='Refer Corrigendum 1'?'selected':''}>Refer Corrigendum 1</option>
           <option value="Response" ${row.responseType==='Response'?'selected':''}>Response (type below)</option>
         </select>
-        ${row.responseType==='Response' ? `<textarea style="${taStyle}" placeholder="Type response..." oninput="updateQueryField(${row.id},'responseText',this.value)">${esc(row.responseText)}</textarea>` : ''}
+        ${row.responseType==='Response' ? `<textarea style="${taStyle}" placeholder="Type response..." oninput="updateQueryField(${row.id},'responseText',this.value)" id="respTa_${row.id}">${esc(row.responseText)}</textarea><button style="margin-top:4px;font-size:11px;padding:3px 10px;font-weight:600;border-radius:5px;border:none;cursor:pointer;background:#2D6A4F;color:#fff;" onclick="event.stopPropagation();openRefModal(${row.id})">📖 Cite Rule</button>` : ''}
         ${row.responseType==='Refer Corrigendum 1' ? `<div style="font-size:11px;color:#1A5CA8;margin-top:4px;">↪ Sent to Corrigendum table (Step 4)</div>` : ''}
       </td>
       <td class="col-action" onclick="event.stopPropagation()">
@@ -1661,6 +2091,23 @@ function renderQueryTable() {
 }
 
 // ---------- CORRIGENDUM TABLE ----------
+let dateExtensionRow = null; // special pinned row at Sr. No. 1
+
+function insertDateExtensionRow(proposalDue, techOpening) {
+  dateExtensionRow = {
+    proposalDue: proposalDue || '',
+    techOpening: techOpening || '',
+    revisedProposalDue: '',
+    revisedTechOpening: ''
+  };
+  renderCorrigTable();
+}
+
+function removeDateExtensionRow() {
+  dateExtensionRow = null;
+  renderCorrigTable();
+}
+
 function addCorrigRow() {
   rowCounter++;
   corrigRows.push({ id: rowCounter, srNo: corrigRows.length + 1, clause: '', corrigendum: '', sourceQueryId: null });
@@ -1669,7 +2116,6 @@ function addCorrigRow() {
 
 function removeCorrigRow(id) {
   const cr = corrigRows.find(c => c.id === id);
-  // If linked to a query, revert that query's response type
   if (cr && cr.sourceQueryId) {
     const qr = queryRows.find(r => r.id === cr.sourceQueryId);
     if (qr) { qr.responseType = ''; }
@@ -1685,11 +2131,72 @@ function updateCorrigField(id, field, value) {
   row[field] = value;
 }
 
+function updateDateExtField(field, value) {
+  if (!dateExtensionRow) return;
+  dateExtensionRow[field] = value;
+}
+
 function renderCorrigTable() {
   const body = document.getElementById('corrigBody');
   body.innerHTML = '';
+  let srOffset = 0;
+
+  // ── Sr. No. 1: Date Extension row (pinned, always first if present) ──
+  if (dateExtensionRow) {
+    srOffset = 1;
+    const tr = document.createElement('tr');
+    tr.style.background = '#FFFDE7';
+    tr.innerHTML = `
+      <td class="col-num" style="vertical-align:top;padding-top:8px;">
+        <div style="font-weight:700;">1</div>
+        <div style="font-size:9px;color:#E8BB4A;font-weight:700;margin-top:3px;">DATE</div>
+      </td>
+      <td style="vertical-align:top;">
+        <div style="font-size:11px;font-weight:700;color:#5B6478;margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em;">Clause as per RFP</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;align-items:baseline;gap:6px;">
+            <span style="font-size:12px;font-weight:600;color:#0B1F3A;white-space:nowrap;">Proposal due date:</span>
+            <input type="text" value="${esc(dateExtensionRow.proposalDue)}"
+              oninput="updateDateExtField('proposalDue',this.value)"
+              placeholder="Date from RFP"
+              style="flex:1;font-size:12px;font-weight:600;color:#1A5CA8;border:none;border-bottom:1px dashed #CBD3E1;background:transparent;padding:2px 4px;font-family:inherit;" />
+          </div>
+          <div style="display:flex;align-items:baseline;gap:6px;">
+            <span style="font-size:12px;font-weight:600;color:#0B1F3A;white-space:nowrap;">Opening of technical bid:</span>
+            <input type="text" value="${esc(dateExtensionRow.techOpening)}"
+              oninput="updateDateExtField('techOpening',this.value)"
+              placeholder="Date from RFP"
+              style="flex:1;font-size:12px;font-weight:600;color:#1A5CA8;border:none;border-bottom:1px dashed #CBD3E1;background:transparent;padding:2px 4px;font-family:inherit;" />
+          </div>
+        </div>
+      </td>
+      <td style="vertical-align:top;">
+        <div style="font-size:11px;font-weight:700;color:#5B6478;margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em;">Corrigendum / Addendum</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;align-items:baseline;gap:6px;">
+            <span style="font-size:12px;font-weight:600;color:#0B1F3A;white-space:nowrap;">Proposal due date:</span>
+            <input type="text" value="${esc(dateExtensionRow.revisedProposalDue)}" placeholder="Revised date"
+              oninput="updateDateExtField('revisedProposalDue',this.value)"
+              style="flex:1;font-size:12px;color:#C0392B;font-weight:600;border:none;border-bottom:1px dashed #CBD3E1;background:transparent;padding:2px 4px;font-family:inherit;" />
+          </div>
+          <div style="display:flex;align-items:baseline;gap:6px;">
+            <span style="font-size:12px;font-weight:600;color:#0B1F3A;white-space:nowrap;">Opening of technical bid:</span>
+            <input type="text" value="${esc(dateExtensionRow.revisedTechOpening)}" placeholder="Revised date"
+              oninput="updateDateExtField('revisedTechOpening',this.value)"
+              style="flex:1;font-size:12px;color:#C0392B;font-weight:600;border:none;border-bottom:1px dashed #CBD3E1;background:transparent;padding:2px 4px;font-family:inherit;" />
+          </div>
+        </div>
+      </td>
+      <td class="col-action" style="vertical-align:top;padding-top:8px;">
+        <button class="danger" style="font-size:11px;padding:4px 6px;" onclick="removeDateExtensionRow()" title="Remove date extension row">✕</button>
+      </td>
+    `;
+    body.appendChild(tr);
+  }
+
+  // ── Remaining corrigendum rows ──
   corrigRows.forEach((row, i) => {
-    row.srNo = i + 1;
+    row.srNo = i + 1 + srOffset;
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-num">${row.srNo}</td>
@@ -1699,8 +2206,10 @@ function renderCorrigTable() {
     `;
     body.appendChild(tr);
   });
-  document.getElementById('cCount').textContent = corrigRows.length + ' items';
-  document.getElementById('corrigEmpty').style.display = corrigRows.length ? 'none' : 'block';
+
+  const total = corrigRows.length + (dateExtensionRow ? 1 : 0);
+  document.getElementById('cCount').textContent = total + ' items';
+  document.getElementById('corrigEmpty').style.display = total ? 'none' : 'block';
 }
 
 function esc(s) {
@@ -1850,13 +2359,36 @@ async function exportExcel() {
   applyHdr(ws2.getCell('C4'), 'Corrigendum/ Addendum');
   ws2.getRow(4).height = 34;
 
-  // Data rows
+  // Data rows — date extension row first (Sr. No. 1), then corrig rows
+  let excelRowNum = 5;
+
+  if (dateExtensionRow) {
+    // Build "Clause in RFP" text
+    const clauseLines = [];
+    if (dateExtensionRow.proposalDue)
+      clauseLines.push('Proposal due date: ' + dateExtensionRow.proposalDue);
+    if (dateExtensionRow.techOpening)
+      clauseLines.push('Opening of technical bid: ' + dateExtensionRow.techOpening);
+    // Build "Corrigendum" text
+    const corrigLines = [];
+    if (dateExtensionRow.revisedProposalDue)
+      corrigLines.push('Proposal due date: ' + dateExtensionRow.revisedProposalDue);
+    if (dateExtensionRow.revisedTechOpening)
+      corrigLines.push('Opening of technical bid: ' + dateExtensionRow.revisedTechOpening);
+    applyData(ws2.getCell('A' + excelRowNum), '1', CENTER_TOP);
+    applyData(ws2.getCell('B' + excelRowNum), clauseLines.join('\n'));
+    applyData(ws2.getCell('C' + excelRowNum), corrigLines.join('\n'));
+    ws2.getRow(excelRowNum).height = 80;
+    excelRowNum++;
+  }
+
   corrigRows.forEach((r, i) => {
-    const rowNum = 5 + i;
-    applyData(ws2.getCell('A' + rowNum), String(r.srNo || i+1), CENTER_TOP);
-    applyData(ws2.getCell('B' + rowNum), r.clause      || '');
-    applyData(ws2.getCell('C' + rowNum), r.corrigendum || '');
-    ws2.getRow(rowNum).height = 80;
+    const srNo = (dateExtensionRow ? 2 : 1) + i;
+    applyData(ws2.getCell('A' + excelRowNum), String(srNo), CENTER_TOP);
+    applyData(ws2.getCell('B' + excelRowNum), r.clause      || '');
+    applyData(ws2.getCell('C' + excelRowNum), r.corrigendum || '');
+    ws2.getRow(excelRowNum).height = 80;
+    excelRowNum++;
   });
 
   // ── Download ──────────────────────────────────────────────────
@@ -1884,7 +2416,7 @@ function saveProgress() {
     tenderId: document.getElementById('tenderId').value,
     rfpTitle: document.getElementById('rfpTitle').value,
     corrigTitle: document.getElementById('corrigTitle').value,
-    queryRows, corrigRows, rowCounter
+    queryRows, corrigRows, rowCounter, dateExtensionRow
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
@@ -1907,6 +2439,7 @@ function loadProgress(e) {
       queryRows = data.queryRows || [];
       corrigRows = data.corrigRows || [];
       rowCounter = data.rowCounter || 0;
+      dateExtensionRow = data.dateExtensionRow || null;
       renderQueryTable();
       renderCorrigTable();
       document.getElementById('exportStatus').innerHTML = '<div class="status ok">Progress loaded.</div>';
@@ -1917,243 +2450,699 @@ function loadProgress(e) {
   reader.readAsText(file);
 }
 
+// detectTenderMetadata — reads directly from uploaded PDF, no registry
+function detectTenderMetadata(text) {
+  return detectTenderMetadataBase(text);
+}
+
 // ═══════════════════════════════════════════════════════════════
-//  AUTHORITY INTELLIGENCE REGISTRY
-//  Seed known authorities; learn new ones from every confirmed use
+//  PROCUREMENT REFERENCE LIBRARY
+//  Sources: GFR 2017, CVC Guidelines, Manual on Policies &
+//           Procedures for Purchase of Goods, GeM / CPPP
 // ═══════════════════════════════════════════════════════════════
 
-const REGISTRY_KEY = 'prebid_authority_registry_v1';
+// Official government source documents/portals for each reference tab.
+// Used by the "Download Procurement Document" button when a specific
+// source tab (not "All Sources") is active, so the correct official
+// document/portal opens instead of the uploaded tender/query PDF.
+const SOURCE_PDF_URLS = {
+  'GFR 2017': 'https://doe.gov.in/general-financial-rules-2017-updated-upto-31st-january-2026',
+  'CVC Guidelines': 'https://cvc.gov.in/?q=guidelines/tender-guidelines',
+  'Manual on Policies & Procedures (Goods)': 'https://doe.gov.in/files/circulars_document/Manual_Goods_2024.pdf',
+  'Manual for Procurement of Works (2022)': 'https://doe.gov.in/files/procurement-policy-division/Manual_for_Procurement_of_Works_updated_2022_Amendment.pdf',
+  'Manual for Procurement of Consultancy Services (2025)': 'https://doe.gov.in/files/circulars_document/MfPoCS_2025.pdf',
+  'Manual for Procurement of Non-Consultancy Services (2025)': 'https://doe.gov.in/files/circulars_document/MfPoNCS_2025.pdf',
+  'GeM / CPPP Guidelines': 'https://gem.gov.in',
+  'MSE Procurement Policy Order, 2012': 'https://msme.gov.in/public-procurement-policy-micro-and-small-enterprises-mses-order-2012',
+  'DFPR, 2016': 'https://doe.gov.in/order-circular/delegation-financial-powers'
+};
 
-// Seed data — grows automatically as users confirm new entries
-const SEED_REGISTRY = [
+const PROC_RULES = [
+  // ── GFR 2017 ─────────────────────────────────────────────────
   {
-    client: 'Saharanpur Development Authority',
-    abbr: 'SDA',
-    state: 'Uttar Pradesh',
-    type: 'Development Authority',
-    knownRfps: [
-      'Request for Proposal (RFP) for Appointment of Planning, Monitoring & Operational Efficiency Consultant'
-    ]
+    id: 'GFR Rule 149', source: 'GFR 2017', srcClass: 'src-gfr',
+    title: 'Procurement through Competitive Bidding',
+    text: 'Every authority delegated with the financial powers of procuring goods in public interest shall have the responsibility and accountability to bring efficiency, economy, transparency and fairness in procuring goods. The procedure to be followed for procurement shall conform to the relevant rules and instructions as may be applicable.',
+    tags: ['procurement', 'competitive bidding', 'transparency', 'open tender', 'NIT']
   },
-  { client: 'Bulandshahr Khurja Development Authority', abbr: 'BKDA', state: 'Uttar Pradesh', type: 'Development Authority', knownRfps: [] },
-  { client: 'Agra Development Authority', abbr: 'ADA', state: 'Uttar Pradesh', type: 'Development Authority', knownRfps: [] },
-  { client: 'Lucknow Development Authority', abbr: 'LDA', state: 'Uttar Pradesh', type: 'Development Authority', knownRfps: [] },
-  { client: 'Meerut Development Authority', abbr: 'MDA', state: 'Uttar Pradesh', type: 'Development Authority', knownRfps: [] },
-  { client: 'Varanasi Development Authority', abbr: 'VDA', state: 'Uttar Pradesh', type: 'Development Authority', knownRfps: [] },
-  { client: 'Allahabad Development Authority', abbr: 'ADA', state: 'Uttar Pradesh', type: 'Development Authority', knownRfps: [] },
-  { client: 'Kanpur Development Authority', abbr: 'KDA', state: 'Uttar Pradesh', type: 'Development Authority', knownRfps: [] },
-  { client: 'Greater Noida Industrial Development Authority', abbr: 'GNIDA', state: 'Uttar Pradesh', type: 'Development Authority', knownRfps: [] },
-  { client: 'Yamuna Expressway Industrial Development Authority', abbr: 'YEIDA', state: 'Uttar Pradesh', type: 'Development Authority', knownRfps: [] },
-  { client: 'Delhi Development Authority', abbr: 'DDA', state: 'Delhi', type: 'Development Authority', knownRfps: [] },
-  { client: 'Mumbai Metropolitan Region Development Authority', abbr: 'MMRDA', state: 'Maharashtra', type: 'Development Authority', knownRfps: [] },
-  { client: 'Pune Metropolitan Region Development Authority', abbr: 'PMRDA', state: 'Maharashtra', type: 'Development Authority', knownRfps: [] },
-  { client: 'Chennai Metropolitan Development Authority', abbr: 'CMDA', state: 'Tamil Nadu', type: 'Development Authority', knownRfps: [] },
-  { client: 'Bangalore Development Authority', abbr: 'BDA', state: 'Karnataka', type: 'Development Authority', knownRfps: [] },
-  { client: 'Hyderabad Metropolitan Development Authority', abbr: 'HMDA', state: 'Telangana', type: 'Development Authority', knownRfps: [] },
-  { client: 'Jaipur Development Authority', abbr: 'JDA', state: 'Rajasthan', type: 'Development Authority', knownRfps: [] },
-  { client: 'Ahmedabad Urban Development Authority', abbr: 'AUDA', state: 'Gujarat', type: 'Development Authority', knownRfps: [] },
-  { client: 'Central Public Works Department', abbr: 'CPWD', state: 'Central', type: 'Government Department', knownRfps: [] },
-  { client: 'National Highways Authority of India', abbr: 'NHAI', state: 'Central', type: 'National Authority', knownRfps: [] },
-  { client: 'National Buildings Construction Corporation', abbr: 'NBCC', state: 'Central', type: 'PSU', knownRfps: [] },
-  { client: 'Housing and Urban Development Corporation', abbr: 'HUDCO', state: 'Central', type: 'PSU', knownRfps: [] },
+  {
+    id: 'GFR Rule 150', source: 'GFR 2017', srcClass: 'src-gfr',
+    title: 'Procurement of Goods and Services — General Principles',
+    text: 'Procuring authorities should procure goods at competitive prices from genuine sources, ensuring quality, delivery and after-sales support. Procurement should be by open competitive bidding unless otherwise specified.',
+    tags: ['goods', 'services', 'competitive price', 'quality', 'delivery']
+  },
+  {
+    id: 'GFR Rule 154', source: 'GFR 2017', srcClass: 'src-gfr',
+    title: 'Procurement through Limited Tender Enquiry',
+    text: 'Procurement may be made through Limited Tender Enquiry where the estimated value of the goods is up to ₹25 lakh. In such cases, a minimum of three suppliers should be invited. Justification for resorting to LTE must be recorded.',
+    tags: ['LTE', 'limited tender', 'single source', 'direct purchase', 'value']
+  },
+  {
+    id: 'GFR Rule 155', source: 'GFR 2017', srcClass: 'src-gfr',
+    title: 'Single Tender / Proprietary Article',
+    text: 'Procurement on single tender basis may be resorted to in cases where only a particular firm is the manufacturer of the required goods. A certificate that the item is a proprietary product available from a single source must be recorded by the competent authority.',
+    tags: ['single tender', 'proprietary', 'sole vendor', 'single source']
+  },
+  {
+    id: 'GFR Rule 157', source: 'GFR 2017', srcClass: 'src-gfr',
+    title: 'Bidding Documents',
+    text: 'The procuring entity must prepare bidding documents well in advance. Bidding documents must include: invitation to bid, instructions to bidders, scope of work/supply, specifications, evaluation criteria, contract terms and conditions, price bid format, and any other relevant terms.',
+    tags: ['bid document', 'RFP', 'RFQ', 'NIT', 'tender document', 'specifications', 'scope of work']
+  },
+  {
+    id: 'GFR Rule 158', source: 'GFR 2017', srcClass: 'src-gfr',
+    title: 'Pre-bid Conference and Clarifications',
+    text: 'The procuring entity may hold a pre-bid conference before the closing date of the bid to allow prospective bidders to seek clarifications. All clarifications issued should be communicated to all prospective bidders. The RFP document may be amended if necessary following the pre-bid conference.',
+    tags: ['pre-bid', 'clarification', 'queries', 'corrigendum', 'addendum', 'amendment']
+  },
+  {
+    id: 'GFR Rule 159', source: 'GFR 2017', srcClass: 'src-gfr',
+    title: 'Evaluation of Bids',
+    text: 'Bids shall be evaluated on the basis of conditions already incorporated in the bidding documents. No new condition should be imposed after bids are received. The lowest evaluated bid fulfilling all conditions should normally be accepted.',
+    tags: ['evaluation', 'technical evaluation', 'financial bid', 'QCBS', 'L1', 'lowest bid', 'criteria']
+  },
+  {
+    id: 'GFR Rule 160', source: 'GFR 2017', srcClass: 'src-gfr',
+    title: 'Post-Qualification and Verification',
+    text: 'Before award of contract, the procuring entity may carry out post-qualification of the apparently successful bidder to verify their eligibility and qualification as stated in the bidding documents.',
+    tags: ['post qualification', 'eligibility', 'verification', 'award', 'credentials']
+  },
+  {
+    id: 'GFR Rule 161', source: 'GFR 2017', srcClass: 'src-gfr',
+    title: 'Bid Security (Earnest Money Deposit)',
+    text: 'Bid security / EMD is required to protect the procuring entity against the risk of bidder withdrawing or modifying its bid after submission. The EMD amount should not exceed 2% of the estimated value of procurement. EMD may be in the form of bank guarantee, demand draft, or FDR.',
+    tags: ['EMD', 'bid security', 'earnest money', 'bank guarantee', 'FDR', 'withdrawal']
+  },
+  {
+    id: 'GFR Rule 166', source: 'GFR 2017', srcClass: 'src-gfr',
+    title: 'Performance Security',
+    text: 'The successful bidder should be required to furnish performance security for due performance of the contract. The performance security should be for an amount between 5% to 10% of the contract value and should remain valid for the period of contract plus claim period.',
+    tags: ['performance security', 'performance guarantee', 'PBG', 'contract security', 'bank guarantee']
+  },
+  {
+    id: 'GFR Rule 175', source: 'GFR 2017', srcClass: 'src-gfr',
+    title: 'Consortium / Joint Venture',
+    text: 'Where permitted by the procuring entity, a consortium or joint venture of firms may be allowed to bid. The bidding documents must clearly specify whether consortium or JV bids are permitted, the maximum number of partners, lead partner requirements, and the allocation of responsibilities.',
+    tags: ['consortium', 'joint venture', 'JV', 'partnership', 'lead member', 'associates']
+  },
+  {
+    id: 'GFR Rule 176', source: 'GFR 2017', srcClass: 'src-gfr',
+    title: 'Eligibility Criteria',
+    text: 'The eligibility and qualification criteria must be clearly defined in bidding documents. Criteria should be fair, transparent, and non-discriminatory. Criteria may include legal status, financial standing, technical capacity, relevant experience, and key personnel.',
+    tags: ['eligibility', 'qualification', 'criteria', 'experience', 'turnover', 'net worth', 'key personnel', 'manpower']
+  },
+  {
+    id: 'GFR Rule 178', source: 'GFR 2017', srcClass: 'src-gfr',
+    title: 'Extension of Bid Submission Deadline',
+    text: 'In exceptional circumstances, the procuring entity may extend the deadline for submission of bids. Notice of the extension must be communicated to all prospective bidders who received the original bidding documents. Adequate time must be provided for bidders to revise their bids.',
+    tags: ['extension', 'deadline', 'bid submission', 'date extension', 'corrigendum', 'timeline']
+  },
+  {
+    id: 'GFR Rule 182', source: 'GFR 2017', srcClass: 'src-gfr',
+    title: 'Opening of Bids',
+    text: 'Bids should be opened at the prescribed time and place in the presence of bidders or their authorised representatives. A bid opening register must be maintained. Bid prices and other relevant details should be read out and recorded.',
+    tags: ['bid opening', 'technical bid', 'financial bid', 'price bid', 'opening committee']
+  },
+  {
+    id: 'GFR Rule 197', source: 'GFR 2017', srcClass: 'src-gfr',
+    title: 'Transparency and Confidentiality',
+    text: 'Information relating to the examination, clarification, evaluation, and comparison of bids and recommendations concerning the award of a contract shall not be disclosed to bidders or others until the award of the contract is announced.',
+    tags: ['confidentiality', 'transparency', 'disclosure', 'evaluation', 'non-disclosure']
+  },
+
+  // ── CVC Guidelines ───────────────────────────────────────────
+  {
+    id: 'CVC Circular 2007/ORG/ENG/2', source: 'CVC Guidelines', srcClass: 'src-cvc',
+    title: 'Transparency in Tendering Process',
+    text: 'All tender conditions should be clearly specified upfront and no post-tender negotiations should ordinarily be held except with L1 bidder when the prices received are unreasonably high. The award of contracts should be finalized within the original validity period of bids.',
+    tags: ['transparency', 'post-tender negotiation', 'L1', 'bid validity', 'award']
+  },
+  {
+    id: 'CVC Circular 2005/ENG/01', source: 'CVC Guidelines', srcClass: 'src-cvc',
+    title: 'Ensuring Effective Competition — Minimum Bidders',
+    text: 'Tenders where only a single bid or fewer than three bids are received should be examined carefully. Where competition is inadequate, re-tendering should be considered. Accepting single bids requires approval of the competent authority with proper justification.',
+    tags: ['single bid', 'competition', 'minimum bidders', 're-tender', 'inadequate response']
+  },
+  {
+    id: 'CVC Circular 2017-ENG-01', source: 'CVC Guidelines', srcClass: 'src-cvc',
+    title: 'Integrity Pact in Procurement',
+    text: 'For procurements above specified thresholds, an Integrity Pact between the procuring authority and bidders should be executed. The Integrity Pact prevents corrupt practices in tendering and is monitored by an Independent External Monitor (IEM).',
+    tags: ['integrity pact', 'IEM', 'anti-corruption', 'ethics', 'IP']
+  },
+  {
+    id: 'CVC Advisory 2014/MMP/10', source: 'CVC Guidelines', srcClass: 'src-cvc',
+    title: 'e-Procurement Mandate',
+    text: 'All procurements above ₹2 lakh should be mandatorily conducted through the Government e-Marketplace (GeM) or other approved e-procurement portals. Manual tendering for such procurements requires specific approval with documented justification.',
+    tags: ['e-procurement', 'GeM', 'CPPP', 'online tender', 'digital']
+  },
+  {
+    id: 'CVC Circular 2016/WC/01', source: 'CVC Guidelines', srcClass: 'src-cvc',
+    title: 'Debarment and Blacklisting of Vendors',
+    text: 'Vendors found to have furnished false information, indulged in corrupt practices, or failed to perform as per contract may be debarred/blacklisted for a specified period. Such debarment should be widely publicised and other government organisations informed.',
+    tags: ['debarment', 'blacklist', 'banned', 'corrupt practice', 'false information']
+  },
+  {
+    id: 'CVC Circular 2003/POL/31', source: 'CVC Guidelines', srcClass: 'src-cvc',
+    title: 'Award within Bid Validity Period',
+    text: 'Awards of contracts must be made within the validity period of bids. Extension of bid validity beyond original period, or re-negotiation of price after bid validity, is generally not permissible and requires CVC consultation.',
+    tags: ['bid validity', 'award', 'extension of validity', 'negotiation', 'contract award']
+  },
+
+  // ── Manual on Policies & Procedures (Purchase of Goods) ──────
+  {
+    id: 'Manual Para 6.1', source: 'Manual on Policies & Procedures (Goods)', srcClass: 'src-manual',
+    title: 'Rate Contract and DGS&D',
+    text: 'Goods available on DGS&D/GeM rate contracts can be procured directly without following tender formalities. The procuring authority should verify the rate contract validity and any amendments before ordering against it.',
+    tags: ['rate contract', 'DGS&D', 'GeM', 'direct procurement', 'RC']
+  },
+  {
+    id: 'Manual Para 6.7', source: 'Manual on Policies & Procedures (Goods)', srcClass: 'src-manual',
+    title: 'Technical Specifications — Neutrality',
+    text: 'Technical specifications should be drawn up in a neutral manner so as not to give undue advantage to any particular supplier. Specifications should not be modelled around any specific make or brand. Where proprietary features are essential, justification must be documented.',
+    tags: ['specifications', 'technical', 'brand neutral', 'make', 'model', 'proprietary', 'scope']
+  },
+  {
+    id: 'Manual Para 8.1', source: 'Manual on Policies & Procedures (Goods)', srcClass: 'src-manual',
+    title: 'Inspection and Quality Control',
+    text: 'All goods procured should be subject to inspection before acceptance. Inspection may be carried out by departmental inspecting officers, or third-party inspection agencies. Inspection criteria and acceptance standards must be specified in the contract.',
+    tags: ['inspection', 'quality', 'acceptance', 'testing', 'third party inspection', 'QC']
+  },
+  {
+    id: 'Manual Para 9.3', source: 'Manual on Policies & Procedures (Goods)', srcClass: 'src-manual',
+    title: 'Advance Payment and Payment Terms',
+    text: 'Advance payment should normally not be made except in exceptional circumstances with justification. Where advance is unavoidable, it should not exceed 15% of contract value and must be secured by a bank guarantee of equivalent amount. Payment milestones should be tied to deliverables.',
+    tags: ['advance payment', 'payment terms', 'milestone payment', 'bank guarantee', 'mobilisation advance']
+  },
+  {
+    id: 'Manual Para 10.1', source: 'Manual on Policies & Procedures (Goods)', srcClass: 'src-manual',
+    title: 'Liquidated Damages',
+    text: 'Contracts should incorporate a liquidated damages (LD) clause to cover late delivery or non-performance. LD is typically 0.5% per week of delay subject to a maximum of 10% of the contract value. LD is not a penalty but pre-estimated damages.',
+    tags: ['liquidated damages', 'LD', 'penalty', 'delay', 'late delivery', 'non-performance', 'damages']
+  },
+
+  // ── GeM / CPPP Guidelines ────────────────────────────────────
+  {
+    id: 'GeM Guidelines 2.0', source: 'GeM / CPPP Guidelines', srcClass: 'src-gem',
+    title: 'Mandatory Procurement through GeM',
+    text: 'All Central Government Ministries/Departments and attached offices are mandatorily required to procure goods and services available on GeM. State Governments are encouraged to register and procure through GeM. Procuring entities must check GeM availability before initiating manual procurement.',
+    tags: ['GeM', 'government e-marketplace', 'mandatory', 'online procurement', 'central government']
+  },
+  {
+    id: 'GeM Bid Guidelines 3.1', source: 'GeM / CPPP Guidelines', srcClass: 'src-gem',
+    title: 'GeM Bid and RA (Reverse Auction)',
+    text: 'For procurements above ₹25 lakh on GeM, a Bid or Reverse Auction (RA) process should be followed. In RA, the lowest price discovered through an automated process becomes the basis for award. Bidders must register on GeM and comply with its terms for participation.',
+    tags: ['GeM bid', 'reverse auction', 'RA', 'L1', 'online bidding', 'auction']
+  },
+  {
+    id: 'CPPP OM 2012', source: 'GeM / CPPP Guidelines', srcClass: 'src-gem',
+    title: 'Central Public Procurement Portal — e-Publishing',
+    text: 'All procurements above ₹5 lakh must be published on the Central Public Procurement Portal (CPPP / eprocure.gov.in). The NIT/tender notice must include scope, eligibility, evaluation criteria, EMD details, and bid submission deadline. Corrigenda must also be published on CPPP.',
+    tags: ['CPPP', 'eprocure', 'publishing', 'NIT', 'transparency', 'notice', 'corrigendum']
+  },
+  {
+    id: 'GeM Seller Registration', source: 'GeM / CPPP Guidelines', srcClass: 'src-gem',
+    title: 'Vendor Registration and Eligibility on GeM',
+    text: 'Sellers/service providers on GeM must be registered entities complying with all statutory requirements including GST, MSME, and income tax filings. Micro and Small Enterprises (MSEs) are given purchase preference as per Public Procurement Policy for MSEs.',
+    tags: ['vendor registration', 'MSME', 'MSE', 'startup', 'GST', 'purchase preference', 'registration']
+  },
+  {
+    id: 'Make in India Order 2017', source: 'GeM / CPPP Guidelines', srcClass: 'src-gem',
+    title: 'Preference to Make in India — Class I / Class II Local Suppliers',
+    text: 'Government procuring entities must give purchase preference to local suppliers. Class I Local Suppliers (minimum 50% local content) get purchase preference over Class II (minimum 20%) and non-local suppliers. For items below ₹200 crore, only local suppliers should be invited.',
+    tags: ['make in india', 'local content', 'class I', 'class II', 'purchase preference', 'domestic', 'import']
+  },
+
+  // ── Manual for Procurement of Works (Updated June 2022, DoE) ─────────────────
+  {
+    id: 'Works Manual Ch.2 Para 2.3', source: 'Manual for Procurement of Works (2022)', srcClass: 'src-works',
+    title: 'Eligibility and Qualification Criteria for Contractors',
+    text: 'Eligibility and qualification criteria for contractors must be clearly defined in the bidding documents and must be commensurate with the nature and scale of the works. Criteria may include legal status, financial capability (turnover, net worth), technical capacity (similar work experience, equipment), and key personnel. Criteria must be non-discriminatory and must not be set so high as to restrict competition.',
+    tags: ['eligibility', 'qualification', 'contractor', 'turnover', 'experience', 'similar work', 'key personnel', 'equipment', 'net worth']
+  },
+  {
+    id: 'Works Manual Ch.2 Para 2.5', source: 'Manual for Procurement of Works (2022)', srcClass: 'src-works',
+    title: 'Consortium / Joint Venture for Works Contracts',
+    text: 'The bidding document must clearly state whether bids from Joint Ventures (JVs) or Consortia are permitted. Where permitted, the document must specify: the maximum number of JV members, the minimum shareholding of the lead partner, individual qualification requirements per partner, joint and several liability, and any restrictions on sub-contracting by JV members.',
+    tags: ['consortium', 'joint venture', 'JV', 'lead member', 'partner', 'liability', 'sub-contracting', 'works']
+  },
+  {
+    id: 'Works Manual Ch.3 Para 3.2', source: 'Manual for Procurement of Works (2022)', srcClass: 'src-works',
+    title: 'Notice Inviting Tenders (NIT) for Works',
+    text: 'The NIT for works should contain: name and address of procuring entity, nature and location of work, estimated cost, EMD amount, period of completion, eligibility criteria, dates and place for obtaining/submitting bid documents, and date/time/place of bid opening. NIT must be published on CPPP for procurements above ₹5 lakh.',
+    tags: ['NIT', 'notice inviting tender', 'works', 'estimated cost', 'completion period', 'publication', 'CPPP']
+  },
+  {
+    id: 'Works Manual Ch.3 Para 3.7', source: 'Manual for Procurement of Works (2022)', srcClass: 'src-works',
+    title: 'Two-Bid System for Works (Technical and Financial)',
+    text: 'For works above specified thresholds or complex works, a two-bid system (technical and financial bids in separate envelopes) is recommended. Technical bids are evaluated first; only technically qualified bidders are short-listed and their financial bids opened. This prevents undue emphasis on price at the cost of quality and technical capability.',
+    tags: ['two bid', 'technical bid', 'financial bid', 'price bid', 'envelope', 'works', 'two envelope']
+  },
+  {
+    id: 'Works Manual Ch.3 Para 3.10', source: 'Manual for Procurement of Works (2022)', srcClass: 'src-works',
+    title: 'Bid Validity and Extension for Works',
+    text: 'Bids for works must remain valid for the period specified in the bidding documents (typically 90–180 days). If the procuring entity is unable to award within the original validity, it may request bidders to extend validity. A bidder may refuse such extension without forfeiting its EMD. Any extension of validity must not require the bidder to alter its price.',
+    tags: ['bid validity', 'extension', 'validity period', 'works', 'EMD forfeiture', 'price']
+  },
+  {
+    id: 'Works Manual Ch.4 Para 4.1', source: 'Manual for Procurement of Works (2022)', srcClass: 'src-works',
+    title: 'Evaluation of Bids for Works — L1 Basis',
+    text: 'Bids for works are normally evaluated on the lowest price (L1) basis, provided the bidder is technically qualified and the bid is substantially responsive. Abnormally low bids must be scrutinised to verify whether the bidder has made an arithmetic error, omitted items, or is making a deliberate unsustainable offer. The Tender Committee must record its findings before award.',
+    tags: ['L1', 'lowest bid', 'evaluation', 'works', 'abnormally low bid', 'tender committee', 'technically qualified']
+  },
+  {
+    id: 'Works Manual Ch.4 Para 4.4', source: 'Manual for Procurement of Works (2022)', srcClass: 'src-works',
+    title: 'Negotiations for Works Contracts',
+    text: 'Post-bid negotiations are ordinarily not permitted for works contracts. In exceptional cases where the L1 price is unreasonably high, negotiations may be conducted with the L1 bidder only, with prior approval of the competent authority. Negotiated price must not exceed the estimated cost. Results of negotiations must be documented.',
+    tags: ['negotiation', 'post bid', 'L1', 'works', 'price negotiation', 'competent authority']
+  },
+  {
+    id: 'Works Manual Ch.5 Para 5.2', source: 'Manual for Procurement of Works (2022)', srcClass: 'src-works',
+    title: 'Mobilisation Advance for Works',
+    text: 'A mobilisation advance may be paid to the contractor for initial expenses. It should not exceed 10% of the contract value and must be secured by a bank guarantee of equal amount valid until recovery. The advance should be recovered in equal instalments from subsequent payment certificates. Recovery must be completed before 80% of the contract period has elapsed.',
+    tags: ['mobilisation advance', 'advance payment', 'bank guarantee', 'recovery', 'works', 'contractor payment']
+  },
+  {
+    id: 'Works Manual Ch.5 Para 5.4', source: 'Manual for Procurement of Works (2022)', srcClass: 'src-works',
+    title: 'Price Variation Clause (PVC) for Works',
+    text: 'For long-duration works contracts (typically exceeding 18 months), a Price Variation Clause (PVC) should be incorporated to protect both parties against inflation. The formula should be based on the indices published by CPWD, RBI or other authorised agency. No PVC is generally permissible for lump-sum turnkey contracts unless specifically approved.',
+    tags: ['price variation', 'PVC', 'escalation', 'inflation', 'index', 'long duration', 'works', 'turnkey']
+  },
+  {
+    id: 'Works Manual Ch.5 Para 5.6', source: 'Manual for Procurement of Works (2022)', srcClass: 'src-works',
+    title: 'Liquidated Damages for Works',
+    text: 'Works contracts must incorporate a Liquidated Damages (LD) clause for delay in completion. LD is typically 0.5% per week of delay subject to a ceiling of 10% of the contract value. LD represents a genuine pre-estimate of damages, not a penalty. The procuring entity must serve notice of imposition of LD. Recovery of LD does not bar other remedies for breach of contract.',
+    tags: ['liquidated damages', 'LD', 'delay', 'penalty', 'completion', 'works', 'breach', 'extension of time']
+  },
+  {
+    id: 'Works Manual Ch.5 Para 5.9', source: 'Manual for Procurement of Works (2022)', srcClass: 'src-works',
+    title: 'Extension of Time (EoT) for Works Contracts',
+    text: 'A contractor may seek Extension of Time (EoT) where delay is caused by reasons beyond the contractor\'s control: force majeure, acts of the employer, change in law, abnormal weather, or other specified events. The claim must be submitted in writing within the specified notice period. EoT does not automatically entitle the contractor to additional cost unless the contract provides for it.',
+    tags: ['extension of time', 'EoT', 'delay', 'force majeure', 'employer risk', 'weather', 'works', 'claim', 'completion date']
+  },
+  {
+    id: 'Works Manual Ch.5 Para 5.11', source: 'Manual for Procurement of Works (2022)', srcClass: 'src-works',
+    title: 'Defect Liability Period (DLP) for Works',
+    text: 'After completion and acceptance of works, a Defect Liability Period (DLP) — typically 12 months — must be specified during which the contractor is responsible for rectifying any defects arising from faulty materials or workmanship. Retention money or a Defect Liability Certificate (DLC) bank guarantee should be held during the DLP. On expiry and clearance of defects, the retained amount/guarantee is released.',
+    tags: ['defect liability', 'DLP', 'DLC', 'retention', 'warranty', 'maintenance', 'rectification', 'works', 'completion']
+  },
+  {
+    id: 'Works Manual Ch.5 Para 5.13', source: 'Manual for Procurement of Works (2022)', srcClass: 'src-works',
+    title: 'Retention Money for Works',
+    text: 'Retention money is withheld from each running bill of the contractor to ensure satisfactory completion and defect rectification. Retention is typically 5–10% of each bill, subject to a maximum of 5% of contract value. Half the retention is released on substantial completion; the balance on expiry of the DLP with satisfactory rectification of defects.',
+    tags: ['retention money', 'withheld', 'running bill', 'works', 'completion', 'defect', 'DLP', 'release']
+  },
+  {
+    id: 'Works Manual Ch.6 Para 6.2', source: 'Manual for Procurement of Works (2022)', srcClass: 'src-works',
+    title: 'Sub-Contracting in Works',
+    text: 'The main contractor must not sub-contract the entire works without the written consent of the procuring entity. Key items of work (as identified in the contract) must be executed by the main contractor. Sub-contracting thresholds and permissible work categories must be specified in the bidding document. The main contractor remains fully responsible for sub-contracted work.',
+    tags: ['sub-contracting', 'sub-contractor', 'works', 'main contractor', 'key items', 'responsibility', 'consent']
+  },
+  {
+    id: 'Works Manual Ch.7 Para 7.1', source: 'Manual for Procurement of Works (2022)', srcClass: 'src-works',
+    title: 'Registration / Enlistment of Contractors',
+    text: 'Procuring entities may maintain a list of registered/enlisted contractors classified by category of work and financial limit. Registration does not guarantee award of work. Criteria for registration must be transparent. Registration lists must be reviewed periodically. Registered contractors must maintain their qualifications to stay on the list.',
+    tags: ['registration', 'enlistment', 'contractor', 'empanelment', 'works', 'category', 'approved list']
+  },
+
+  // ── Manual for Procurement of Consultancy Services (2nd Ed., 2025, DoE) ──────
+  {
+    id: 'Consultancy Manual 2025 Ch.1 Para 1.3', source: 'Manual for Procurement of Consultancy Services (2025)', srcClass: 'src-consult',
+    title: 'Applicability — What Constitutes Consultancy Services',
+    text: 'Consultancy services include professional, intellectual, advisory, training, research, design, technical assistance, and management advisory services. The manual applies to all Central Government Ministries, Departments, CPSEs, and autonomous bodies. Individual appointments under service rules are excluded. The key distinction from non-consultancy services is the predominance of intellectual input.',
+    tags: ['consultancy', 'services', 'advisory', 'professional', 'intellectual', 'applicability', 'CPSEs']
+  },
+  {
+    id: 'Consultancy Manual 2025 Ch.2 Para 2.1', source: 'Manual for Procurement of Consultancy Services (2025)', srcClass: 'src-consult',
+    title: 'Types of Consultancy Contracts',
+    text: 'Consultancy contracts may be: (a) Lump Sum (Firm Fixed Price) — total cost fixed, suitable when scope is well-defined; (b) Time-Based — payment based on time spent, suitable for complex or open-ended assignments; (c) Retainer/Contingency — for advisory services on call; (d) Percentage of Construction Cost — for design and supervision; (e) Indefinite Delivery (IDIQ) — for recurring needs.',
+    tags: ['lump sum', 'time based', 'retainer', 'contract type', 'consultancy', 'IDIQ', 'percentage', 'fee']
+  },
+  {
+    id: 'Consultancy Manual 2025 Ch.3 Para 3.2', source: 'Manual for Procurement of Consultancy Services (2025)', srcClass: 'src-consult',
+    title: 'Preparation of Terms of Reference (ToR)',
+    text: 'The Terms of Reference (ToR) is the most critical document in consultancy procurement. It must define: background and objectives of the assignment, scope of services and deliverables, institutional and reporting arrangements, required qualifications and experience of the firm and key experts, schedule of activities, and data/facilities to be provided by the client. A well-prepared ToR ensures clarity and accountability.',
+    tags: ['terms of reference', 'TOR', 'scope', 'deliverables', 'key experts', 'consultancy', 'qualifications', 'background', 'objectives']
+  },
+  {
+    id: 'Consultancy Manual 2025 Ch.3 Para 3.5', source: 'Manual for Procurement of Consultancy Services (2025)', srcClass: 'src-consult',
+    title: 'Shortlisting of Consultants — Expression of Interest (EoI)',
+    text: 'For procurements above ₹50 lakh (indicative), an Expression of Interest (EoI) must be published to shortlist eligible firms. The shortlist should normally comprise 3–6 firms. Criteria for shortlisting include: firm\'s general experience, specific experience relevant to the assignment, work methodology, and key staff. EoI must be published on CPPP.',
+    tags: ['expression of interest', 'EoI', 'shortlist', 'consultancy', 'eligibility', 'CPPP', 'firm', 'experience']
+  },
+  {
+    id: 'Consultancy Manual 2025 Ch.4 Para 4.1', source: 'Manual for Procurement of Consultancy Services (2025)', srcClass: 'src-consult',
+    title: 'Selection Methods for Consultancy Services',
+    text: 'The main selection methods are: (a) Quality and Cost Based Selection (QCBS) — recommended for most assignments, balancing technical quality and cost; (b) Quality Based Selection (QBS) — for highly complex or specialised assignments where quality is paramount; (c) Fixed Budget Selection (FBS); (d) Least Cost Selection (LCS) — for standard or routine assignments; (e) Single Source Selection (SSS) — only in exceptional circumstances with justification.',
+    tags: ['QCBS', 'QBS', 'quality cost', 'selection method', 'consultancy', 'single source', 'FBS', 'LCS', 'evaluation']
+  },
+  {
+    id: 'Consultancy Manual 2025 Ch.4 Para 4.3', source: 'Manual for Procurement of Consultancy Services (2025)', srcClass: 'src-consult',
+    title: 'Technical Proposal Evaluation Criteria',
+    text: 'Technical proposals are evaluated against pre-disclosed criteria, typically covering: (a) Firm\'s relevant experience (10–20%); (b) Understanding of ToR and methodology/work plan (20–40%); (c) Key experts\' qualifications and competence (30–60%). The technical evaluation must be completed by a duly constituted Consultancy Evaluation Committee (CEC) before financial proposals are opened. Minimum qualifying technical score is typically 70–75%.',
+    tags: ['technical evaluation', 'CEC', 'methodology', 'key experts', 'scoring', 'consultancy', 'criteria', 'proposal']
+  },
+  {
+    id: 'Consultancy Manual 2025 Ch.4 Para 4.6', source: 'Manual for Procurement of Consultancy Services (2025)', srcClass: 'src-consult',
+    title: 'Negotiations with Selected Consultant',
+    text: 'Negotiations are held with the top-ranked consultant (technically and financially). Negotiation may cover: clarification of ToR, methodology, staffing, and conditions of contract. The financial negotiation should not result in substantial reduction of technical inputs. Negotiated contract amount should not exceed the budget estimate. Negotiations should be documented in detail.',
+    tags: ['negotiation', 'consultancy', 'selected firm', 'contract amount', 'staffing', 'TOR', 'conditions']
+  },
+  {
+    id: 'Consultancy Manual 2025 Ch.5 Para 5.1', source: 'Manual for Procurement of Consultancy Services (2025)', srcClass: 'src-consult',
+    title: 'Conflict of Interest in Consultancy Assignments',
+    text: 'A consultant shall not be hired if they have a conflict of interest. Conflicts include: firm-related conflicts (related parties, financial interest in the procuring entity), assignment-specific conflicts (downstream work benefit, simultaneous assignments for competing parties), and relationship conflicts (former government employees within the cooling-off period). Consultants must disclose any potential conflict.',
+    tags: ['conflict of interest', 'consultancy', 'related party', 'cooling off', 'disclosure', 'competing assignments']
+  },
+  {
+    id: 'Consultancy Manual 2025 Ch.6 Para 6.2', source: 'Manual for Procurement of Consultancy Services (2025)', srcClass: 'src-consult',
+    title: 'Key Expert Replacement during Assignment',
+    text: 'Key experts (as listed in the contract) shall not be replaced without the prior written approval of the procuring entity. Proposed replacements must have equal or superior qualifications and experience. The consultant must submit CVs of proposed replacements for approval. Unauthorised replacement may attract penalty or rejection of the replacement.',
+    tags: ['key expert', 'replacement', 'personnel', 'consultant', 'CV', 'approval', 'assignment']
+  },
+  {
+    id: 'Consultancy Manual 2025 Ch.7 Para 7.1', source: 'Manual for Procurement of Consultancy Services (2025)', srcClass: 'src-consult',
+    title: 'Contract Management and Monitoring of Consultancy',
+    text: 'A Contract Management Committee (CMC) should be constituted to oversee delivery of consultancy services. Deliverables must be reviewed against the ToR and approved before payment is released. Progress reports at agreed intervals are mandatory. Time and cost overruns must be approved by the competent authority before incurring additional expenditure.',
+    tags: ['contract management', 'CMC', 'deliverables', 'monitoring', 'consultancy', 'progress report', 'payment', 'overrun']
+  },
+  {
+    id: 'Consultancy Manual 2025 Ch.9 Para 9.1', source: 'Manual for Procurement of Consultancy Services (2025)', srcClass: 'src-consult',
+    title: 'Single Source Selection (SSS) — Justification Required',
+    text: 'Single Source Selection of a consultant is permissible only in exceptional circumstances: (a) tasks are a natural continuation of a previous contract; (b) only one firm has the requisite qualifications; (c) emergency situation requiring urgent assignment; (d) assignment is of small value (below threshold). Justification for SSS must be approved by the competent authority and documented.',
+    tags: ['single source', 'SSS', 'sole source', 'consultancy', 'emergency', 'justification', 'continuation']
+  },
+
+  // ── Manual for Procurement of Non-Consultancy Services (2025, DoE) ─────────
+  {
+    id: 'Non-Consult Manual 2025 Ch.1 Para 1.2', source: 'Manual for Procurement of Non-Consultancy Services (2025)', srcClass: 'src-nonconsult',
+    title: 'Definition and Scope — Non-Consultancy Services',
+    text: 'Non-Consultancy Services cover services where physical or operational output is the primary deliverable rather than intellectual output. Examples include: security services, housekeeping, horticulture, data entry, AMC of equipment, transportation, catering, repair and maintenance, event management, and IT support services. The distinction from consultancy is that non-consultancy services are generally routine, with standard specifications and measurable physical outputs.',
+    tags: ['non-consultancy', 'services', 'security', 'housekeeping', 'AMC', 'maintenance', 'outsourcing', 'facility management', 'scope']
+  },
+  {
+    id: 'Non-Consult Manual 2025 Ch.2 Para 2.3', source: 'Manual for Procurement of Non-Consultancy Services (2025)', srcClass: 'src-nonconsult',
+    title: 'Procurement Method — Open Tender for Non-Consultancy Services',
+    text: 'Non-consultancy services above ₹25 lakh should normally be procured through open competitive tendering (NIT/RFP). The NIT must include: detailed scope of services, eligibility criteria, evaluation methodology, service level agreements (SLAs), penalty clause for non-performance, payment terms, and contract duration. Services available on GeM must be procured through GeM.',
+    tags: ['open tender', 'NIT', 'non-consultancy', 'services', 'SLA', 'GeM', 'competitive bidding', 'eligibility']
+  },
+  {
+    id: 'Non-Consult Manual 2025 Ch.2 Para 2.6', source: 'Manual for Procurement of Non-Consultancy Services (2025)', srcClass: 'src-nonconsult',
+    title: 'Service Level Agreements (SLA) and Performance Standards',
+    text: 'All non-consultancy service contracts must incorporate Service Level Agreements (SLAs) defining measurable performance standards, response times, uptime requirements, and reporting obligations. SLAs must be realistic, measurable, and linked to the payment mechanism. Penalty for SLA breach should be specified and automated where possible. SLAs must be periodically reviewed and updated.',
+    tags: ['SLA', 'service level', 'performance', 'penalty', 'non-consultancy', 'response time', 'uptime', 'measurable']
+  },
+  {
+    id: 'Non-Consult Manual 2025 Ch.3 Para 3.1', source: 'Manual for Procurement of Non-Consultancy Services (2025)', srcClass: 'src-nonconsult',
+    title: 'Eligibility and Qualification Criteria for Service Providers',
+    text: 'Qualification criteria for non-consultancy service providers should include: legal registration, statutory compliance (PF, ESI, GST), relevant experience in similar services, financial capacity, manpower availability, and equipment/infrastructure. Criteria should be proportionate to the scale and nature of services. Specifying brand or proprietary technology criteria is restrictive and should be avoided.',
+    tags: ['eligibility', 'qualification', 'service provider', 'non-consultancy', 'PF', 'ESI', 'GST', 'manpower', 'statutory', 'experience']
+  },
+  {
+    id: 'Non-Consult Manual 2025 Ch.3 Para 3.5', source: 'Manual for Procurement of Non-Consultancy Services (2025)', srcClass: 'src-nonconsult',
+    title: 'Evaluation of Bids for Non-Consultancy Services',
+    text: 'Non-consultancy services are typically evaluated on Least Cost Selection (LCS) basis, i.e., the lowest evaluated compliant bid. For complex or quality-sensitive services, QCBS may be used. Evaluation criteria must be pre-disclosed in the RFP. Price bids of only technically qualified bidders should be opened. Award should be made to the L1 technically qualified bidder.',
+    tags: ['evaluation', 'L1', 'LCS', 'QCBS', 'non-consultancy', 'price bid', 'compliant bid', 'award']
+  },
+  {
+    id: 'Non-Consult Manual 2025 Ch.4 Para 4.2', source: 'Manual for Procurement of Non-Consultancy Services (2025)', srcClass: 'src-nonconsult',
+    title: 'Contract Duration and Renewal for Services',
+    text: 'Non-consultancy service contracts are typically for one year, renewable annually subject to satisfactory performance and budget availability. Initial contract duration should not exceed 3 years without specific approval. Extension beyond original term requires the competent authority\'s approval and must not be used as a substitute for fresh tendering. Price for renewed period should be linked to specified index or negotiated with justification.',
+    tags: ['contract duration', 'renewal', 'extension', 'annual', 'non-consultancy', 'services', 'fresh tender', 'period']
+  },
+  {
+    id: 'Non-Consult Manual 2025 Ch.4 Para 4.5', source: 'Manual for Procurement of Non-Consultancy Services (2025)', srcClass: 'src-nonconsult',
+    title: 'Minimum Wages and Labour Law Compliance',
+    text: 'Service contracts involving labour/manpower must comply with the Code on Wages, the Contract Labour (Regulation and Abolition) Act, and applicable Minimum Wages notifications. The procuring entity should include an obligation clause in the contract requiring the service provider to pay at least the applicable minimum wage. Non-compliance is grounds for contract termination.',
+    tags: ['minimum wages', 'labour law', 'manpower', 'non-consultancy', 'PF', 'ESI', 'contractor labour', 'compliance', 'code on wages']
+  },
+
+  // ── Public Procurement Policy for MSEs Order, 2012 ───────────────────────────
+  {
+    id: 'MSE Policy Order 2012 Para 4', source: 'MSE Procurement Policy Order, 2012', srcClass: 'src-mse',
+    title: 'Mandatory 25% Annual Procurement Target from MSEs',
+    text: 'Every Central Ministry/Department/PSU is required to procure a minimum of 25% of its annual procurement (by value) from Micro and Small Enterprises (MSEs). Of this 25%, a sub-target of 4% is earmarked for MSEs owned by Scheduled Caste/Scheduled Tribe entrepreneurs, and 3% is earmarked for MSEs owned by women. Failure to meet the target must be reported with reasons to the nodal ministry.',
+    tags: ['MSE', 'MSME', 'micro', 'small enterprise', 'purchase preference', 'annual target', 'SC ST', 'women entrepreneur', '25 percent', 'sub-target']
+  },
+  {
+    id: 'MSE Policy Order 2012 Para 5', source: 'MSE Procurement Policy Order, 2012', srcClass: 'src-mse',
+    title: 'EMD and Tender Fee Exemption for MSEs / DPIIT Startups',
+    text: 'Micro and Small Enterprises registered with Udyam Registration Portal (or its predecessors NSIC/UAM) are exempt from payment of Earnest Money Deposit (EMD) and tender document fees. DPIIT-recognized startups are similarly exempt from EMD requirement. Procuring entities cannot make EMD/tender-fee payment a mandatory pre-condition that effectively excludes MSEs or recognised startups.',
+    tags: ['EMD', 'earnest money', 'tender fee', 'waiver', 'exemption', 'MSE', 'MSME', 'Udyam', 'NSIC', 'startup', 'DPIIT', 'eligibility']
+  },
+  {
+    id: 'MSE Policy Order 2012 Para 11', source: 'MSE Procurement Policy Order, 2012', srcClass: 'src-mse',
+    title: 'Purchase Preference / Price Preference for MSEs',
+    text: 'Where the lowest bid in a tender is from a non-MSE supplier, MSE bidders quoting within a price band of L1 + 15% (subject to their matching L1 price) shall be considered for award of a portion of the quantity (at least 25% of the order). MSE bidders must furnish documentary proof of registration with Udyam/NSIC and produce the relevant manufactured product to avail the preference.',
+    tags: ['purchase preference', 'price preference', 'L1', '15 percent', 'MSE', 'MSME', 'Udyam', 'quantity split', 'award', 'eligibility']
+  },
+  {
+    id: 'MSE Policy Order 2012 Para 9', source: 'MSE Procurement Policy Order, 2012', srcClass: 'src-mse',
+    title: 'Local Content Self-Certification for Make in India (MSE Overlap)',
+    text: 'MSEs availing purchase preference or tender-fee/EMD exemption must self-certify their registration category (Udyam certificate) and that the goods/services are manufactured or rendered by them. False self-certification leads to disqualification, forfeiture of bid security, and blacklisting. Procuring entities may seek independent verification from Udyam portal.',
+    tags: ['self certification', 'Udyam', 'MSE', 'MSME', 'local content', 'make in india', 'false declaration', 'blacklist', 'disqualification']
+  },
+
+  // ── GFR 2017 — Surety Bonds (2022 Amendment) ─────────────────────────────────
+  {
+    id: 'GFR 2017 Rule 170A', source: 'GFR 2017', srcClass: 'src-gfr',
+    title: 'Insurance Surety Bonds as Alternative to Bank Guarantee (EMD / PBG)',
+    text: 'GFR Rule 170A (inserted by amendment, October 2022) permits Insurance Surety Bonds issued by IRDAI-regulated insurance companies as an acceptable alternative to Bank Guarantees for Bid Security (EMD) and Performance Bank Guarantees (PBG). The surety bond must be issued by an insurer rated at least AA by a recognised credit rating agency. Procuring entities may specify surety bonds as an acceptable instrument; bidders cannot insist on surety bonds where only BG/DD/FDR is specified.',
+    tags: ['surety bond', 'insurance surety', 'bank guarantee', 'EMD', 'bid security', 'performance security', 'PBG', 'GFR 170A', 'IRDAI', 'alternative instrument', '2022 amendment']
+  },
+
+  // ── Code of Integrity for Public Procurement (CIPP) ─────────────────────────
+  {
+    id: 'CVC CIPP Para 3', source: 'CVC Guidelines', srcClass: 'src-cvc',
+    title: 'Code of Integrity — Prohibition on Collusion, Coercion & Front-Loading',
+    text: 'The Code of Integrity for Public Procurement (CIPP), circulated by DoE and CVC, prohibits all parties — procuring entities as well as bidders — from: (a) entering into agreements to fix prices, bid amounts, or terms (collusive bidding); (b) exerting coercion or undue influence on bid evaluation; (c) front-loading specifications or evaluation criteria in favour of a particular bidder; (d) making false declarations in bids; and (e) obstructing the audit/investigation of procurement. Violation by a bidder is grounds for disqualification and blacklisting.',
+    tags: ['code of integrity', 'CIPP', 'collusion', 'coercion', 'front loading', 'false declaration', 'blacklist', 'integrity', 'rigging', 'price fixing', 'bid manipulation']
+  },
+  {
+    id: 'CVC CIPP Para 5', source: 'CVC Guidelines', srcClass: 'src-cvc',
+    title: 'Integrity Pact vs. Code of Integrity — Scope and Applicability',
+    text: 'The Integrity Pact (IP) is a bilateral agreement signed between the procuring entity and each bidder/contractor committing both parties to ethical conduct during and after procurement. The Code of Integrity (CIPP) is broader: it applies as a matter of policy to all public procurement by the government (procuring entity and bidder) regardless of whether an IP is executed. For high-value contracts typically above ₹5 crore, CVC advises executing an Integrity Pact with an Independent External Monitor (IEM); the CIPP applies in all cases.',
+    tags: ['integrity pact', 'code of integrity', 'CIPP', 'IEM', 'independent external monitor', 'corruption', 'ethical', 'high value', 'bilateral']
+  },
+
+  // ── Delegation of Financial Powers Rules (DFPR) 2016 ────────────────────────
+  {
+    id: 'DFPR 2016 Rule 8', source: 'DFPR, 2016', srcClass: 'src-dfpr',
+    title: 'Sanction Authority — Financial Powers Delegated to Ministries/Departments',
+    text: 'The Delegation of Financial Powers Rules, 2016 (DFPR) specify the financial limits up to which Heads of Departments, Heads of Offices, and other designated officers may sanction expenditure without seeking higher-level approval. Procurement tender conditions or clause relaxations (e.g., pre-qualification waiver, single-source justification) that require expenditure beyond the delegated limit of the approving authority must receive prior approval from the next higher authority or the Ministry of Finance. Challenging a clause as "ultra vires of delegated powers" requires reference to the relevant schedule of DFPR.',
+    tags: ['DFPR', 'delegation', 'financial powers', 'sanction authority', 'approval', 'ultra vires', 'expenditure limit', 'ministry', 'department', 'head of department']
+  },
+  {
+    id: 'DFPR 2016 Rule 15', source: 'DFPR, 2016', srcClass: 'src-dfpr',
+    title: 'Advance and Mobilisation Payments — Prior Sanction and Security',
+    text: 'Under DFPR 2016, advance payments to contractors and suppliers require express sanction of the competent authority as per the delegated schedule; no advance may exceed the limits specified therein without Ministry of Finance concurrence. Mobilisation advance, where permitted in works/service contracts, must be secured by a bank guarantee of equivalent amount. Interest on advance is chargeable unless waived by MoF. Advance payment clauses inserted in tenders must align with DFPR limits and GFR Rule 237.',
+    tags: ['advance payment', 'mobilisation advance', 'DFPR', 'bank guarantee', 'sanction', 'GFR 237', 'interest', 'contractor', 'financial limit', 'MoF']
+  },
 ];
 
-function loadRegistry() {
+// ── Topic-to-rule keyword matcher ────────────────────────────────
+function matchProcurementRules(queryText, activeSource) {
+  const q = (queryText || '').toLowerCase().replace(/[^a-z0-9\s]/g,' ');
+  const words = q.split(/\s+/).filter(w => w.length > 2);
+
+  return PROC_RULES
+    .filter(r => activeSource === 'ALL' || r.source === activeSource)
+    .map(r => {
+      const haystack = (r.title + ' ' + r.tags.join(' ') + ' ' + r.text).toLowerCase();
+      let score = 0;
+      for (const w of words) {
+        if (haystack.includes(w)) score++;
+        // Boost exact tag matches
+        if (r.tags.some(t => t.toLowerCase().includes(w) || w.includes(t.toLowerCase()))) score += 2;
+      }
+      return { ...r, score };
+    })
+    .filter(r => r.score > 0)
+    .sort((a, b) => b.score - a.score);
+}
+
+// ── Reference Modal state ────────────────────────────────────────
+let refModalRowId = null;
+let refSelectedIds = new Set();
+let refActiveSource = 'ALL';
+
+function openRefModal(rowId) {
+  refModalRowId = rowId;
+  refSelectedIds = new Set();
+  refActiveSource = 'ALL';
+  const row = queryRows.find(r => r.id === rowId);
+  document.getElementById('refModalQueryBox').textContent =
+    (row && row.query) ? row.query : '(no query text)';
+  document.getElementById('refSearchInput').value = '';
+  document.querySelectorAll('.ref-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.src === 'ALL');
+  });
+  renderRefResults(row ? (row.query || '') : '');
+  updateRefReadBtnLabel();
+  document.getElementById('refModal').classList.add('open');
+}
+
+function openRefModalTenderViewer() {
+  // 1. If a specific rulebook tab is active (not "All Sources"), open the
+  //    official government document/portal for that source in a new tab.
+  if (refActiveSource && refActiveSource !== 'ALL' && SOURCE_PDF_URLS[refActiveSource]) {
+    window.open(SOURCE_PDF_URLS[refActiveSource], '_blank', 'noopener');
+    return;
+  }
+
+  // 2. Otherwise fall back to the uploaded document:
+  //    a) if the current row came from a query PDF, use that query PDF.
+  //    b) otherwise use the uploaded tender PDF.
+  const row = queryRows.find(r => r.id === refModalRowId);
+  const sourceFile = row && row.sourceFile;
+
+  let entry = null;
+  if (sourceFile && pdfBuffers[sourceFile]) {
+    entry = pdfBuffers[sourceFile];
+  } else if (pdfBuffers['__tender__']) {
+    entry = pdfBuffers['__tender__'];
+  }
+
+  if (!entry) {
+    alert('No procurement document found. Please upload the Tender PDF in Step 1 or a Queries PDF in Step 2 first, or select a specific rulebook tab above to get its official document.');
+    return;
+  }
+
   try {
-    const raw = localStorage.getItem(REGISTRY_KEY);
-    if (!raw) return SEED_REGISTRY.map(e => ({...e}));
-    const saved = JSON.parse(raw);
-    // Merge: seed entries not in saved get added; saved entries preserved
-    const savedClients = new Set(saved.map(e => normaliseClient(e.client)));
-    const merged = [...saved];
-    for (const seed of SEED_REGISTRY) {
-      if (!savedClients.has(normaliseClient(seed.client))) merged.push({...seed});
-    }
-    return merged;
-  } catch(e) { return SEED_REGISTRY.map(e => ({...e})); }
-}
-
-function saveRegistry(registry) {
-  try { localStorage.setItem(REGISTRY_KEY, JSON.stringify(registry)); } catch(e) {}
-}
-
-function normaliseClient(name) {
-  return (name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-// Fuzzy match: returns best registry entry for a detected client string
-function matchRegistry(detectedClient) {
-  if (!detectedClient) return null;
-  const registry = loadRegistry();
-  const norm = normaliseClient(detectedClient);
-  // 1. Exact match
-  for (const e of registry) {
-    if (normaliseClient(e.client) === norm) return e;
-  }
-  // 2. Abbreviation match (e.g. "SDA" inside detected string)
-  for (const e of registry) {
-    if (e.abbr && norm.includes(e.abbr.toLowerCase())) return e;
-  }
-  // 3. Token overlap score
-  const dTokens = norm.split('');
-  let best = null, bestScore = 0;
-  for (const e of registry) {
-    const eNorm = normaliseClient(e.client);
-    let overlap = 0;
-    for (let i = 0; i < Math.min(norm.length, eNorm.length); i++) {
-      if (norm[i] === eNorm[i]) overlap++;
-    }
-    // also check if detected name contains the authority's key words
-    const eWords = e.client.toLowerCase().split(/\s+/);
-    const dWords = detectedClient.toLowerCase().split(/\s+/);
-    const wordHits = eWords.filter(w => w.length > 3 && dWords.some(d => d.includes(w) || w.includes(d))).length;
-    const score = wordHits / Math.max(eWords.length, 1);
-    if (score > bestScore && score > 0.4) { bestScore = score; best = e; }
-  }
-  return best;
-}
-
-// Learn a new authority from confirmed user input and save to registry
-function learnAuthority(client, rfpTitle, tenderType) {
-  if (!client || client.length < 5) return;
-  const registry = loadRegistry();
-  const norm = normaliseClient(client);
-  const existing = registry.find(e => normaliseClient(e.client) === norm);
-  if (existing) {
-    // Update: add RFP if new
-    if (rfpTitle && !existing.knownRfps.includes(rfpTitle)) {
-      existing.knownRfps.push(rfpTitle);
-    }
-    if (tenderType) existing.lastTenderType = tenderType;
-  } else {
-    // New entry
-    const words = client.split(/\s+/);
-    const abbr = words.filter(w => /^[A-Z]/.test(w) && w.length > 1).map(w => w[0]).join('');
-    registry.unshift({
-      client,
-      abbr: abbr || '',
-      state: '',
-      type: 'Unknown',
-      knownRfps: rfpTitle ? [rfpTitle] : [],
-      lastTenderType: tenderType || ''
-    });
-  }
-  saveRegistry(registry);
-  showRegistrySavedToast(client);
-}
-
-function showRegistrySavedToast(client) {
-  let toast = document.getElementById('registryToast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'registryToast';
-    toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#1A3A5C;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2);transition:opacity .4s;';
-    document.body.appendChild(toast);
-  }
-  toast.textContent = `✦ "${client}" saved to registry`;
-  toast.style.opacity = '1';
-  setTimeout(() => { toast.style.opacity = '0'; }, 3000);
-}
-
-// Called when user confirms / edits the authority field — triggers learning
-document.getElementById('authorityName').addEventListener('blur', function() {
-  const client = this.value.trim();
-  const rfpTitle = document.getElementById('rfpTitle').value.trim();
-  const tenderType = document.getElementById('detectedTenderType').textContent.trim();
-  if (client) learnAuthority(client, rfpTitle, tenderType);
-});
-
-// When RFP title is confirmed, update the registry entry too
-document.getElementById('rfpTitle').addEventListener('blur', function() {
-  const client = document.getElementById('authorityName').value.trim();
-  const rfpTitle = this.value.trim();
-  const tenderType = document.getElementById('detectedTenderType').textContent.trim();
-  if (client && rfpTitle) learnAuthority(client, rfpTitle, tenderType);
-});
-
-// Override detectTenderMetadata to also use registry for better client matching
-function detectTenderMetadata(text) {
-  const result = detectTenderMetadataBase(text);
-  // Try to improve client match using registry
-  if (result.client) {
-    const match = matchRegistry(result.client);
-    if (match) {
-      result.client = match.client; // use canonical name from registry
-      result.registryMatch = match;
-    }
-  }
-  return result;
-}
-
-// Patch the upload handler's auto-fill to also suggest known RFPs
-const _origUploadHandler = document.getElementById('tenderPdf').onchange;
-// Extend apply logic in the upload handler to suggest known RFPs from registry
-function applyRegistryRfpSuggestion(match) {
-  if (!match || !match.knownRfps || !match.knownRfps.length) return;
-  const rfpEl = document.getElementById('rfpTitle');
-  if (rfpEl.value.trim()) return; // already filled
-  if (match.knownRfps.length === 1) {
-    rfpEl.value = match.knownRfps[0];
-    rfpEl.style.background = '#FFFDE7';
-  } else {
-    // Show a small suggestion dropdown
-    showRfpSuggestions(match.knownRfps, rfpEl);
+    const blob = new Blob([entry.buffer], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = entry.name || 'Procurement_Document.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  } catch(err) {
+    alert('Could not prepare PDF for download: ' + err.message);
   }
 }
 
-function showRfpSuggestions(rfps, inputEl) {
-  let existing = document.getElementById('rfpSuggestBox');
-  if (existing) existing.remove();
-  const box = document.createElement('div');
-  box.id = 'rfpSuggestBox';
-  box.style.cssText = 'background:#fff;border:1px solid #CBD3E1;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.1);margin-top:4px;z-index:200;';
-  box.innerHTML = '<div style="font-size:11px;color:#5B6478;padding:6px 10px 2px;font-weight:700;">Known RFPs for this authority:</div>';
-  rfps.forEach(rfp => {
-    const opt = document.createElement('div');
-    opt.style.cssText = 'padding:6px 10px;font-size:12px;cursor:pointer;color:#1A1F2E;border-top:1px solid #F0F0F0;';
-    opt.textContent = rfp;
-    opt.onmouseenter = () => opt.style.background = '#EEF4FC';
-    opt.onmouseleave = () => opt.style.background = '';
-    opt.onclick = () => { inputEl.value = rfp; inputEl.style.background = '#FFFDE7'; box.remove(); };
-    box.appendChild(opt);
+function closeRefModal() {
+  document.getElementById('refModal').classList.remove('open');
+  refModalRowId = null;
+  refSelectedIds = new Set();
+}
+
+function setRefSource(src) {
+  refActiveSource = src;
+  document.querySelectorAll('.ref-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.src === src);
   });
-  inputEl.parentNode.appendChild(box);
-  // dismiss on outside click
-  setTimeout(() => document.addEventListener('click', function h(e) {
-    if (!box.contains(e.target) && e.target !== inputEl) { box.remove(); document.removeEventListener('click', h); }
-  }), 100);
+  updateRefReadBtnLabel();
+  const q = document.getElementById('refSearchInput').value ||
+    (queryRows.find(r => r.id === refModalRowId) || {}).query || '';
+  renderRefResults(q);
 }
 
-// ── Registry Viewer Modal ────────────────────────────────────────
-function openRegistryViewer() {
-  const registry = loadRegistry();
-  const modal = document.getElementById('registryModal');
-  const body = document.getElementById('registryBody');
+function updateRefReadBtnLabel() {
+  const btn = document.getElementById('refReadTenderBtn');
+  const helper = document.getElementById('refReadTenderHelper');
+  if (!btn || !helper) return;
+  if (refActiveSource && refActiveSource !== 'ALL' && SOURCE_PDF_URLS[refActiveSource]) {
+    btn.textContent = '📥 Download ' + refActiveSource + ' (Official PDF)';
+    helper.textContent = 'Opens the official government document/portal for ' + refActiveSource + ' in a new tab';
+  } else {
+    btn.textContent = '📥 Download Procurement Document (PDF)';
+    helper.textContent = 'Downloads the uploaded tender PDF as a searchable document';
+  }
+}
+
+function renderRefResults(query) {
+  const body = document.getElementById('refBody');
+  const results = matchProcurementRules(query, refActiveSource);
+
+  // If search is blank and no matches, show all rules for active source
+  const display = results.length ? results :
+    PROC_RULES.filter(r => refActiveSource === 'ALL' || r.source === refActiveSource);
+
+  if (!display.length) {
+    body.innerHTML = '<div class="ref-no-results">No matching rules found. Try different keywords.</div>';
+    return;
+  }
+
   body.innerHTML = '';
-  registry.forEach((e, i) => {
-    const row = document.createElement('tr');
-    row.innerHTML = `
-      <td style="font-size:12px;font-weight:600;color:#0B1F3A;">${esc(e.client)}</td>
-      <td style="font-size:12px;text-align:center;">${esc(e.abbr||'—')}</td>
-      <td style="font-size:12px;">${esc(e.state||'—')}</td>
-      <td style="font-size:12px;">${e.knownRfps.length ? e.knownRfps.map(r=>`<div style="border-bottom:1px solid #f0f0f0;padding:2px 0">${esc(r)}</div>`).join('') : '<span style="color:#9AA5B8">—</span>'}</td>
-      <td style="text-align:center;">
-        <button onclick="deleteRegistryEntry(${i})" style="background:none;border:none;color:#E74C3C;cursor:pointer;font-size:13px;">✕</button>
-      </td>`;
-    body.appendChild(row);
+  display.forEach(rule => {
+    const isSelected = refSelectedIds.has(rule.id);
+    const div = document.createElement('div');
+    div.className = 'ref-rule' + (isSelected ? ' selected' : '');
+    div.dataset.ruleId = rule.id;
+    div.innerHTML = `
+      <div class="ref-rule-head" onclick="toggleRefRule('${rule.id}',this.closest('.ref-rule'))">
+        <span class="ref-rule-source ${rule.srcClass}">${rule.source}</span>
+        <div class="ref-rule-meta">
+          <div class="ref-rule-id">${esc(rule.id)}</div>
+          <div class="ref-rule-title">${esc(rule.title)}</div>
+        </div>
+        <button class="ref-select-btn ${isSelected ? 'deselect' : ''}"
+          onclick="event.stopPropagation();selectRefRule('${rule.id}',this.closest('.ref-rule'))"
+        >${isSelected ? '📖 Reading' : '📖 Read'}</button>
+      </div>
+      <div class="ref-rule-body">
+        <p style="margin:0 0 8px;">${esc(rule.text)}</p>
+        <div class="ref-rule-tags">${rule.tags.map(t=>`<span class="ref-tag">${esc(t)}</span>`).join('')}</div>
+      </div>`;
+    body.appendChild(div);
   });
-  modal.style.display = 'flex';
+
+  updateRefSelectedCount();
 }
 
-function deleteRegistryEntry(idx) {
-  const registry = loadRegistry();
-  registry.splice(idx, 1);
-  saveRegistry(registry);
-  openRegistryViewer();
+function toggleRefRule(ruleId, cardEl) {
+  cardEl.classList.toggle('open');
 }
 
-function closeRegistryModal() {
-  document.getElementById('registryModal').style.display = 'none';
+function selectRefRule(ruleId, cardEl) {
+  if (refSelectedIds.has(ruleId)) {
+    refSelectedIds.delete(ruleId);
+    cardEl.classList.remove('selected');
+    cardEl.querySelector('.ref-select-btn').textContent = '📖 Read';
+    cardEl.querySelector('.ref-select-btn').classList.remove('deselect');
+  } else {
+    refSelectedIds.add(ruleId);
+    cardEl.classList.add('selected');
+    cardEl.querySelector('.ref-select-btn').textContent = '📖 Reading';
+    cardEl.querySelector('.ref-select-btn').classList.add('deselect');
+  }
+  updateRefSelectedCount();
+}
+
+function updateRefSelectedCount() {
+  const n = refSelectedIds.size;
+  document.getElementById('refApplyBtn').disabled = n === 0;
+  document.getElementById('refSelectedCount').textContent =
+    n === 0 ? 'Select rules to reference' : `${n} rule${n > 1 ? 's' : ''} selected`;
+}
+
+function applyRefCitations() {
+  if (!refSelectedIds.size || refModalRowId == null) return;
+  const row = queryRows.find(r => r.id === refModalRowId);
+  if (!row) return;
+
+  const citations = [...refSelectedIds].map(id => {
+    const rule = PROC_RULES.find(r => r.id === id);
+    return rule ? `[Ref: ${rule.id} — ${rule.source}: ${rule.title}]` : null;
+  }).filter(Boolean);
+
+  const existing = (row.responseText || '').trimEnd();
+  row.responseText = existing
+    ? existing + '\n\n' + citations.join('\n')
+    : citations.join('\n');
+
+  if (row.responseType !== 'Response') row.responseType = 'Response';
+
+  renderQueryTable();
+  closeRefModal();
+
+  // Re-focus on the response textarea after render
+  setTimeout(() => {
+    const ta = document.getElementById('respTa_' + refModalRowId);
+    if (ta) { ta.focus(); ta.scrollTop = ta.scrollHeight; }
+  }, 60);
 }
 
 // init
@@ -2163,37 +3152,7 @@ renderCorrigTable();
 
 </div><!-- end #mainApp -->
 
-<!-- ── REGISTRY VIEWER MODAL ── -->
-<div id="registryModal" style="display:none;position:fixed;inset:0;background:rgba(11,31,58,.5);z-index:1001;align-items:center;justify-content:center;padding:20px;" class="reg-modal">
-  <div style="background:#fff;border-radius:12px;width:100%;max-width:860px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(11,31,58,.28);overflow:hidden;">
-    <div style="background:linear-gradient(135deg,#0B1F3A,#1A3A5C);padding:14px 20px;display:flex;align-items:center;gap:10px;">
-      <span style="font-size:18px">🏛</span>
-      <span style="color:#fff;font-weight:700;font-size:15px;flex:1;">Authority Intelligence Registry</span>
-      <button onclick="closeRegistryModal()" style="background:none;border:none;color:#8FA8C8;font-size:20px;cursor:pointer;line-height:1;">✕</button>
-    </div>
-    <div style="padding:10px 16px;background:#F5F7FA;border-bottom:1px solid #E8EDF4;font-size:12px;color:#5B6478;">
-      Every authority you confirm is saved here and auto-matched on future tender uploads. Edits and new entries persist across sessions.
-    </div>
-    <div style="overflow-y:auto;flex:1;padding:16px;">
-      <table style="width:100%;border-collapse:collapse;font-family:inherit;">
-        <thead>
-          <tr style="background:#F0F4FA;">
-            <th style="text-align:left;padding:8px 10px;font-size:11px;color:#5B6478;font-weight:700;border-bottom:2px solid #CBD3E1;">AUTHORITY NAME</th>
-            <th style="text-align:center;padding:8px 10px;font-size:11px;color:#5B6478;font-weight:700;border-bottom:2px solid #CBD3E1;">ABBR</th>
-            <th style="text-align:left;padding:8px 10px;font-size:11px;color:#5B6478;font-weight:700;border-bottom:2px solid #CBD3E1;">STATE</th>
-            <th style="text-align:left;padding:8px 10px;font-size:11px;color:#5B6478;font-weight:700;border-bottom:2px solid #CBD3E1;">KNOWN RFPs</th>
-            <th style="border-bottom:2px solid #CBD3E1;"></th>
-          </tr>
-        </thead>
-        <tbody id="registryBody"></tbody>
-      </table>
-    </div>
-    <div style="padding:12px 16px;border-top:1px solid #E8EDF4;background:#F9FAFB;display:flex;gap:10px;align-items:center;">
-      <span style="font-size:12px;color:#9AA5B8;">Registry is stored locally in your browser and grows with each tender you process.</span>
-      <button onclick="closeRegistryModal()" style="margin-left:auto;padding:7px 18px;font-size:13px;border-radius:6px;cursor:pointer;background:#F5F7FA;color:#5B6478;border:1px solid #CBD3E1;">Close</button>
-    </div>
-  </div>
-</div>
+
 <div id="clauseModal">
   <div class="cm-box">
     <div class="cm-header">
@@ -2207,7 +3166,7 @@ renderCorrigTable();
       <div style="display:flex;gap:8px;padding-bottom:12px;">
         <input id="cmSearchInput" type="text" placeholder="Refine search terms…"
           style="flex:1;font-size:13px;padding:7px 10px;border:1px solid #CBD3E1;border-radius:6px;font-family:inherit;"
-          oninput="runClauseSearch(this.value)" />
+          oninput="clearTimeout(window._cmDbounce);window._cmDbounce=setTimeout(()=>runClauseSearch(this.value),300)" />
         <button onclick="runClauseSearch(document.getElementById('cmSearchInput').value)"
           style="padding:7px 14px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;background:#1A3A5C;color:#fff;border:none;">Search</button>
       </div>
@@ -2229,6 +3188,79 @@ renderCorrigTable();
   </div>
 </div>
 
+<!-- ── DOCUMENT VIEWER MODAL ── -->
+<div id="docViewerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;flex-direction:column;">
+  <div style="display:flex;align-items:center;gap:12px;background:#0B1F3A;padding:12px 16px;color:#fff;flex-shrink:0;">
+    <span style="font-size:18px;">📄</span>
+    <span id="dvFileName" style="font-weight:700;font-size:14px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input id="dvSearchInput" type="text" placeholder="Search keyword…" style="padding:6px 10px;border-radius:5px;border:none;font-size:13px;width:220px;" oninput="dvSearch()" onkeydown="if(event.key==='Enter')dvNextMatch()">
+      <span id="dvMatchCount" style="font-size:12px;color:#E8BB4A;white-space:nowrap;min-width:60px;"></span>
+      <button onclick="dvPrevMatch()" style="padding:4px 10px;font-size:13px;background:#E8BB4A;color:#0B1F3A;border:none;border-radius:4px;cursor:pointer;font-weight:700;">▲</button>
+      <button onclick="dvNextMatch()" style="padding:4px 10px;font-size:13px;background:#E8BB4A;color:#0B1F3A;border:none;border-radius:4px;cursor:pointer;font-weight:700;">▼</button>
+      <button onclick="closeDocViewer()" style="padding:4px 12px;font-size:13px;background:#c0392b;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:700;">✕ Close</button>
+    </div>
+  </div>
+  <div style="display:flex;gap:0;flex:1;overflow:hidden;">
+    <!-- Page thumbnails sidebar -->
+    <div id="dvSidebar" style="width:100px;background:#1A2840;overflow-y:auto;flex-shrink:0;padding:8px;display:flex;flex-direction:column;gap:6px;"></div>
+    <!-- Main canvas area -->
+    <div id="dvCanvasArea" style="flex:1;overflow-y:auto;background:#525659;padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px;"></div>
+  </div>
+  <div id="dvStatus" style="background:#0B1F3A;color:#9AA5B8;font-size:11px;padding:4px 16px;flex-shrink:0;"></div>
+</div>
+
+<!-- ── PROCUREMENT REFERENCE MODAL ── -->
+<div id="refModal">
+  <div class="ref-box">
+    <div class="ref-header">
+      <span style="font-size:20px">📖</span>
+      <span class="ref-header-title">Procurement Rules Reference</span>
+      <button class="cm-close" onclick="closeRefModal()">✕</button>
+    </div>
+    <div style="padding:10px 20px 0; border-bottom:1px solid #E8EDF4;">
+      <div class="cm-query-label" style="margin-bottom:3px;">Bidder Query</div>
+      <div class="cm-query-box" id="refModalQueryBox" style="margin-bottom:10px;max-height:60px;overflow:hidden;"></div>
+      <div style="padding-bottom:10px;">
+        <button id="refReadTenderBtn" onclick="openRefModalTenderViewer()"
+          style="font-size:12px;padding:5px 14px;font-weight:600;border-radius:5px;border:none;cursor:pointer;background:#1A5CA8;color:#fff;">
+          📥 Download Procurement Document (PDF)
+        </button>
+        <span id="refReadTenderHelper" style="font-size:11px;color:#9AA5B8;margin-left:8px;">Downloads the uploaded tender PDF as a searchable document</span>
+      </div>
+    </div>
+    <div class="ref-source-tabs">
+      <div class="ref-tab active" data-src="ALL" onclick="setRefSource('ALL')">All Sources</div>
+      <div class="ref-tab" data-src="GFR 2017" onclick="setRefSource('GFR 2017')">GFR 2017</div>
+      <div class="ref-tab" data-src="CVC Guidelines" onclick="setRefSource('CVC Guidelines')">CVC Guidelines</div>
+      <div class="ref-tab" data-src="Manual on Policies &amp; Procedures (Goods)" onclick="setRefSource('Manual on Policies &amp; Procedures (Goods)')">Manual (Goods)</div>
+      <div class="ref-tab" data-src="Manual for Procurement of Works (2022)" onclick="setRefSource('Manual for Procurement of Works (2022)')">Manual (Works)</div>
+      <div class="ref-tab" data-src="Manual for Procurement of Consultancy Services (2025)" onclick="setRefSource('Manual for Procurement of Consultancy Services (2025)')">Manual (Consultancy)</div>
+      <div class="ref-tab" data-src="Manual for Procurement of Non-Consultancy Services (2025)" onclick="setRefSource('Manual for Procurement of Non-Consultancy Services (2025)')">Manual (Non-Consultancy)</div>
+      <div class="ref-tab" data-src="GeM / CPPP Guidelines" onclick="setRefSource('GeM / CPPP Guidelines')">GeM / CPPP</div>
+      <div class="ref-tab" data-src="MSE Procurement Policy Order, 2012" onclick="setRefSource('MSE Procurement Policy Order, 2012')">MSE Policy</div>
+      <div class="ref-tab" data-src="DFPR, 2016" onclick="setRefSource('DFPR, 2016')">DFPR 2016</div>
+    </div>
+    <div class="ref-search-bar">
+      <input id="refSearchInput" type="text"
+        placeholder="Refine — e.g. 'consortium eligibility', 'EMD waiver', 'extension of date'…"
+        oninput="clearTimeout(window._refDbounce);window._refDbounce=setTimeout(()=>renderRefResults(this.value||((queryRows.find(r=>r.id===refModalRowId)||{}).query||'')),280)" />
+    </div>
+    <div class="ref-body" id="refBody"></div>
+    <div class="ref-footer">
+      <span class="ref-selected-count" id="refSelectedCount">Select rules to reference</span>
+      <button id="refApplyBtn" disabled onclick="applyRefCitations()"
+        style="margin-left:auto;padding:8px 20px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;background:#2D6A4F;color:#fff;border:none;">
+        ✓ Insert References
+      </button>
+      <button onclick="closeRefModal()"
+        style="padding:8px 14px;font-size:13px;border-radius:6px;cursor:pointer;background:#F5F7FA;color:#5B6478;border:1px solid #CBD3E1;">
+        Cancel
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 function startTool() {
   document.getElementById('landingPage').style.display = 'none';
@@ -2237,6 +3269,208 @@ function startTool() {
 // Close modal on backdrop click
 document.getElementById('clauseModal').addEventListener('click', function(e) {
   if (e.target === this) closeClauseModal();
+});
+document.getElementById('refModal').addEventListener('click', function(e) {
+  if (e.target === this) closeRefModal();
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  DOCUMENT VIEWER
+// ═══════════════════════════════════════════════════════════════
+let _dvPdf = null;
+let _dvMatches = []; // [{pageNum, matchIdx}]
+let _dvCurrentMatch = -1;
+let _dvRenderedPages = {}; // pageNum -> {canvas, textLayer}
+let _dvPageCanvases = {}; // pageNum -> canvas element
+
+async function openDocViewer(sourceFileName, autoSearchKw) {
+  let entry = null;
+  if (sourceFileName && pdfBuffers[sourceFileName]) {
+    entry = pdfBuffers[sourceFileName];
+  } else if (pdfBuffers['__tender__']) {
+    entry = pdfBuffers['__tender__'];
+  }
+  if (!entry) {
+    alert('No PDF available to view. Please upload the query/tender PDF first.');
+    return;
+  }
+
+  const modal = document.getElementById('docViewerModal');
+  modal.style.display = 'flex';
+  document.getElementById('dvFileName').textContent = entry.name;
+  document.getElementById('dvSearchInput').value = '';
+  document.getElementById('dvMatchCount').textContent = '';
+  document.getElementById('dvStatus').textContent = 'Loading PDF…';
+  document.getElementById('dvCanvasArea').innerHTML = '';
+  document.getElementById('dvSidebar').innerHTML = '';
+  _dvRenderedPages = {};
+  _dvPageCanvases = {};
+  _dvMatches = [];
+  _dvCurrentMatch = -1;
+  _dvPdf = null;
+
+  try {
+    const buf = entry.buffer.slice(0); // clone so it can be reused
+    _dvPdf = await pdfjsLib.getDocument({data: buf}).promise;
+    document.getElementById('dvStatus').textContent = `${_dvPdf.numPages} pages — type a keyword to search`;
+
+    // Render all pages
+    for (let p = 1; p <= _dvPdf.numPages; p++) {
+      await _dvRenderPage(p);
+    }
+    document.getElementById('dvStatus').textContent = `${_dvPdf.numPages} pages loaded — type a keyword to search`;
+
+    // Auto-search from query keywords if provided
+    if (autoSearchKw && autoSearchKw.trim().length >= 2) {
+      document.getElementById('dvSearchInput').value = autoSearchKw.trim();
+      dvDoSearch(autoSearchKw.trim().toLowerCase());
+    }
+  } catch(err) {
+    document.getElementById('dvStatus').textContent = 'Error loading PDF: ' + err.message;
+  }
+}
+
+async function _dvRenderPage(pageNum) {
+  const page = await _dvPdf.getPage(pageNum);
+  const viewport = page.getViewport({scale: 1.5});
+
+  // Canvas
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  canvas.style.cssText = `max-width:100%;box-shadow:0 2px 10px rgba(0,0,0,.4);background:#fff;`;
+  canvas.id = `dv-canvas-${pageNum}`;
+
+  // Wrapper with page label
+  const wrapper = document.createElement('div');
+  wrapper.id = `dv-page-${pageNum}`;
+  wrapper.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;max-width:900px;';
+  const label = document.createElement('div');
+  label.textContent = `Page ${pageNum}`;
+  label.style.cssText = 'color:#ccc;font-size:11px;font-family:sans-serif;';
+  wrapper.appendChild(label);
+  wrapper.appendChild(canvas);
+
+  // Overlay for highlights
+  const overlay = document.createElement('div');
+  overlay.id = `dv-overlay-${pageNum}`;
+  overlay.style.cssText = `position:absolute;top:0;left:0;width:${viewport.width}px;height:${viewport.height}px;pointer-events:none;`;
+  const relative = document.createElement('div');
+  relative.style.cssText = `position:relative;max-width:100%;`;
+  relative.appendChild(canvas);
+  relative.appendChild(overlay);
+  wrapper.appendChild(relative);
+  wrapper.removeChild(canvas); // move to relative wrapper
+
+  document.getElementById('dvCanvasArea').appendChild(wrapper);
+
+  // Render
+  const ctx = canvas.getContext('2d');
+  await page.render({canvasContext: ctx, viewport}).promise;
+
+  // Sidebar thumb
+  const thumb = document.createElement('div');
+  thumb.style.cssText = 'cursor:pointer;border-radius:4px;border:2px solid transparent;overflow:hidden;';
+  thumb.title = `Page ${pageNum}`;
+  const thumbCanvas = document.createElement('canvas');
+  const thumbVp = page.getViewport({scale: 0.15});
+  thumbCanvas.width = thumbVp.width;
+  thumbCanvas.height = thumbVp.height;
+  thumbCanvas.style.cssText = 'width:100%;display:block;';
+  thumb.appendChild(thumbCanvas);
+  const tn = document.createElement('div');
+  tn.textContent = pageNum;
+  tn.style.cssText = 'text-align:center;color:#9AA5B8;font-size:10px;font-family:sans-serif;';
+  thumb.appendChild(tn);
+  thumb.addEventListener('click', () => { document.getElementById(`dv-page-${pageNum}`).scrollIntoView({behavior:'smooth',block:'start'}); });
+  document.getElementById('dvSidebar').appendChild(thumb);
+  page.render({canvasContext: thumbCanvas.getContext('2d'), viewport: thumbVp}).promise;
+
+  _dvPageCanvases[pageNum] = {canvas, viewport, overlay, page};
+}
+
+function dvSearch() {
+  const kw = document.getElementById('dvSearchInput').value.trim().toLowerCase();
+  // Clear old highlights
+  document.querySelectorAll('.dv-highlight').forEach(el => el.remove());
+  _dvMatches = [];
+  _dvCurrentMatch = -1;
+  document.getElementById('dvMatchCount').textContent = '';
+  if (!kw || kw.length < 2) return;
+  dvDoSearch(kw);
+}
+
+async function dvDoSearch(kw) {
+  if (!_dvPdf) return;
+  const highlights = [];
+  for (let p = 1; p <= _dvPdf.numPages; p++) {
+    const info = _dvPageCanvases[p];
+    if (!info) continue;
+    const page = info.page;
+    const viewport = info.viewport;
+    const overlay = info.overlay;
+    const textContent = await page.getTextContent();
+    let matchCount = 0;
+    for (const item of textContent.items) {
+      if (!item.str) continue;
+      const text = item.str.toLowerCase();
+      let idx = text.indexOf(kw);
+      while (idx !== -1) {
+        // Compute bounding box
+        const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+        const x = tx[4];
+        const y = tx[5];
+        const w = item.width * viewport.scale;
+        const h = item.height * viewport.scale;
+        const charW = w / (item.str.length || 1);
+        const hlX = x + idx * charW;
+        const hlW = kw.length * charW;
+
+        const hl = document.createElement('div');
+        hl.className = 'dv-highlight';
+        hl.dataset.matchId = _dvMatches.length;
+        hl.style.cssText = `position:absolute;left:${hlX}px;top:${viewport.height - y - h}px;width:${hlW}px;height:${h + 2}px;background:rgba(255,220,0,.45);border:1px solid #E8BB4A;border-radius:2px;`;
+        overlay.appendChild(hl);
+        highlights.push({pageNum: p, el: hl});
+        _dvMatches.push({pageNum: p, el: hl});
+        matchCount++;
+        idx = text.indexOf(kw, idx + 1);
+      }
+    }
+  }
+  document.getElementById('dvMatchCount').textContent = _dvMatches.length ? `1/${_dvMatches.length}` : 'No matches';
+  if (_dvMatches.length) { _dvCurrentMatch = 0; dvScrollToMatch(0); }
+}
+
+function dvScrollToMatch(idx) {
+  document.querySelectorAll('.dv-highlight').forEach(el => el.style.background = 'rgba(255,220,0,.45)');
+  if (!_dvMatches[idx]) return;
+  const m = _dvMatches[idx];
+  m.el.style.background = 'rgba(255,100,0,.65)';
+  m.el.scrollIntoView({behavior:'smooth', block:'center'});
+  document.getElementById('dvMatchCount').textContent = `${idx+1}/${_dvMatches.length}`;
+}
+
+function dvNextMatch() {
+  if (!_dvMatches.length) return;
+  _dvCurrentMatch = (_dvCurrentMatch + 1) % _dvMatches.length;
+  dvScrollToMatch(_dvCurrentMatch);
+}
+
+function dvPrevMatch() {
+  if (!_dvMatches.length) return;
+  _dvCurrentMatch = (_dvCurrentMatch - 1 + _dvMatches.length) % _dvMatches.length;
+  dvScrollToMatch(_dvCurrentMatch);
+}
+
+function closeDocViewer() {
+  document.getElementById('docViewerModal').style.display = 'none';
+  _dvPdf = null;
+  _dvPageCanvases = {};
+}
+
+document.getElementById('docViewerModal').addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeDocViewer();
 });
 </script>
 </body>
