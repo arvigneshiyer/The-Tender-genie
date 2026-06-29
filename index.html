@@ -210,7 +210,7 @@
 
     .tools-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(3, 1fr);
       gap: 24px;
       padding: 8px 40px 60px;
       max-width: 1200px;
@@ -222,10 +222,11 @@
       background: rgba(255,255,255,0.04);
       border: 1px solid rgba(255,255,255,0.09);
       border-radius: 18px;
-      padding: 36px 32px;
+      padding: 32px 28px;
       cursor: pointer;
       text-decoration: none;
-      display: block;
+      display: flex;
+      flex-direction: column;
       transition: background 0.2s, border-color 0.2s, transform 0.15s;
       position: relative;
       overflow: hidden;
@@ -249,7 +250,7 @@
 
     .tool-card:hover::before { opacity: 1; }
 
-    .tool-icon { font-size: 36px; margin-bottom: 18px; display: block; }
+    .tool-icon { font-size: 32px; margin-bottom: 16px; display: block; }
 
     .tool-label {
       font-size: 10px;
@@ -262,7 +263,7 @@
 
     .tool-name {
       font-family: 'Instrument Serif', serif;
-      font-size: 24px;
+      font-size: 22px;
       color: var(--white);
       margin-bottom: 10px;
     }
@@ -272,9 +273,10 @@
       color: rgba(255,255,255,0.45);
       line-height: 1.65;
       margin-bottom: 24px;
+      flex-grow: 1;
     }
 
-    .tool-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tool-tags { display: flex; flex-wrap: wrap; gap: 6px; padding-right: 26px; }
 
     .tag {
       font-size: 10px;
@@ -287,8 +289,8 @@
 
     .tool-arrow {
       position: absolute;
-      bottom: 28px;
-      right: 28px;
+      bottom: 26px;
+      right: 24px;
       font-size: 18px;
       color: rgba(255,255,255,0.2);
       transition: color 0.2s, transform 0.2s;
@@ -320,7 +322,7 @@
 
     .logout-btn:hover { color: rgba(255,255,255,0.55); }
 
-    @media (max-width: 900px) {
+    @media (max-width: 980px) {
       .tools-grid { grid-template-columns: 1fr 1fr; }
     }
 
@@ -419,6 +421,20 @@
           <span class="tag">Excel Import</span>
           <span class="tag">PDF Import</span>
           <span class="tag">Works</span>
+        </div>
+        <span class="tool-arrow">↗</span>
+      </a>
+
+      <a class="tool-card" href="tender-evaluator (2).html">
+        <span class="tool-icon">🔍</span>
+        <div class="tool-label">Compliance &amp; Eligibility</div>
+        <div class="tool-name">Tender Evaluator</div>
+        <div class="tool-desc">Upload an RFP and instantly check it against GFR, CVC, GeM, and MSE compliance rules. Flags missing eligibility, EMD, and timeline clauses.</div>
+        <div class="tool-tags">
+          <span class="tag">GFR 2017</span>
+          <span class="tag">CVC</span>
+          <span class="tag">MSE</span>
+          <span class="tag">PDF/Word Import</span>
         </div>
         <span class="tool-arrow">↗</span>
       </a>
