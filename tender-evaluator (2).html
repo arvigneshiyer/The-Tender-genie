@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tender Evaluator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Georgia','Times New Roman',serif; background:#EEF1F6; color:#1A1F2E; margin:0; padding:24px; }
+  .wrap { max-width: 1300px; margin: 0 auto; }
+  h1 { color:#0B1F3A; font-size:24px; margin-bottom:4px; }
+  .sub { color:#5B6478; font-size:13px; margin-bottom:20px; }
+  .card { background:#fff; border-radius:10px; padding:20px; margin-bottom:20px; box-shadow:0 2px 8px rgba(11,31,58,.08); }
+  .card h2 { color:#1A5CA8; font-size:17px; margin-top:0; margin-bottom:12px; border-bottom:2px solid #E8BB4A; padding-bottom:6px; }
+  .row { display:flex; gap:16px; flex-wrap:wrap; }
+  .col { flex:1; min-width:260px; }
+  label { font-size:12px; color:#5B6478; display:block; margin-bottom:4px; font-weight:bold; }
+  input[type=text], input[type=file], textarea, select {
+    width:100%; padding:8px; border:1px solid #CBD3E1; border-radius:6px; font-family:inherit; font-size:13px; background:#fff; color:#1A1F2E;
+  }
+  textarea { resize: vertical; }
+  button { background:#1A5CA8; color:#fff; border:none; padding:10px 18px; border-radius:6px; font-size:14px; cursor:pointer; font-family:inherit; }
+  button:hover { background:#0B1F3A; }
+  button.secondary { background:#E8BB4A; color:#0B1F3A; }
+  button.secondary:hover { background:#d4a83d; }
+  button:disabled { background:#CBD3E1; color:#8895AC; cursor:not-allowed; }
+  button:disabled:hover { background:#CBD3E1; }
+  .status { font-size:12px; padding:8px 12px; border-radius:6px; margin-top:8px; }
+  .status.ok { background:#E6F4EA; color:#1E7E34; }
+  .status.err { background:#FBE8E6; color:#C0392B; }
+  .status.info { background:#E8F0FB; color:#1A5CA8; }
+  .toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+  .badge { display:inline-block; background:#E8BB4A; color:#0B1F3A; border-radius:10px; padding:2px 10px; font-size:11px; font-weight:bold; }
+  .empty-note { color:#9AA5B8; font-size:12px; padding:14px; text-align:center; }
+  .dropzone {
+    border:2px dashed #CBD3E1; border-radius:8px; padding:18px 14px; background:#F9FAFB;
+    cursor:pointer; transition:border-color .15s, background .15s; text-align:center;
+  }
+  .dropzone:hover, .dropzone.drag { border-color:#1A5CA8; background:#EEF4FC; }
+  .dropzone .dz-icon { font-size:26px; margin-bottom:6px; }
+  .dropzone .dz-main { font-size:13px; font-weight:600; color:#1A5CA8; }
+  .dropzone .dz-sub { font-size:11px; color:#9AA5B8; margin-top:4px; }
+  .file-chip {
+    display:flex; align-items:center; gap:8px; background:#F5F7FA; border:1px solid #E0E6F0;
+    border-radius:6px; padding:6px 10px; font-size:12px; margin-top:8px;
+  }
+  .file-chip .fc-name { flex:1; color:#1A1F2E; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .file-chip .fc-remove { cursor:pointer; color:#C0392B; font-weight:700; padding:0 4px; }
+
+  /* ── Landing Page ── */
+  #landingPage { max-width: 860px; margin: 0 auto; padding: 0 16px 60px; }
+  .lp-header {
+    background: linear-gradient(135deg, #0B1F3A 0%, #1A3A5C 100%);
+    padding: 16px 28px; display: flex; align-items: center; gap: 14px;
+    border-radius: 10px 10px 0 0; box-shadow: 0 2px 12px rgba(11,31,58,0.18);
+  }
+  .lp-header-title { color:#fff; font-weight:700; font-size:16px; letter-spacing:.04em; }
+  .lp-header-sub { margin-left:auto; font-size:11px; color:#8FA8C8; letter-spacing:.06em; }
+  .lp-body { background:#fff; border-radius: 0 0 12px 12px; box-shadow: 0 4px 20px rgba(11,31,58,0.10); padding: 48px 36px; text-align: center; }
+  .lp-icon { font-size:60px; margin-bottom:16px; }
+  .lp-title { color:#0B1F3A; font-size:26px; margin: 0 0 10px; font-family: 'Georgia', serif; }
+  .lp-desc { color:#5B6478; font-size:15px; max-width:560px; margin: 0 auto 12px; line-height:1.7; }
+  .lp-note { color:#5B6478; font-size:13px; max-width:520px; margin: 0 auto 32px; line-height:1.6; }
+  .lp-tags { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-bottom:36px; }
+  .lp-tag { font-size:12px; padding:4px 12px; border-radius:20px; background: rgba(26,92,168,0.07); color:#1A5CA8; border:1px solid rgba(26,92,168,0.2); font-weight:600; }
+  .lp-features { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; max-width: 600px; margin: 0 auto 36px; }
+  .lp-feature { padding: 12px 8px; border-radius: 8px; border: 1px solid #CBD3E1; background: #F5F7FA; text-align: center; }
+  .lp-feature-icon { font-size:22px; margin-bottom:4px; }
+  .lp-feature-label { font-size:12px; color:#1A1F2E; font-weight:600; }
+  .lp-cta { background: #E8BB4A; color: #0B1F3A; border: none; border-radius: 8px; padding: 14px 36px; font-size:15px; font-weight:700; cursor:pointer; font-family: inherit; letter-spacing:.02em; }
+  .lp-cta:hover { background: #d4a83d; }
+  #mainApp { display: none; }
+
+  /* ── Disclaimer ── */
+  .disclaimer { background:#FFF8E1; border:1px solid #F0DDA0; border-radius:8px; padding:10px 14px; font-size:12px; color:#7A5B00; line-height:1.6; margin-bottom:16px; }
+  .disclaimer b { color:#5B4400; }
+  .timeline-note { background:#E8F0FB; border:1px solid #B9D4F0; border-radius:8px; padding:10px 14px; font-size:12px; color:#1A3A5C; line-height:1.6; margin-bottom:16px; }
+  .timeline-note b { color:#0B1F3A; }
+  .tender-type-banner { display:flex; align-items:center; gap:12px; border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:13px; font-weight:600; }
+  .tender-type-banner.works { background:#E6F4EA; border:1px solid #A7D7B0; color:#155724; }
+  .tender-type-banner.services { background:#E8F0FB; border:1px solid #B9D4F0; color:#1A3A5C; }
+  .tender-type-banner.unknown { background:#F9FAFB; border:1px solid #CBD3E1; color:#5B6478; }
+  .tender-type-banner .tt-icon { font-size:22px; }
+  .tender-type-banner .tt-body { flex:1; }
+  .tender-type-banner .tt-title { font-size:14px; font-weight:800; margin-bottom:2px; }
+  .tender-type-banner .tt-desc { font-size:12px; font-weight:400; opacity:0.85; }
+  .tt-override { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .tt-override-label { font-size:11px; font-weight:700; opacity:.8; }
+  .tt-override-btn { font-size:11px; padding:3px 10px; border-radius:10px; border:1px solid rgba(0,0,0,.2); cursor:pointer; font-family:inherit; font-weight:600; background:rgba(255,255,255,.5); color:inherit; }
+  .tt-override-btn:hover { background:rgba(255,255,255,.8); }
+  .tt-override-btn.active { background:#0B1F3A; color:#fff; border-color:#0B1F3A; }
+  .tt-override-reset { opacity:.7; font-style:italic; }
+
+  /* ── Summary cards (now act as filter buttons) ── */
+  .summary-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:14px; }
+  .summary-card {
+    border-radius:8px; padding:14px 16px; text-align:center; border:2px solid transparent;
+    cursor:pointer; transition:transform .12s, box-shadow .12s, border-color .12s;
+    user-select:none;
+  }
+  .summary-card:hover { transform:translateY(-2px); box-shadow:0 4px 14px rgba(0,0,0,0.10); }
+  .summary-card.active { border-color:#0B1F3A !important; box-shadow:0 0 0 3px rgba(11,31,58,0.12); transform:translateY(-2px); }
+  .summary-card .sc-count { font-size:26px; font-weight:700; line-height:1; }
+  .summary-card .sc-label { font-size:11px; margin-top:4px; font-weight:600; letter-spacing:.03em; text-transform:uppercase; }
+  .sc-total   { background:#F0F4FA; border-color:#CBD3E1 !important; } .sc-total .sc-count, .sc-total .sc-label { color:#1A1F2E; }
+  .sc-compliant { background:#E6F4EA; } .sc-compliant .sc-count, .sc-compliant .sc-label { color:#1E7E34; }
+  .sc-noncompliant { background:#FBE8E6; } .sc-noncompliant .sc-count, .sc-noncompliant .sc-label { color:#C0392B; }
+  .sc-review { background:#FFF8E1; } .sc-review .sc-count, .sc-review .sc-label { color:#A06000; }
+  .sc-custom { background:#FCE7F3; } .sc-custom .sc-count, .sc-custom .sc-label { color:#9D174D; }
+  .sc-model  { background:#E0F2FE; } .sc-model .sc-count, .sc-model .sc-label { color:#075985; }
+
+  /* ── Category section ── */
+  .cat-section { margin-bottom:18px; }
+  .cat-title { display:flex; align-items:center; gap:8px; color:#0B1F3A; font-size:15px; font-weight:700; margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid #E0E6F0; }
+  .cat-title .cat-icon { font-size:18px; }
+  .cat-title .cat-count { margin-left:auto; font-size:11px; color:#9AA5B8; font-weight:600; }
+
+  /* ── Finding card ── */
+  .finding { border:1px solid #E0E6F0; border-radius:8px; margin-bottom:10px; overflow:hidden; }
+  .finding-head { display:flex; align-items:center; gap:10px; padding:10px 14px; background:#F9FAFB; flex-wrap:wrap; }
+  .finding-label { font-size:13px; font-weight:700; color:#1A1F2E; flex:1; min-width:200px; }
+  .status-pill { font-size:11px; font-weight:700; padding:3px 10px; border-radius:12px; white-space:nowrap; }
+  .pill-compliant { background:#E6F4EA; color:#1E7E34; }
+  .pill-noncompliant { background:#FBE8E6; color:#C0392B; }
+  .pill-review { background:#FFF8E1; color:#A06000; }
+  .req-tag { font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; background:#E8F0FB; color:#1A5CA8; }
+  .finding-body { padding:10px 14px; font-size:12.5px; line-height:1.7; color:#374151; }
+  .finding-rule { font-style:italic; color:#5B6478; margin-bottom:8px; }
+  .finding-note { color:#1A1F2E; margin-bottom:8px; }
+  .finding-snippet { background:#F5F7FA; border-left:3px solid #CBD3E1; padding:8px 12px; font-size:12px; color:#374151; border-radius:0 6px 6px 0; }
+  .finding-page { font-size:11px; color:#9AA5B8; margin-top:6px; }
+  .source-badge { font-size:10px; font-weight:800; padding:2px 9px; border-radius:10px; white-space:nowrap; }
+
+  @media print {
+    .lp-cta, #step1card, #step2card, #step3card, #runBtnWrap, button { display:none !important; }
+    .summary-card { cursor:default; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── LANDING PAGE ── -->
+<div id="landingPage">
+  <div class="lp-header">
+    <span style="font-size:22px">⚖️</span>
+    <span class="lp-header-title">TENDER EVALUATOR</span>
+    <span class="lp-header-sub">RFP COMPLIANCE SCREENING</span>
+  </div>
+  <div class="lp-body">
+    <div class="lp-icon">⚖️</div>
+    <h2 class="lp-title">Tender / RFP Compliance Evaluator</h2>
+    <p class="lp-desc">
+      Upload an RFP or tender document and instantly see which eligibility, technical and commercial clauses are present, missing, or need a manual look — checked against built-in Indian public procurement norms (GFR 2017, CVC, GeM, MSME, Make in India) plus any department-specific guideline you layer on top.
+    </p>
+    <p class="lp-note">
+      Works entirely in your browser — no documents are uploaded to any server or AI API. Upload a PDF or Word file to get started.
+    </p>
+    <div class="lp-tags">
+      <span class="lp-tag">PDF &amp; Word Upload</span>
+      <span class="lp-tag">Built-in GFR / CVC / GeM / MSME Rules</span>
+      <span class="lp-tag">Custom Guideline Upload</span>
+      <span class="lp-tag">No API · Runs Locally</span>
+    </div>
+    <div class="lp-features">
+      <div class="lp-feature"><div class="lp-feature-icon">📄</div><div class="lp-feature-label">Upload RFP</div></div>
+      <div class="lp-feature"><div class="lp-feature-icon">📚</div><div class="lp-feature-label">Add Dept. Guidelines</div></div>
+      <div class="lp-feature"><div class="lp-feature-icon">🔎</div><div class="lp-feature-label">Clause Detection</div></div>
+      <div class="lp-feature"><div class="lp-feature-icon">✅</div><div class="lp-feature-label">Compliance Status</div></div>
+      <div class="lp-feature"><div class="lp-feature-icon">🏷</div><div class="lp-feature-label">Guideline Reference</div></div>
+      <div class="lp-feature"><div class="lp-feature-icon">🖨</div><div class="lp-feature-label">Printable Report</div></div>
+    </div>
+    <button class="lp-cta" onclick="startTool()">Start Tool ✦</button>
+  </div>
+</div>
+
+<!-- ── MAIN APP ── -->
+<div id="mainApp">
+<div class="wrap">
+  <h1>⚖️ Tender Evaluator</h1>
+  <div class="sub">Upload the RFP, optionally add your department's guidelines and/or a model tender document, then run the evaluation to get a clause-by-clause compliance report.</div>
+
+  <!-- STEP 1: RFP -->
+  <div class="card" id="step1card">
+    <h2>Step 1 — Upload the RFP / Tender Document <span style="color:#C0392B;">*</span></h2>
+    <div class="dropzone" id="rfpDropzone" onclick="document.getElementById('rfpFile').click()">
+      <div class="dz-icon">📄</div>
+      <div class="dz-main">Click to upload or drag &amp; drop the RFP</div>
+      <div class="dz-sub">PDF or Word (.pdf, .doc, .docx) — required</div>
+    </div>
+    <input type="file" id="rfpFile" accept=".pdf,.doc,.docx" style="display:none;" />
+    <div id="rfpFileChip"></div>
+    <div id="rfpStatus"></div>
+  </div>
+
+  <!-- STEP 2: GUIDELINES -->
+  <div class="card" id="step2card">
+    <h2>Step 2 — Department Guidelines / SOP <span class="badge">Optional</span></h2>
+    <p style="font-size:12px;color:#5B6478;margin-top:-6px;">
+      The evaluator already checks the RFP against GFR 2017, CVC, GeM, MSME and Make-in-India norms. If your department has its own SOP, manual, or additional checklist, upload it here — obligation clauses ("must", "shall", "mandatory", "minimum") will be pulled out and checked against the RFP too, shown separately as <span class="badge" style="background:#FCE7F3;color:#9D174D;">Dept. Guideline</span> findings.
+    </p>
+    <div class="dropzone" id="guideDropzone" onclick="document.getElementById('guideFile').click()">
+      <div class="dz-icon">📚</div>
+      <div class="dz-main">Click to upload or drag &amp; drop a guidelines document</div>
+      <div class="dz-sub">PDF or Word — optional</div>
+    </div>
+    <input type="file" id="guideFile" accept=".pdf,.doc,.docx" style="display:none;" />
+    <div id="guideFileChip"></div>
+    <div id="guideStatus"></div>
+  </div>
+
+  <!-- STEP 3: MODEL TENDER -->
+  <div class="card" id="step3card">
+    <h2>Step 3 — Model / Standard Tender Document <span class="badge">Optional</span></h2>
+    <p style="font-size:12px;color:#5B6478;margin-top:-6px;">
+      Upload your organisation's approved model tender document for Services or Works — the standard template that every issued tender should conform to. The evaluator will extract mandatory clauses from it and check whether the RFP includes them, shown separately as <span class="badge" style="background:#E0F2FE;color:#075985;">Model Tender</span> findings. Useful for ensuring no standard clause has been dropped or altered.
+    </p>
+    <div class="dropzone" id="modelDropzone" onclick="document.getElementById('modelFile').click()">
+      <div class="dz-icon">📐</div>
+      <div class="dz-main">Click to upload or drag &amp; drop the model tender document</div>
+      <div class="dz-sub">Services or Works standard template — PDF or Word — optional</div>
+    </div>
+    <input type="file" id="modelFile" accept=".pdf,.doc,.docx" style="display:none;" />
+    <div id="modelFileChip"></div>
+    <div id="modelStatus"></div>
+  </div>
+
+  <!-- RUN -->
+  <div class="card" id="runBtnWrap">
+    <div class="toolbar">
+      <button id="runEvalBtn" onclick="runEvaluation()" disabled>Run Evaluation ▶</button>
+      <button class="secondary" onclick="window.print()" id="printBtn" style="display:none;">🖨 Print / Save Report</button>
+      <span id="runStatus"></span>
+    </div>
+  </div>
+
+  <!-- REPORT -->
+  <div id="reportSection" style="display:none;">
+    <div class="card">
+      <h2>Compliance Report <span class="badge" id="reportCount">0 checks</span></h2>
+      <div class="disclaimer">
+        <b>Automated screening, not legal advice.</b> This tool flags likely clause presence/absence using text-pattern matching against common Indian public-procurement norms (GFR 2017, CVC, GeM, MSME, Make in India Order 2017, Arbitration &amp; Conciliation Act). Rule thresholds (EMD %, PBG %, etc.) change over time — a qualified procurement officer should confirm every "Non-compliant" or "Needs review" item against the current circulars before final decisions.
+      </div>
+      <div id="tenderTypeBanner"></div>
+      <div class="timeline-note" id="timelineNote"></div>
+      <div class="summary-grid" id="summaryGrid"></div>
+      <div id="findingsContainer"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+// ======================================================================
+// FILE STATE
+// ======================================================================
+let rfpPages = null;     // [{page, text}]
+let guidePages = null;   // [{page, text}]
+let modelPages = null;   // [{page, text}]
+let rfpFileMeta = null;
+let guideFileMeta = null;
+let modelFileMeta = null;
+let lastResults = null;
+let lastTenderType = 'unknown';
+let manualTenderType = null;
+
+function startTool(){
+  document.getElementById('landingPage').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+}
+
+// ======================================================================
+// PDF / DOCX EXTRACTION
+// ======================================================================
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+async function extractPdfText(file) {
+  const data = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data}).promise;
+  let pages = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    let lines = [];
+    let currentLine = [];
+    let lastY = null;
+    for (const item of content.items) {
+      const y = item.transform[5];
+      if (lastY !== null && Math.abs(y - lastY) > 2) {
+        lines.push(currentLine.join(' '));
+        currentLine = [];
+      }
+      currentLine.push(item.str);
+      lastY = y;
+    }
+    if (currentLine.length) lines.push(currentLine.join(' '));
+    pages.push({page: i, text: lines.join('\n')});
+  }
+  return pages;
+}
+
+async function extractDocxText(file) {
+  const buf = await file.arrayBuffer();
+  const result = await mammoth.extractRawText({arrayBuffer: buf});
+  // Word docs have no fixed pages once parsed — split into pseudo-pages of ~3500 chars
+  // so the report can still cite an approximate location.
+  const text = result.value || '';
+  const chunkSize = 3500;
+  let pages = [];
+  for (let i = 0, p = 1; i < text.length; i += chunkSize, p++) {
+    pages.push({page: p, text: text.slice(i, i + chunkSize)});
+  }
+  if (!pages.length) pages.push({page: 1, text: ''});
+  return pages;
+}
+
+function isPdf(file){ return /\.pdf$/i.test(file.name); }
+function isWord(file){ return /\.docx?$/i.test(file.name); }
+
+async function extractAny(file){
+  if (isPdf(file)) return {pages: await extractPdfText(file), type:'PDF'};
+  if (isWord(file)) return {pages: await extractDocxText(file), type:'Word'};
+  throw new Error('Unsupported file type — please upload a PDF or Word (.doc/.docx) document.');
+}
+
+// ======================================================================
+// UPLOAD HANDLERS
+// ======================================================================
+function wireDropzone(zoneId, inputId, onFile){
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  input.addEventListener('change', e => { if (e.target.files[0]) onFile(e.target.files[0]); });
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag');
+    if (e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]);
+  });
+}
+
+function showChip(chipElId, file, onRemove){
+  const el = document.getElementById(chipElId);
+  el.innerHTML = '';
+  const chip = document.createElement('div');
+  chip.className = 'file-chip';
+  chip.innerHTML = `<span>📎</span><span class="fc-name">${escapeHtml(file.name)}</span><span class="fc-remove" title="Remove">✕</span>`;
+  chip.querySelector('.fc-remove').onclick = onRemove;
+  el.appendChild(chip);
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function updateRunButton(){
+  document.getElementById('runEvalBtn').disabled = !rfpPages;
+}
+
+wireDropzone('rfpDropzone', 'rfpFile', async (file) => {
+  const statusEl = document.getElementById('rfpStatus');
+  statusEl.innerHTML = '<div class="status info">⏳ Reading RFP…</div>';
+  try {
+    const {pages, type} = await extractAny(file);
+    rfpPages = pages;
+    rfpFileMeta = {name: file.name, type};
+    showChip('rfpFileChip', file, () => { rfpPages = null; rfpFileMeta = null; document.getElementById('rfpFileChip').innerHTML=''; document.getElementById('rfpStatus').innerHTML=''; updateRunButton(); });
+    const totalChars = pages.reduce((a,p) => a + p.text.length, 0);
+    if (totalChars < 200) {
+      statusEl.innerHTML = '<div class="status err">⚠ Very little text extracted — this may be a scanned/image-only document. Results may be unreliable.</div>';
+    } else {
+      statusEl.innerHTML = `<div class="status ok">✓ Extracted ${type === 'PDF' ? pages.length + ' page(s)' : 'document text'} (${totalChars.toLocaleString()} characters).</div>`;
+    }
+  } catch (err) {
+    statusEl.innerHTML = `<div class="status err">✗ ${escapeHtml(err.message || 'Could not read this file.')}</div>`;
+    rfpPages = null;
+  }
+  updateRunButton();
+});
+
+wireDropzone('guideDropzone', 'guideFile', async (file) => {
+  const statusEl = document.getElementById('guideStatus');
+  statusEl.innerHTML = '<div class="status info">⏳ Reading guidelines document…</div>';
+  try {
+    const {pages, type} = await extractAny(file);
+    guidePages = pages;
+    guideFileMeta = {name: file.name, type};
+    showChip('guideFileChip', file, () => { guidePages = null; guideFileMeta = null; document.getElementById('guideFileChip').innerHTML=''; document.getElementById('guideStatus').innerHTML=''; });
+    const totalChars = pages.reduce((a,p) => a + p.text.length, 0);
+    statusEl.innerHTML = `<div class="status ok">✓ Extracted ${totalChars.toLocaleString()} characters. Obligation clauses will be pulled out when you run the evaluation.</div>`;
+  } catch (err) {
+    statusEl.innerHTML = `<div class="status err">✗ ${escapeHtml(err.message || 'Could not read this file.')}</div>`;
+    guidePages = null;
+  }
+});
+
+wireDropzone('modelDropzone', 'modelFile', async (file) => {
+  const statusEl = document.getElementById('modelStatus');
+  statusEl.innerHTML = '<div class="status info">⏳ Reading model tender document…</div>';
+  try {
+    const {pages, type} = await extractAny(file);
+    modelPages = pages;
+    modelFileMeta = {name: file.name, type};
+    showChip('modelFileChip', file, () => { modelPages = null; modelFileMeta = null; document.getElementById('modelFileChip').innerHTML=''; document.getElementById('modelStatus').innerHTML=''; });
+    const totalChars = pages.reduce((a,p) => a + p.text.length, 0);
+    statusEl.innerHTML = `<div class="status ok">✓ Extracted ${totalChars.toLocaleString()} characters. Mandatory clauses from this model tender will be checked against the RFP when you run the evaluation.</div>`;
+  } catch (err) {
+    statusEl.innerHTML = `<div class="status err">✗ ${escapeHtml(err.message || 'Could not read this file.')}</div>`;
+    modelPages = null;
+  }
+});
+
+// ======================================================================
+// GUIDELINE SOURCE BADGES
+// ======================================================================
+const SOURCES = {
+  gfr:    {label:'GFR 2017',                bg:'#DBEAFE', color:'#1E40AF'},
+  cvc:    {label:'CVC Guidelines',          bg:'#FEF3C7', color:'#92400E'},
+  gem:    {label:'GeM GTC',                 bg:'#D1FAE5', color:'#065F46'},
+  mse:    {label:'MSE Procurement Policy',  bg:'#FFF7ED', color:'#9A3412'},
+  ppi:    {label:'Make in India Order 2017',bg:'#EDE9FE', color:'#5B21B6'},
+  arb:    {label:'Arbitration Act 1996',    bg:'#F0FDFA', color:'#134E4A'},
+  rti:    {label:'RTI Act 2005',            bg:'#F3F4F6', color:'#374151'},
+  cppp:   {label:'CPPP / e-Procurement',    bg:'#FFF0E6', color:'#9A3412'},
+  custom: {label:'Dept. Guideline',         bg:'#FCE7F3', color:'#9D174D'},
+  model:  {label:'Model Tender',             bg:'#E0F2FE', color:'#075985'}
+};
+function sourceBadge(key){
+  const s = SOURCES[key] || SOURCES.custom;
+  return `<span class="source-badge" style="background:${s.bg};color:${s.color};">${s.label}</span>`;
+}
+
+// ======================================================================
+// TENDER TYPE DETECTION
+// ======================================================================
+const WORKS_SIGNALS = [
+  /\bworks (contract|tender|bid)\b/i, /\bcivil works\b/i, /\bconstruction (work|project|contract)\b/i,
+  /\bill of quantities\b/i, /\bBOQ\b/, /\bproject cost\b/i, /\bestimated cost of (the )?work/i,
+  /\bcompletion of (the )?work/i, /\bsite (possession|handover)\b/i, /\bcontractor.{0,20}(civil|infra|construct)/i,
+  /\bdefect liability period\b/i, /\bpayment on measurement\b/i, /\brate analysis\b/i,
+  /\bstandard schedule of rates\b/i, /\bSSR\b/, /\bcpwd/i, /\bPWD\b/
+];
+const SERVICES_SIGNALS = [
+  /\bservices (contract|tender|bid|agreement)\b/i, /\bmanpower (services|deployment|supply)\b/i,
+  /\boutcome[- ]based\b/i, /\bQCBS\b/i, /\bquality[- ]cum[- ]cost based selection\b/i,
+  /\b(L1|L-1|lowest bidder)\b/i, /\b(H1|H-1|highest scorer)\b/i,
+  /\bempanelment\b/i, /\brate (contract|list)\b/i, /\bmanaged services\b/i,
+  /\bIT services\b/i, /\bconsultancy\b/i, /\bfacility management\b/i,
+  /\bhousekeeping\b/i, /\bsecurity services\b/i, /\boutsorc/i,
+  /\bsoftware (development|implementation|maintenance)\b/i, /\bAMC\b/
+];
+
+function detectTenderType(fullText){
+  let worksScore = 0, servicesScore = 0;
+  for (const re of WORKS_SIGNALS)   if (re.test(fullText)) worksScore++;
+  for (const re of SERVICES_SIGNALS) if (re.test(fullText)) servicesScore++;
+  if (worksScore > servicesScore && worksScore >= 2) return 'works';
+  if (servicesScore > worksScore && servicesScore >= 2) return 'services';
+  if (worksScore === servicesScore && worksScore >= 1) return 'mixed';
+  return 'unknown';
+}
+
+// ======================================================================
+// RULE DATABASE
+// ======================================================================
+function emdValidate(snippet, tenderType){
+  const m = snippet.match(/(\d{1,2}(\.\d+)?)\s*%/);
+  if (tenderType === 'services') {
+    if (m) {
+      const pct = parseFloat(m[1]);
+      return {status:'compliant', note:`EMD specified at ${pct}%. For services tenders, EMD is not pegged to project cost — the amount is set at the procuring entity's discretion. Verify it is reasonable and not unduly restrictive for MSEs/Startups.`};
+    }
+    const amt = snippet.match(/(?:Rs\.?|INR|₹)\s*([\d,]+)/i);
+    if (amt) return {status:'compliant', note:`Fixed EMD amount (Rs. ${amt[1]}) specified. For services tenders, a fixed EMD amount is acceptable; ensure MSME/Startup exemptions are mentioned.`};
+    return {status:'needs-review', note:'EMD clause found but amount/percentage could not be extracted. For services tenders, the value is discretionary — verify it is stated clearly and MSE/Startup exemptions are granted.'};
+  }
+  // Works tender: EMD must be ≤ 2% of project cost
+  if (m) {
+    const pct = parseFloat(m[1]);
+    if (pct <= 2) return {status:'compliant', note:`EMD specified at ${pct}% of estimated value — within the 2% cap under GFR 2017, Rule 170 for works contracts.`};
+    return {status:'non-compliant', note:`EMD specified at ${pct}% — exceeds the 2% cap under GFR 2017, Rule 170 for works contracts. Confirm whether a specific dispensation applies.`};
+  }
+  return {status:'needs-review', note:'EMD clause found, but a percentage could not be auto-extracted — verify manually against the 2% GFR cap for works contracts.'};
+}
+
+function bidValidityValidate(snippet){
+  const m = snippet.match(/(\d{1,3})\s*(days|day)/i);
+  if (m) {
+    const days = parseInt(m[1], 10);
+    if (days >= 60) return {status:'compliant', note:`Validity period of ${days} days specified — typical range for public tenders is 90–180 days.`};
+    return {status:'needs-review', note:`Validity period of only ${days} days found — shorter than the typical 90–180 day range; verify this is intentional.`};
+  }
+  return {status:'needs-review', note:'Validity clause found but a specific day count could not be auto-extracted — verify manually.'};
+}
+
+const RULES = [
+  // ── ELIGIBILITY ──
+  {id:'reg', category:'elig', label:'Legal entity registration / incorporation proof', required:true, source:'gfr',
+    ruleRef:'GFR 2017, Rule 170 read with bidding document Annexures', ruleText:'Bidders must furnish proof of legal status — registration certificate, PAN, GST registration — to establish eligibility to contract.',
+    patterns:[/certificate of incorporation/i,/registration certificate/i,/\bPAN\b.{0,20}(card|number)/i,/legal entity/i,/firm.{0,20}registered under/i]},
+  {id:'turnover', category:'elig', label:'Minimum annual turnover criteria', required:true, source:'gfr',
+    ruleRef:'GFR 2017, Rule 173 — Qualification criteria', ruleText:'Qualification criteria must be specific to the requirement and not unduly restrictive; a minimum turnover threshold should be clearly stated.',
+    patterns:[/annual turnover/i,/average annual turnover/i,/minimum turnover/i]},
+  {id:'experience', category:'elig', label:'Similar work / prior experience requirement', required:true, source:'gfr',
+    ruleRef:'GFR 2017, Rule 173', ruleText:'Past experience in similar works or services over a specified period should be set as a qualifying criterion.',
+    patterns:[/similar work/i,/relevant experience/i,/years of experience/i,/experience (of|in) (executing|completing|providing|undertaking)/i]},
+  {id:'blacklist', category:'elig', label:'Non-blacklisting / no-conviction declaration', required:true, source:'cvc',
+    ruleRef:'CVC Circular on Banning/Blacklisting of Business Dealings', ruleText:'Bidders must declare they are not currently blacklisted or debarred by any government department, PSU or statutory body.',
+    patterns:[/not.{0,15}blacklisted/i,/debarred/i,/banned from business/i,/no conviction/i,/blacklisting/i]},
+  {id:'jv', category:'elig', label:'JV / Consortium participation rules', required:false, source:'gfr',
+    ruleRef:'GFR 2017, Rule 173 read with tender-specific conditions', ruleText:'Where JV/Consortium bidding is permitted, the lead member, equity share and liability terms should be defined.',
+    patterns:[/joint venture/i,/consortium/i,/\bJV\b/]},
+
+  // ── TECHNICAL ──
+  {id:'scope', category:'tech', label:'Scope of Work clearly defined', required:true, source:'gfr',
+    ruleRef:'GFR 2017, Rule 168', ruleText:'The scope of work or services must be precisely defined to avoid ambiguity in bids.',
+    patterns:[/scope of work/i,/scope of services/i]},
+  {id:'techspec', category:'tech', label:'Technical specifications / BOQ', required:true, source:'gfr',
+    ruleRef:'GFR 2017, Rule 168', ruleText:'Detailed technical specifications or a Bill of Quantities must form part of the bidding document.',
+    patterns:[/technical specification/i,/bill of quantities/i,/\bBOQ\b/]},
+  {id:'manpower', category:'tech', label:'Manpower deployment plan', required:false, source:'gem',
+    ruleRef:'GeM General Terms & Conditions — Manpower Services', ruleText:'Minimum manpower deployment, qualification and shift requirements should be specified for service contracts.',
+    patterns:[/manpower deployment/i,/deployment of (staff|personnel|manpower)/i,/minimum (staff|personnel|manpower)/i]},
+  {id:'timeline', category:'tech', label:'Project timeline / completion schedule', required:true, source:'gfr',
+    ruleRef:'GFR 2017, Rule 168', ruleText:'The contract period and milestones for completion must be specified clearly.',
+    patterns:[/completion period/i,/project timeline/i,/time schedule/i,/contract period/i,/delivery period/i]},
+  {id:'warranty', category:'tech', label:'Warranty / SLA / Defect Liability Period', required:true, source:'gfr',
+    ruleRef:'GFR 2017, Rule 168 and Standard Bidding Document clauses', ruleText:'Warranty obligations, defect liability period, or service-level agreement terms must be specified.',
+    patterns:[/defect liability period/i,/warranty period/i,/service level agreement/i,/\bSLA\b/]},
+
+  // ── FINANCIAL & COMMERCIAL ──
+  {id:'emd', category:'fin', label:'Earnest Money Deposit (EMD)', required:true, source:'gfr',
+    ruleRef:'GFR 2017, Rule 170', ruleText:'EMD should not exceed 2% of the estimated procurement value; registered MSEs and DPIIT-recognised Startups are ordinarily exempt.',
+    patterns:[/earnest money deposit/i,/\bEMD\b/], validate: emdValidate},
+  {id:'pbg', category:'fin', label:'Performance Bank Guarantee / Performance Security', required:true, source:'gfr',
+    ruleRef:'GFR 2017, Rule 158', ruleText:'Performance security is generally taken as a percentage of contract value, valid through the warranty/defect-liability period.',
+    patterns:[/performance (bank )?guarantee/i,/performance security/i,/\bPBG\b/]},
+  {id:'payment', category:'fin', label:'Payment terms / milestone-linked payments', required:true, source:'gfr',
+    ruleRef:'GFR 2017, Rule 160', ruleText:'Payment terms and milestones — advance, stage and final payment — must be explicitly stated.',
+    patterns:[/payment terms/i,/milestone payment/i,/mode of payment/i,/payment schedule/i]},
+  {id:'pricevalidity', category:'fin', label:'Price / bid validity period', required:true, source:'gfr',
+    ruleRef:'GFR 2017, Rule 172', ruleText:'Bid/price validity period should be specified, typically 90–180 days from the date of bid opening.',
+    patterns:[/bid validity/i,/price validity/i,/validity of (the )?(bid|offer|quotation)/i], validate: bidValidityValidate},
+  {id:'gst', category:'fin', label:'GST / Taxes & duties clause', required:true, source:'gfr',
+    ruleRef:'GFR 2017 read with CBIC GST procurement guidance', ruleText:'The tender must clarify whether quoted prices are inclusive or exclusive of GST and other applicable duties.',
+    patterns:[/\bGST\b/,/goods and services tax/i,/taxes and duties/i,/inclusive of (all )?taxes/i]},
+
+  // ── SUBMISSION & COMPLIANCE ──
+  {id:'bidformat', category:'sub', label:'Bid submission format (technical & financial bid)', required:true, source:'gfr',
+    ruleRef:'GFR 2017, Rule 174 — single-bid / two-bid system', ruleText:'The tender must specify whether bids are submitted as a single packet or as separate technical and financial bids (two-envelope/two-cover system).',
+    patterns:[/technical bid/i,/financial bid/i,/two[- ]envelope/i,/two[- ]cover/i,/single packet/i]},
+  {id:'deadline', category:'sub', label:'Bid submission deadline / pre-bid meeting date', required:true, source:'gfr',
+    ruleRef:'GFR 2017, Rule 172', ruleText:'The last date/time for bid submission, and the pre-bid meeting date (if any), must be clearly stated.',
+    patterns:[/last date (for|of) submission/i,/bid submission (date|deadline)/i,/pre[- ]bid meeting/i,/bid opening date/i]},
+  {id:'msme', category:'sub', label:'MSME / DPIIT Startup exemptions', required:false, source:'mse',
+    ruleRef:'Public Procurement Policy for MSEs Order, 2012 (as amended) / GeM Startup Runway', ruleText:'Registered Micro & Small Enterprises and DPIIT-recognised Startups are eligible for exemption from EMD, tender fee, and prior experience/turnover criteria, subject to meeting quality and technical specifications.',
+    patterns:[/\bMSME\b/i,/micro.{0,5}small.{0,5}enterprise/i,/\bMSE\b/,/startup/i,/DPIIT/i]},
+  {id:'makeinindia', category:'sub', label:'Make in India / Local Content preference', required:false, source:'ppi',
+    ruleRef:'Public Procurement (Preference to Make in India) Order, 2017', ruleText:'Tenders should specify local content requirements and the purchase-preference margin applicable to Class-I/Class-II local suppliers, where relevant.',
+    patterns:[/make in india/i,/local content/i,/class[- ]?i local supplier/i,/local supplier/i]},
+  {id:'arbitration', category:'sub', label:'Arbitration / Dispute Resolution clause', required:true, source:'arb',
+    ruleRef:'Arbitration and Conciliation Act, 1996 (as amended 2015 & 2019)', ruleText:'A dispute-resolution mechanism — including arbitration seat, governing law, and time-bound resolution — must be specified.',
+    patterns:[/arbitration/i,/dispute resolution/i,/governing law/i]},
+  {id:'forcemajeure', category:'sub', label:'Force Majeure clause', required:false, source:'gfr',
+    ruleRef:'Standard Bidding Document clause referenced under GFR 2017', ruleText:'A force majeure clause excusing performance during events beyond reasonable control should be included.',
+    patterns:[/force majeure/i]},
+  {id:'eproc', category:'sub', label:'e-Procurement / CPPP publishing compliance', required:false, source:'cppp',
+    ruleRef:'CPPP / GeM e-Procurement Guidelines', ruleText:'Tenders above the prescribed threshold should be published on CPPP/GeM with provision for online bid submission.',
+    patterns:[/eprocurement/i,/e-procurement/i,/\bCPPP\b/,/\bGeM\b/,/online bid submission/i]},
+  {id:'rti', category:'sub', label:'RTI clause / transparency provision', required:false, source:'rti',
+    ruleRef:'Right to Information Act, 2005', ruleText:'Tender documents commonly note that records held by the procuring entity are subject to the RTI Act.',
+    patterns:[/right to information/i,/\bRTI\b/]}
+];
+
+// Rules applicable ONLY to services tenders
+const RULES_SERVICES_ONLY = [
+  {id:'qcbs', category:'fin', label:'Evaluation methodology (QCBS / L1 / H1 / Empanelment)', required:true, source:'gfr',
+    ruleRef:'GFR 2017, Rule 175 — Selection of Consultants; CVC Guidelines on Consultancy', ruleText:'Services tenders must clearly state the bid-evaluation methodology: Quality-and-Cost-Based Selection (QCBS), Least Cost (L1), highest-technical-scorer (H1), or empanelment — with weightages if QCBS.',
+    patterns:[/\bQCBS\b/i,/quality[- ]cum[- ]cost/i,/\bL[-\s]?1\b/i,/\bH[-\s]?1\b/i,/empanelment/i,/evaluation methodology/i,/evaluation criteria/i,/marking scheme/i,/technical score/i]},
+  {id:'techweight', category:'fin', label:'Technical vs Financial weightage (if QCBS)', required:false, source:'gfr',
+    ruleRef:'GFR 2017, Rule 175 — Standard Consultant Selection Procedures', ruleText:'In QCBS, the relative weightage given to technical and financial bids must be stated explicitly (common split: 70:30 or 80:20).',
+    patterns:[/technical.{0,20}weightage/i,/financial.{0,20}weightage/i,/\b70[:\s]*30\b/,/\b80[:\s]*20\b/,/technical marks/i,/financial marks/i]},
+  {id:'sla', category:'tech', label:'Service Level Agreement (SLA) / KPI metrics', required:true, source:'gem',
+    ruleRef:'GeM GTC — Service Contracts; GFR 2017, Rule 168', ruleText:'For services contracts, measurable SLA targets, KPIs, penalties for non-performance and escalation mechanisms must be specified.',
+    patterns:[/\bSLA\b/,/service level agreement/i,/key performance indicator/i,/\bKPI\b/,/penalty.{0,20}(non[- ]performance|delay|breach)/i]},
+  {id:'deployment', category:'tech', label:'Personnel deployment & qualification requirements', required:true, source:'gem',
+    ruleRef:'GeM GTC — Manpower Services; CVC Manpower Outsourcing Guidelines', ruleText:'Minimum qualifications, experience and count of key personnel to be deployed must be defined for services tenders.',
+    patterns:[/deployment of (key )?personnel/i,/minimum (qualification|experience).{0,20}(staff|personnel|resource)/i,/key personnel/i,/team composition/i,/resource deployment/i,/manpower plan/i]},
+  {id:'reporting', category:'tech', label:'Reporting obligations & progress review mechanism', required:false, source:'gfr',
+    ruleRef:'GFR 2017, Rule 168 — Contract Management', ruleText:'Periodic progress reports, review meetings, and escalation procedures should be specified for services agreements.',
+    patterns:[/progress report/i,/monthly report/i,/quarterly report/i,/review meeting/i,/status report/i]},
+];
+
+// Rules applicable ONLY to works tenders
+const RULES_WORKS_ONLY = [
+  {id:'estimatedcost', category:'fin', label:'Estimated project / work cost (PAC/NIT amount)', required:true, source:'gfr',
+    ruleRef:'GFR 2017, Rule 168 — Procurement of Works; CPWD Manual', ruleText:'The Notice Inviting Tender (NIT) must state the estimated cost of the work, from which EMD (≤2%) is derived and bid thresholds are calculated.',
+    patterns:[/estimated cost/i,/put to tender/i,/NIT (amount|value)/i,/project cost/i,/contract value/i,/approximate cost/i]},
+  {id:'sitevisit', category:'tech', label:'Site visit / possession clause', required:false, source:'gfr',
+    ruleRef:'GFR 2017 / CPWD Works Manual — Pre-bid Site Inspection', ruleText:'Works tenders should mention whether site visits are mandatory, and when site possession will be handed over to the contractor.',
+    patterns:[/site visit/i,/site inspection/i,/site possession/i,/handing over.{0,20}site/i,/inspect.{0,20}site/i]},
+  {id:'boq', category:'tech', label:'Bill of Quantities (BOQ) completeness', required:true, source:'gfr',
+    ruleRef:'GFR 2017, Rule 168; CPWD Works Manual Schedule of Quantities', ruleText:'A complete Bill of Quantities with item descriptions, units and estimated quantities must be attached to works tenders.',
+    patterns:[/bill of quantities/i,/\bBOQ\b/,/schedule of quantities/i,/SoQ/i]},
+  {id:'liquidateddamages', category:'fin', label:'Liquidated Damages (LD) clause', required:true, source:'gfr',
+    ruleRef:'GFR 2017, Rule 158; Standard Bidding Document for Works', ruleText:'The rate of liquidated damages for delays (typically 0.5% per week, capped at 10% of contract value) must be stated in works contracts.',
+    patterns:[/liquidated damages/i,/\bLD\b.{0,20}(clause|rate|week|delay)/i,/penalty.{0,20}delay/i,/delay damages/i]},
+  {id:'variation', category:'fin', label:'Variation / deviation clause (quantity variation limits)', required:false, source:'gfr',
+    ruleRef:'GFR 2017, Rule 162 — Modifications/Variations; CVC Circular on Excess Quantities', ruleText:'The permissible variation in quantities (typically ±25% at item level) and the approval authority for variations beyond limits must be defined.',
+    patterns:[/variation.{0,20}(order|limit|quantity)/i,/deviation.{0,20}(order|limit)/i,/change order/i,/excess quantity/i,/\b\+?25\s*%\b/]},
+];
+
+const CATEGORIES = [
+  {key:'elig', icon:'🏛', label:'Eligibility'},
+  {key:'tech', icon:'🛠', label:'Technical Parameters'},
+  {key:'fin',  icon:'💰', label:'Financial & Commercial'},
+  {key:'sub',  icon:'📋', label:'Submission & Compliance'},
+  {key:'custom', icon:'📚', label:'From Your Department Guideline'},
+  {key:'model',  icon:'📐', label:'From Model Tender Document'}
+];
+
+// ======================================================================
+// EVALUATION ENGINE
+// ======================================================================
+function getFullText(pages){ return pages.map(p => p.text).join('\n'); }
+
+function findMatch(fullText, patterns){
+  let best = null;
+  for (const re of patterns) {
+    const r = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
+    r.lastIndex = 0;
+    const m = r.exec(fullText);
+    if (m && (!best || m.index < best.index)) best = {index: m.index, length: m[0].length};
+  }
+  return best;
+}
+
+function locateSnippet(pages, fullText, matchIndex, matchLen){
+  let cum = 0, pageNo = pages.length ? pages[0].page : 1;
+  for (const p of pages) {
+    if (matchIndex < cum + p.text.length + 1) { pageNo = p.page; break; }
+    cum += p.text.length + 1;
+  }
+  const start = Math.max(0, matchIndex - 90);
+  const end = Math.min(fullText.length, matchIndex + matchLen + 90);
+  const snippet = fullText.slice(start, end).replace(/\s+/g, ' ').trim();
+  return {page: pageNo, snippet};
+}
+
+function evaluateBuiltInRule(rule, pages, fullText, tenderType){
+  const match = findMatch(fullText, rule.patterns);
+  if (!match) {
+    return {
+      id: rule.id, kind:'builtin', category: rule.category, label: rule.label, required: rule.required,
+      source: rule.source, ruleRef: rule.ruleRef, ruleText: rule.ruleText,
+      status: rule.required ? 'non-compliant' : 'needs-review',
+      note: rule.required ? 'Clause not found in the RFP text — appears to be missing.' : 'Clause not found — absence is not necessarily a defect; verify manually.',
+      snippet: null, page: null
+    };
+  }
+  const loc = locateSnippet(pages, fullText, match.index, match.length);
+  let status = 'compliant', note = 'Clause located in the document.';
+  if (rule.validate) {
+    const v = rule.validate(loc.snippet, tenderType);
+    status = v.status; note = v.note;
+  }
+  return {
+    id: rule.id, kind:'builtin', category: rule.category, label: rule.label, required: rule.required,
+    source: rule.source, ruleRef: rule.ruleRef, ruleText: rule.ruleText,
+    status, note, snippet: loc.snippet, page: loc.page
+  };
+}
+
+const STOPWORDS = new Set(['the','and','for','that','this','with','from','shall','must','should','will',
+  'have','been','are','was','were','which','their','they','also','any','all','not','more','less','than',
+  'within','being','such','only','into','upon','where','when','while','these','those','each','every','per']);
+
+function extractCustomRules(guidelineText, max){
+  const sentences = guidelineText
+    .split(/(?<=[.;\n])\s+/)
+    .map(s => s.replace(/\s+/g,' ').trim())
+    .filter(s => s.length > 25 && s.length < 280);
+  const obligationRe = /\b(must|shall|mandatory|should|minimum|maximum|not less than|not more than|required to|compulsory|at least)\b/i;
+  let candidates = sentences.filter(s => obligationRe.test(s));
+  // de-duplicate
+  candidates = [...new Set(candidates)];
+  // prefer sentences containing a concrete number / percentage — more checkable
+  candidates.sort((a,b) => {
+    const an = /\d/.test(a) ? 1 : 0, bn = /\d/.test(b) ? 1 : 0;
+    if (bn !== an) return bn - an;
+    return b.length - a.length;
+  });
+  return candidates.slice(0, max || 15).map((s, i) => ({id: 'custom_' + i, text: s}));
+}
+
+function tokenize(sentence){
+  return sentence.toLowerCase().replace(/[^\w\s%]/g, ' ').split(/\s+/)
+    .filter(w => w.length > 3 && !STOPWORDS.has(w));
+}
+
+function evaluateCustomRule(rule, rfpFullTextLower){
+  const tokens = tokenize(rule.text);
+  if (!tokens.length) {
+    return {id: rule.id, kind:'custom', category:'custom', label: rule.text, required:false,
+      source:'custom', ruleRef:'From uploaded department guideline', ruleText: rule.text,
+      status:'needs-review', note:'Could not extract checkable terms from this sentence.', snippet:null, page:null};
+  }
+  let hits = 0;
+  for (const t of tokens) if (rfpFullTextLower.includes(t)) hits++;
+  const ratio = hits / tokens.length;
+  let status, note;
+  if (ratio >= 0.6) { status = 'compliant'; note = `Matched ~${Math.round(ratio*100)}% of key terms in the RFP — likely addressed.`; }
+  else if (ratio >= 0.3) { status = 'needs-review'; note = `Partial term overlap (${Math.round(ratio*100)}%) with the RFP — verify manually.`; }
+  else { status = 'non-compliant'; note = `Key terms from this guideline were not found in the RFP — likely not addressed.`; }
+  return {id: rule.id, kind:'custom', category:'custom', label: rule.text.length > 90 ? rule.text.slice(0,90) + '…' : rule.text,
+    required:false, source:'custom', ruleRef:'From uploaded department guideline', ruleText: rule.text,
+    status, note, snippet:null, page:null};
+}
+
+function extractModelClauses(modelText, max){
+  // Split into sentences/paragraphs; pull obligation sentences AND section headings with clause markers
+  const chunks = modelText
+    .split(/(?<=[.;\n])\s+/)
+    .map(s => s.replace(/\s+/g,' ').trim())
+    .filter(s => s.length > 20 && s.length < 350);
+  const obligationRe = /\b(must|shall|mandatory|should|minimum|maximum|not less than|not more than|required to|compulsory|at least|will be|is required|are required)\b/i;
+  const headingRe = /^\s*(clause|section|article|part|annexure|schedule|appendix)[\s\d.]+/i;
+  let candidates = chunks.filter(s => obligationRe.test(s) || headingRe.test(s));
+  candidates = [...new Set(candidates)];
+  // Prioritise numbered/clause sentences and those with concrete figures
+  candidates.sort((a,b) => {
+    const aNum = /\d/.test(a) ? 1 : 0, bNum = /\d/.test(b) ? 1 : 0;
+    const aHead = headingRe.test(a) ? 1 : 0, bHead = headingRe.test(b) ? 1 : 0;
+    if ((bHead + bNum) !== (aHead + aNum)) return (bHead + bNum) - (aHead + aNum);
+    return b.length - a.length;
+  });
+  return candidates.slice(0, max || 25).map((s, i) => ({id: 'model_' + i, text: s}));
+}
+
+function evaluateModelRule(rule, rfpPages, rfpFullText){
+  const tokens = tokenize(rule.text);
+  if (!tokens.length) {
+    return {id: rule.id, kind:'model', category:'model', label: rule.text, required:true,
+      source:'model', ruleRef:'From uploaded model tender document', ruleText: rule.text,
+      status:'needs-review', note:'Could not extract checkable terms from this clause.', snippet:null, page:null};
+  }
+  // Try to find key phrase in RFP text with a sliding window for proximity
+  const rfpLower = rfpFullText.toLowerCase();
+  let hits = 0;
+  for (const t of tokens) if (rfpLower.includes(t)) hits++;
+  const ratio = hits / tokens.length;
+
+  // Try to locate a snippet if there's a decent match
+  let snippet = null, page = null;
+  if (ratio >= 0.4 && tokens.length >= 2) {
+    // Find the position of the most distinctive token
+    const longest = [...tokens].sort((a,b) => b.length - a.length)[0];
+    const idx = rfpLower.indexOf(longest);
+    if (idx !== -1) {
+      const loc = locateSnippet(rfpPages, rfpFullText, idx, longest.length);
+      snippet = loc.snippet; page = loc.page;
+    }
+  }
+
+  let status, note;
+  if (ratio >= 0.6) {
+    status = 'compliant';
+    note = `Clause appears to be present in the RFP (~${Math.round(ratio*100)}% key-term match with the model tender clause).`;
+  } else if (ratio >= 0.3) {
+    status = 'needs-review';
+    note = `Partial coverage (~${Math.round(ratio*100)}% key-term match) — this clause from the model tender may be partially addressed or differently worded; verify manually.`;
+  } else {
+    status = 'non-compliant';
+    note = 'This clause from the model tender document does not appear to be present in the RFP — it may have been omitted or significantly altered.';
+  }
+  const label = rule.text.length > 100 ? rule.text.slice(0,100) + '…' : rule.text;
+  return {id: rule.id, kind:'model', category:'model', label,
+    required:true, source:'model', ruleRef:'From uploaded model tender document', ruleText: rule.text,
+    status, note, snippet, page};
+}
+
+// ======================================================================
+// RUN EVALUATION
+// ======================================================================
+async function runEvaluation(){
+  if (!rfpPages) return;
+  manualTenderType = null;
+  const runStatus = document.getElementById('runStatus');
+  runStatus.innerHTML = '<span class="status info">⏳ Evaluating…</span>';
+  document.getElementById('runEvalBtn').disabled = true;
+
+  await new Promise(r => setTimeout(r, 50)); // let the UI paint
+
+  const fullText = getFullText(rfpPages);
+  const tenderType = detectTenderType(fullText);
+  const results = RULES.map(rule => evaluateBuiltInRule(rule, rfpPages, fullText, tenderType));
+
+  // Add type-specific rules
+  if (tenderType === 'services' || tenderType === 'mixed' || tenderType === 'unknown') {
+    for (const rule of RULES_SERVICES_ONLY) {
+      results.push(evaluateBuiltInRule(rule, rfpPages, fullText, tenderType));
+    }
+  }
+  if (tenderType === 'works' || tenderType === 'mixed' || tenderType === 'unknown') {
+    for (const rule of RULES_WORKS_ONLY) {
+      results.push(evaluateBuiltInRule(rule, rfpPages, fullText, tenderType));
+    }
+  }
+
+  if (guidePages) {
+    const guideText = getFullText(guidePages);
+    const customRulesRaw = extractCustomRules(guideText, 15);
+    const rfpLower = fullText.toLowerCase();
+    for (const cr of customRulesRaw) {
+      results.push(evaluateCustomRule(cr, rfpLower));
+    }
+  }
+
+  if (modelPages) {
+    const modelText = getFullText(modelPages);
+    const modelClausesRaw = extractModelClauses(modelText, 25);
+    for (const mc of modelClausesRaw) {
+      results.push(evaluateModelRule(mc, rfpPages, fullText));
+    }
+  }
+
+  lastResults = results;
+  lastTenderType = tenderType;
+  renderReport(results, tenderType);
+  runStatus.innerHTML = '<span class="status ok">✓ Evaluation complete.</span>';
+  document.getElementById('runEvalBtn').disabled = false;
+  document.getElementById('printBtn').style.display = 'inline-block';
+}
+
+// ======================================================================
+// RENDER REPORT
+// ======================================================================
+let currentFilter = 'all';
+
+function buildTimelineNote(fullText){
+  const m = fullText.match(/\b(1st|first|2nd|second|3rd|third)\s*(re-)?(call|invitation)\b/i) || fullText.match(/re[- ]?tender/i);
+  let callLabel = null;
+  if (m) {
+    const t = m[0].toLowerCase();
+    if (/2nd|second/.test(t)) callLabel = '2nd call / re-tender';
+    else if (/3rd|third/.test(t)) callLabel = '3rd call / repeat re-tender';
+    else if (/1st|first/.test(t)) callLabel = '1st call';
+    else if (/re[- ]?tender/.test(t)) callLabel = 're-tender';
+  }
+  const base = 'Recommended tender live duration — GFR 2017 sets a clear floor only for the first call: minimum 21 days from publication (28 days if foreign bidders are also invited). There is no separate fixed minimum for a 2nd or 3rd call/re-tender — GFR/CVC only require that any shortening be backed by a recorded justification and competent-authority approval. Common departmental practice compresses this to roughly 14 days for a 2nd call and 7 days for a 3rd, but verify against your own department\'s SOP.';
+  return callLabel ? `<b>📅 This RFP appears to be a ${escapeHtml(callLabel)}.</b> ${base}` : `<b>📅 Tender Timeline:</b> ${base}`;
+}
+
+function buildTenderTypeBanner(tenderType){
+  const effective = manualTenderType || tenderType;
+  const configs = {
+    works:   {icon:'🏗', cls:'works',    title:'Works Tender Detected',              desc:'Evaluating against Works contract norms: EMD ≤ 2% of project cost (GFR Rule 170), BOQ required, Liquidated Damages clause expected, site-possession and variation order provisions checked.'},
+    services:{icon:'🖥', cls:'services', title:'Services Tender Detected',           desc:'Evaluating against Services contract norms: evaluation methodology (QCBS / L1 / H1 / Empanelment) required, EMD is discretionary (not pegged to project cost), SLA/KPI metrics and personnel deployment plan expected.'},
+    mixed:   {icon:'🔀', cls:'unknown',  title:'Mixed / Combined Contract Detected', desc:'The RFP shows signals of both Works and Services elements. Checks for both types have been applied — review each finding in context.'},
+    unknown: {icon:'❓', cls:'unknown',  title:'Tender Type Could Not Be Determined',desc:'Not enough distinguishing signals to auto-classify this as a Works or Services tender. All standard rules plus both type-specific rule sets have been applied. Review manually.'},
+  };
+  const c = configs[effective] || configs.unknown;
+  const overrideNote = manualTenderType ? ` <span style="font-size:11px;font-weight:400;">(manually set — <a href="#" onclick="overrideTenderType(null);return false;" style="color:inherit;">reset to auto</a>)</span>` : ` <span style="font-size:11px;font-weight:400;opacity:.7;">(auto-detected)</span>`;
+  const btns = ['works','services','mixed'].map(t =>
+    `<button class="tt-override-btn${effective===t?' active':''}" onclick="overrideTenderType('${t}')">${{works:'🏗 Works',services:'🖥 Services',mixed:'🔀 Mixed'}[t]}</button>`
+  ).join('');
+  return `<div class="tender-type-banner ${c.cls}">
+    <span class="tt-icon">${c.icon}</span>
+    <div class="tt-body">
+      <div class="tt-title">${c.title}${overrideNote}</div>
+      <div class="tt-desc">${c.desc}</div>
+      <div class="tt-override"><span class="tt-override-label">Override:</span>${btns}</div>
+    </div>
+  </div>`;
+}
+
+function overrideTenderType(type){
+  manualTenderType = type;
+  if (!rfpPages || !lastResults) return;
+  // Re-run only the rule evaluation (fast — no PDF re-parsing)
+  const fullText = getFullText(rfpPages);
+  const autoType = detectTenderType(fullText);
+  const effectiveType = type || autoType;
+  const results = RULES.map(rule => evaluateBuiltInRule(rule, rfpPages, fullText, effectiveType));
+  if (effectiveType === 'services' || effectiveType === 'mixed' || effectiveType === 'unknown')
+    RULES_SERVICES_ONLY.forEach(rule => results.push(evaluateBuiltInRule(rule, rfpPages, fullText, effectiveType)));
+  if (effectiveType === 'works' || effectiveType === 'mixed' || effectiveType === 'unknown')
+    RULES_WORKS_ONLY.forEach(rule => results.push(evaluateBuiltInRule(rule, rfpPages, fullText, effectiveType)));
+  if (guidePages) {
+    const rfpLower = fullText.toLowerCase();
+    extractCustomRules(getFullText(guidePages), 15).forEach(cr => results.push(evaluateCustomRule(cr, rfpLower)));
+  }
+  if (modelPages)
+    extractModelClauses(getFullText(modelPages), 25).forEach(mc => results.push(evaluateModelRule(mc, rfpPages, fullText)));
+  lastResults = results;
+  lastTenderType = autoType;
+  renderReport(results, autoType);
+}
+
+function renderReport(results, tenderType){
+  tenderType = tenderType || lastTenderType || 'unknown';
+  document.getElementById('reportSection').style.display = 'block';
+  document.getElementById('reportCount').textContent = results.length + ' checks';
+  document.getElementById('tenderTypeBanner').innerHTML = buildTenderTypeBanner(tenderType);
+  document.getElementById('timelineNote').innerHTML = buildTimelineNote(rfpPages ? getFullText(rfpPages) : '');
+
+  const counts = {compliant:0, 'non-compliant':0, 'needs-review':0, custom:0, model:0};
+  results.forEach(r => {
+    counts[r.status] = (counts[r.status] || 0) + 1;
+    if (r.kind === 'custom') counts.custom++;
+    if (r.kind === 'model') counts.model++;
+  });
+  const total = results.length;
+
+  const cardDefs = [
+    {filter:'all',           cls:'sc-total',       count:total,                    label:'Total Observations'},
+    {filter:'compliant',     cls:'sc-compliant',   count:counts.compliant,         label:'Compliant'},
+    {filter:'non-compliant', cls:'sc-noncompliant',count:counts['non-compliant'],  label:'Non-compliant'},
+    {filter:'needs-review',  cls:'sc-review',      count:counts['needs-review'],   label:'Needs Review'},
+    {filter:'custom',        cls:'sc-custom',       count:counts.custom,           label:'Dept. Guideline'},
+    ...(counts.model > 0 ? [{filter:'model', cls:'sc-model', count:counts.model, label:'Model Tender'}] : [])
+  ];
+
+  document.getElementById('summaryGrid').innerHTML = cardDefs.map(c => `
+    <div class="summary-card ${c.cls} ${currentFilter === c.filter ? 'active' : ''}" data-filter="${c.filter}">
+      <div class="sc-count">${c.count}</div>
+      <div class="sc-label">${c.label}</div>
+    </div>
+  `).join('');
+
+  document.querySelectorAll('.summary-card').forEach(card => {
+    card.onclick = () => { currentFilter = card.dataset.filter; renderReport(lastResults, lastTenderType); };
+  });
+
+  renderFindings(results);
+}
+
+function statusPill(status){
+  if (status === 'compliant') return '<span class="status-pill pill-compliant">✓ Compliant</span>';
+  if (status === 'non-compliant') return '<span class="status-pill pill-noncompliant">✗ Non-compliant</span>';
+  return '<span class="status-pill pill-review">⚠ Needs Review</span>';
+}
+
+function findingCardHtml(r){
+  return `
+    <div class="finding">
+      <div class="finding-head">
+        <span class="finding-label">${escapeHtml(r.label)}</span>
+        ${r.required && r.kind === 'builtin' ? '<span class="req-tag">Required</span>' : ''}
+        ${sourceBadge(r.source)}
+        ${statusPill(r.status)}
+      </div>
+      <div class="finding-body">
+        <div class="finding-rule">${escapeHtml(r.ruleRef)} — ${escapeHtml(r.ruleText)}</div>
+        <div class="finding-note">${escapeHtml(r.note)}</div>
+        ${r.snippet ? `<div class="finding-snippet">…${escapeHtml(r.snippet)}…</div><div class="finding-page">${rfpFileMeta && rfpFileMeta.type === 'PDF' ? 'Found on page ' + r.page : 'Found in document text'}</div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderFindings(results){
+  const container = document.getElementById('findingsContainer');
+  let filtered = results;
+  if (currentFilter === 'custom') filtered = results.filter(r => r.kind === 'custom');
+  else if (currentFilter === 'model') filtered = results.filter(r => r.kind === 'model');
+  else if (currentFilter !== 'all') filtered = results.filter(r => r.status === currentFilter);
+
+  if (!filtered.length) {
+    container.innerHTML = '<div class="empty-note">No findings match this filter.</div>';
+    return;
+  }
+
+  let html = '';
+  for (const cat of CATEGORIES) {
+    const items = filtered.filter(r => r.category === cat.key);
+    if (!items.length) continue;
+    html += `<div class="cat-section"><div class="cat-title"><span class="cat-icon">${cat.icon}</span>${cat.label}<span class="cat-count">${items.length} item(s)</span></div>`;
+    html += items.map(findingCardHtml).join('');
+    html += '</div>';
+  }
+  container.innerHTML = html || '<div class="empty-note">No findings match this filter.</div>';
+}
+</script>
+</body>
+</html>
