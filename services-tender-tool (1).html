@@ -329,7 +329,7 @@ function(a,b,c){if(!Vd(b))throw Error(m(200));return Wd(null,a,b,!1,c)};Q.unmoun
 <div id="boot">
   <div class="boot-logo">📋</div>
   <div class="boot-title">SERVICES RFP<br>TENDER TOOL</div>
-  <div class="boot-sub">NASHIK KUMBH MELA AUTHORITY · QCBS / L1 / EMPANELMENT</div>
+  <div class="boot-sub">SERVICES TENDER GENERATOR · QCBS / L1 / QBS / EMPANELMENT</div>
   <div class="boot-bar"><div class="boot-fill"></div></div>
 </div>
 <div id="root"></div>
@@ -348,6 +348,7 @@ window.C = {
 
 window.SELECTION_METHODS = [
   { id: "L1",        label: "L1 — Least Cost Selection",     desc: "Lowest price wins among technically qualified bidders" },
+  { id: "QBS",       label: "QBS — Quality Based Selection",  desc: "Selection based on technical quality alone; no cost bidding" },
   { id: "QCBS_7030", label: "QCBS 70:30 — Quality & Cost",   desc: "Technical 70% + Financial 30%" },
   { id: "QCBS_8020", label: "QCBS 80:20 — Quality & Cost",   desc: "Technical 80% + Financial 20%" },
   { id: "PCT_COST",  label: "% of Project Cost",             desc: "Fee quoted as % of project cost — lowest % wins" },
@@ -359,52 +360,50 @@ window.SECTIONS = [
   {
     id: "authority", title: "Issuing Authority", icon: "🏛",
     fields: [
-      { id: "authorityName",      label: "Name of Authority / Department",                  type: "text",     placeholder: "Nashik-Trimbakeshwar Kumbh Mela Authority" },
+      { id: "orgProfilePicker",   label: "Saved Organization Profile",                     type: "orgprofilepicker" },
+      { id: "authorityLogo",      label: "Authority Logo / Emblem (JPEG, PNG, or any image format)", type: "logoupload" },
+      { id: "authorityName",      label: "Name of Authority / Department",                  type: "text",     placeholder: "e.g. XYZ Development Authority" },
       { id: "bidInvitingOfficer", label: "Designation of Bid Inviting Officer",             type: "text",     placeholder: "e.g. Chief Executive Officer" },
-      { id: "authorityAddress",   label: "Full Address",                                    type: "textarea", placeholder: "Old Zila Parishad Bhawan, Trimbak Naka, Nashik, Maharashtra – 422101" },
+      { id: "authorityAddress",   label: "Full Address",                                    type: "textarea", placeholder: "e.g. Authority Office, City, State – Pincode" },
       { id: "authorityPhone",     label: "Telephone / Contact",                             type: "text",     placeholder: "0253-2977375" },
       { id: "contactOfficer",     label: "Name & Designation of Contact Officer for Queries", type: "text",   placeholder: "Shri ___, Project Officer" },
-      { id: "contactEmail",       label: "Official Email for Queries",                      type: "text",     placeholder: "rfp@nashikkumbh.gov.in" },
+      { id: "contactEmail",       label: "Official Email for Queries",                      type: "text",     placeholder: "rfp@authority.gov.in" },
       { id: "portalWebsite",      label: "e-Procurement Portal Website",                    type: "text",     placeholder: "https://mahatenders.gov.in" },
+      { id: "bankAccountNo",     label: "Bank Account No. (for EMD / Fee payment)",           type: "text",     placeholder: "XXXXXXXXXXXXXXXX" },
+      { id: "ifscCode",          label: "IFSC Code",                                          type: "text",     placeholder: "SBIN0XXXXXX" },
+      { id: "bankName",          label: "Bank Name & Branch",                                 type: "text",     placeholder: "e.g. State Bank of India, Main Branch" },
     ],
   },
   {
     id: "assignment", title: "Assignment Details", icon: "📋",
     fields: [
-      { id: "rfpTitle",         label: "Name / Title of RFP Assignment",               type: "text",     placeholder: "e.g. Appointment of PMC for Infrastructure Works, Kumbh Mela 2027" },
+      { id: "rfpTitle",         label: "Name / Title of RFP Assignment",               type: "text",     placeholder: "e.g. Appointment of PMC for Infrastructure Works" },
       { id: "contractDuration", label: "Duration / Time-Period of Contract",            type: "text",     placeholder: "e.g. 24 months from date of LOA" },
+      { id: "background",       label: "Background",                                    type: "textarea", placeholder: "Describe the context for this tender — the project/programme it sits under, why it's being procured now, and any relevant history." },
       { id: "scopeSummary",     label: "Scope of Services",                             type: "textarea", placeholder: "Describe the key scope — planning, design, supervision, reporting, etc." },
-      { id: "deliverables",     label: "Key Deliverables",                              type: "textarea", placeholder: "e.g. Inception Report, Monthly Progress Reports, Completion Report..." },
       { id: "contractType",     label: "Contract Type",                                 type: "select",   options: ["Time \u0026 Material (T\u0026M)", "Deliverable Based"] },
       { id: "paymentMilestones",label: "Payment Schedule \u0026 Milestones",                type: "paymenttable" },
-      { id: "projectLocation",  label: "Project Location",                             type: "text",     placeholder: "Nashik & Trimbakeshwar, Maharashtra" },
     ],
   },
   {
     id: "financial", title: "Fee Pricing & Financial", icon: "💰",
     fields: [
-      { id: "feeAmount",         label: "Estimated / Reference Fee (\u20b9 in Lakhs) — for EMD calculation only",  type: "text", placeholder: "e.g. 85.50" },
+      { id: "feeAmount",         label: "Estimated / Reference Fee (\u20b9 in Lakhs) — optional, only used to auto-calculate EMD; leave blank to default EMD to \u20b91,00,000",  type: "text", placeholder: "e.g. 85.50 (optional)" },
       { id: "emdAmount",         label: "Earnest Money Deposit (EMD) — ₹",                   type: "emd" },
       { id: "tenderFeeAmount",   label: "Bid Processing Fee (incl. GST) — ₹",                type: "tenderfee" },
       { id: "performanceGuar",   label: "Performance Guarantee % of Contract Value",          type: "select",   options: ["3%","5%","7%","10%"] },
       { id: "pgValidity",        label: "Performance Guarantee Validity (post contract end)", type: "select",   options: ["90 days","180 days","1 year"] },
-      { id: "mseExemption",      label: "MSE / Startup Exemption on EMD & Fee",              type: "select",   options: ["Not allowed","Allowed as per Government of Maharashtra policy"] },
-      { id: "bankAccountNo",     label: "Bank Account No. (for EMD / Fee payment)",           type: "text",     placeholder: "XXXXXXXXXXXXXXXX" },
-      { id: "ifscCode",          label: "IFSC Code",                                          type: "text",     placeholder: "SBIN0XXXXXX" },
-      { id: "bankName",          label: "Bank Name & Branch",                                 type: "text",     placeholder: "State Bank of India, Nashik Main Branch" },
+      { id: "mseExemption",      label: "MSE / Startup Exemption on EMD & Fee",              type: "select",   options: ["Not allowed","Allowed as per applicable State/Central MSE policy"] },
     ],
   },
   {
     id: "eligibility", title: "Eligibility Criteria", icon: "✅",
     fields: [
-      { id: "similarWorkDef",      label: "Definition of Similar Work / Assignment",        type: "textarea", placeholder: "e.g. Project Management / Design Consultancy for infrastructure projects..." },
+      { id: "similarWorkDef",      label: "Definition of Similar Work / Assignment",        type: "similarexpai" },
       { id: "expLookbackYears",    label: "Experience Look-back Period",                    type: "select",   options: ["5 years","7 years","10 years"] },
-      { id: "turnoverFYCount",     label: "No. of Financial Years for Turnover",            type: "select",   options: ["3 financial years","5 financial years"] },
       { id: "turnoverAmount",      label: "Minimum Average Annual Turnover",                type: "turnover" },
       { id: "consortiumAllowed",   label: "Consortium Allowed?",                            type: "select",   options: ["No","Yes – Consortium allowed","Yes – JV allowed"] },
       { id: "consortiumMaxMembers",label: "Max Members in Consortium (if allowed)",         type: "select",   options: ["N/A","2 members","3 members","4 members"] },
-      { id: "gstRequired",         label: "GST Registration Required?",                    type: "select",   options: ["Yes – mandatory","No"] },
-      { id: "blacklistDeclaration",label: "Blacklist / Debarment Undertaking Required?",   type: "select",   options: ["Yes – mandatory undertaking","No"] },
     ],
   },
   {
@@ -413,14 +412,12 @@ window.SECTIONS = [
       { id: "selectionMethod",    label: "Method of Selection",                              type: "selmethod" },
       { id: "techScoreCriteria",  label: "Technical Evaluation Criteria (QCBS / Empanelment)", type: "techcriteria" },
       { id: "minTechScore",       label: "Minimum Technical Score to Qualify (%)",           type: "select",   options: ["60%","65%","70%","75%","80%"] },
-      { id: "financialBidTiming", label: "Financial Bid Submitted Together with Technical?", type: "select",   options: ["Yes","No – financial bid opened after technical evaluation"] },
     ],
   },
   {
     id: "team", title: "Team Requirements", icon: "👥",
     fields: [
       { id: "teamPositions",      label: "Key Team Positions",                              type: "teamtable" },
-      { id: "cvFormat",           label: "CV Format Required",                              type: "select",   options: ["As per Form 6 (standard CV format in RFP)","Firm's own format","Both acceptable"] },
       { id: "keyPersonnelChange", label: "Replacement of Key Personnel",                   type: "select",   options: ["Not permitted without written approval of Client","Permitted with 30 days notice and equivalent or better replacement","Permitted with 15 days notice and equivalent or better replacement"] },
     ],
   },
@@ -428,18 +425,24 @@ window.SECTIONS = [
     id: "slb", title: "Service Level Benchmarks", icon: "📊",
     fields: [
       { id: "slbApplicable",      label: "Are SLBs Applicable to this Assignment?",        type: "select",   options: ["No","Yes"] },
-      { id: "slbTable",           label: "Service Level Benchmarks Table",                 type: "slbtable" },
-      { id: "slbShortfallPenalty",label: "Penalty for Shortfall in SLBs",                 type: "select",   options: ["As per GCC Clause 6.1.10 (Liquidated Damages)","Specific penalty as per SLB table","Both LD and additional penalty"] },
+      { id: "slbTable",           label: "Service Level Benchmarks & Penalty Table",       type: "slbtable" },
     ],
   },
   {
     id: "schedule", title: "Bidding Schedule", icon: "📅",
     fields: [
-      { id: "_schedulePanel",   label: "",                                            type: "schedulepanel" },
+      { id: "tenderState",      label: "State (for Sunday / Public Holiday check)",  type: "select",    options: ["Maharashtra","Uttar Pradesh"] },
+      { id: "callSelection",    label: "Call",                                       type: "select",    options: ["First Call","Second Call","Third Call"] },
+      { id: "preBidConferenceHeld", label: "Pre-Bid Conference Held? (First Call only — 21 days without, 28 days with)", type: "select", options: ["Yes","No"] },
+      { id: "tenderUploadDate", label: "Tender Upload / Release Date",               type: "datepicker" },
+      { id: "queryLastDate",    label: "Last Date for Receiving Pre-bid Queries",    type: "datepicker" },
+      { id: "preBidDate",       label: "Pre-Bid Conference Date",                    type: "datepicker" },
       { id: "preBidMode",       label: "Pre-Bid Conference Mode",                    type: "select",    options: ["Online (video conference)","Offline (in-person)","Hybrid (online + in-person)"] },
-      { id: "preBidVenue",      label: "Pre-Bid Conference Venue / Link",            type: "text",      placeholder: "Conference Room, Authority Office, Nashik / Zoom link…" },
+      { id: "preBidVenue",      label: "Pre-Bid Conference Venue / Link",            type: "text",      placeholder: "Conference Room, Authority Office / Zoom link…" },
+      { id: "bidStartDate",     label: "Bid Submission Start Date",                  type: "datepicker" },
+      { id: "bidEndDate",       label: "Bid Submission End Date (PDD)",              type: "datepicker" },
+      { id: "techOpenDate",     label: "Technical Bid Opening Date",                 type: "datepicker" },
       { id: "bidValidity",      label: "Bid Validity Period",                        type: "select",    options: ["90 Days","120 Days","180 Days"] },
-      { id: "proposalLanguage", label: "Proposal Language",                          type: "select",    options: ["English","Hindi","English and Hindi"] },
     ],
   },
 ];
@@ -455,9 +458,67 @@ window.computeFeeDetails = function(data) {
 };
 
 window.autoEmd = function(feeLakhs) {
-  if (!feeLakhs) return 0;
+  if (!feeLakhs) return 100000; // Default EMD when fee is unknown (most services tenders)
   const raw = feeLakhs * 100000 * 0.02;
   return Math.ceil(raw / 10000) * 10000;
+};
+
+// ── Groq API config (for AI-drafted "Similar Experience" eligibility text) ──
+// ⚠️ SECURITY NOTE: This key is embedded client-side and will be visible to
+// anyone who can view this page's source (via browser dev tools). This is a
+// deliberate, informed tradeoff made for this internal, password-gated,
+// trusted-team deployment — not a recommended default. Replace the value
+// below with your own Groq API key before deploying.
+window.GROQ_API_KEY = "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";
+window.GROQ_MODEL = "llama-3.3-70b-versatile";
+
+window.draftSimilarExperience = async function(scopeText) {
+  if (!GROQ_API_KEY || GROQ_API_KEY.indexOf("REPLACE_WITH") === 0) {
+    throw new Error("AI drafting isn't configured on this deployment yet.");
+  }
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout — never hang the UI
+  let res;
+  try {
+    res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + GROQ_API_KEY,
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        temperature: 0.3,
+        max_tokens: 300,
+        messages: [
+          {
+            role: "system",
+            content: "You draft the \"similar work / similar experience\" eligibility definition used in Indian government services RFPs (Request for Proposal) to specify what counts as a qualifying prior project for bidder eligibility. Write 2-4 sentences of formal tender language, specific to the scope of services given. Plain prose only \u2014 no markdown, no headings, no bullet points, no preamble like \"Here is a draft\"."
+          },
+          {
+            role: "user",
+            content: "Scope of Services for this tender:\n\n" + scopeText + "\n\nDraft the definition of \"similar work\" / \"similar experience\" for the eligibility criteria of this tender."
+          },
+        ],
+      }),
+    });
+  } catch (e) {
+    if (e.name === "AbortError") {
+      throw new Error("Request timed out \u2014 the AI service may be unreachable from this network.");
+    }
+    throw new Error("Network request blocked or failed \u2014 the AI service may be unreachable from this network.");
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error("HTTP " + res.status + (errText ? " \u2014 " + errText.slice(0, 200) : ""));
+  }
+  const json = await res.json();
+  const draft = json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content;
+  if (!draft) throw new Error("No draft returned by the model.");
+  return draft.trim();
 };
 
 window.autoProcessingFee = function(feeLakhs) {
@@ -468,6 +529,160 @@ window.autoProcessingFee = function(feeLakhs) {
   if (feeRs <= 5000000)  return Math.round(3000 * 1.18);
   if (feeRs <= 20000000) return Math.round(5000 * 1.18);
   return Math.round(10000 * 1.18);
+};
+
+// ── Public Holiday Calendar & Auto-Scheduling Engine ────────────────────────
+// Fixed-date national holidays (MM-DD), observed across all states.
+window.HOLIDAYS_NATIONAL_FIXED = ["01-26", "08-15", "10-02"]; // Republic Day, Independence Day, Gandhi Jayanti
+
+// Fixed-date state holidays (MM-DD).
+window.HOLIDAYS_STATE_FIXED = {
+  "Maharashtra":    ["02-19", "04-14", "05-01"],  // Shivaji Jayanti, Ambedkar Jayanti, Maharashtra Din
+  "Uttar Pradesh":  ["01-24", "04-14"],            // UP Diwas, Ambedkar Jayanti
+};
+
+// Movable festival holidays (exact ISO dates) — best-effort per official state gazette;
+// verify and edit as needed for years/festivals not listed here.
+window.HOLIDAYS_MOVABLE = {
+  "Maharashtra": {
+    2025: ["2025-03-14","2025-03-31","2025-04-06","2025-04-18","2025-08-09","2025-08-16","2025-08-27","2025-09-05","2025-10-01","2025-10-02","2025-10-20","2025-10-21","2025-11-05","2025-12-25"],
+    2026: ["2026-03-04","2026-03-21","2026-03-26","2026-04-03","2026-04-10","2026-08-15","2026-08-28","2026-09-14","2026-10-20","2026-11-08","2026-11-09","2026-12-25"],
+    2027: ["2027-02-21","2027-03-11","2027-03-29","2027-08-15","2027-08-17","2027-09-04","2027-10-09","2027-10-28","2027-10-29","2027-12-25"],
+  },
+  "Uttar Pradesh": {
+    2025: ["2025-03-14","2025-03-31","2025-04-06","2025-04-18","2025-08-09","2025-08-16","2025-09-05","2025-10-01","2025-10-02","2025-10-20","2025-10-21","2025-11-05","2025-12-25"],
+    2026: ["2026-03-04","2026-03-21","2026-03-26","2026-04-03","2026-08-15","2026-08-28","2026-09-14","2026-10-20","2026-11-08","2026-11-09","2026-12-25"],
+    2027: ["2027-02-21","2027-03-11","2027-03-29","2027-08-15","2027-08-17","2027-09-04","2027-10-09","2027-10-28","2027-10-29","2027-12-25"],
+  },
+};
+
+window.pad2 = function(n) { return String(n).padStart(2, "0"); };
+window.dateToISO = function(dt) { return dt.getFullYear() + "-" + pad2(dt.getMonth() + 1) + "-" + pad2(dt.getDate()); };
+window.isoToDate = function(s) { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+
+window.isHolidayOrSunday = function(dt, state) {
+  if (dt.getDay() === 0) return true; // Sunday
+  const mmdd = pad2(dt.getMonth() + 1) + "-" + pad2(dt.getDate());
+  if (HOLIDAYS_NATIONAL_FIXED.includes(mmdd)) return true;
+  const stateFixed = HOLIDAYS_STATE_FIXED[state] || [];
+  if (stateFixed.includes(mmdd)) return true;
+  const movable = (HOLIDAYS_MOVABLE[state] && HOLIDAYS_MOVABLE[state][dt.getFullYear()]) || [];
+  if (movable.includes(dateToISO(dt))) return true;
+  return false;
+};
+
+// Push a date forward, day by day, until it lands on a working day.
+window.nextWorkingDay = function(dt, state) {
+  const d = new Date(dt.getTime());
+  while (isHolidayOrSunday(d, state)) d.setDate(d.getDate() + 1);
+  return d;
+};
+
+// Add N calendar days to a base date, then push forward to the next working day if needed.
+window.addDaysAndAdjust = function(baseDt, days, state) {
+  const d = new Date(baseDt.getTime());
+  d.setDate(d.getDate() + days);
+  return nextWorkingDay(d, state);
+};
+
+// Compute the full bidding schedule from an upload date, call, pre-bid flag and state.
+// Call durations: First Call = 21 days (no pre-bid) / 28 days (with pre-bid); Second/Third Call = 15 days each.
+window.computeBidSchedule = function(uploadISO, call, preBidHeld, state) {
+  if (!uploadISO) return {};
+  const upload = isoToDate(uploadISO);
+  const st = state || "Maharashtra";
+  const isFirstCall = (call || "First Call") === "First Call";
+  const includePreBid = isFirstCall && (preBidHeld !== "No");
+  const days = isFirstCall ? (includePreBid ? 28 : 21) : 15;
+
+  const bidStart = nextWorkingDay(upload, st);
+  const pdd = addDaysAndAdjust(upload, days, st);
+  const techOpen = addDaysAndAdjust(pdd, 1, st);
+
+  let preBidISO = "";
+  let queryLastISO;
+  if (includePreBid) {
+    const preBid = addDaysAndAdjust(upload, 7, st);
+    const queryLast = addDaysAndAdjust(upload, 10, st);
+    preBidISO = dateToISO(preBid);
+    queryLastISO = dateToISO(queryLast);
+  } else {
+    const queryLast = addDaysAndAdjust(upload, Math.max(3, Math.floor(days / 3)), st);
+    queryLastISO = dateToISO(queryLast);
+  }
+
+  return {
+    bidStartDate: dateToISO(bidStart),
+    preBidDate: preBidISO,
+    queryLastDate: queryLastISO,
+    bidEndDate: dateToISO(pdd),
+    techOpenDate: dateToISO(techOpen),
+  };
+};
+
+window.defaultPortalUrl = function(state) {
+  if (state === "Uttar Pradesh") return "https://www.uptenders.gov.in";
+  if (state === "Maharashtra") return "https://www.mahatenders.gov.in";
+  return "<Insert e-procurement portal website>";
+};
+
+// Derive arbitration venue/jurisdiction city from the Client/Authority's address.
+// Scans the address text for a known city name; falls back to a placeholder if none match.
+window.KNOWN_VENUE_CITIES = [
+  "Moradabad", "Nashik", "Trimbakeshwar", "Lucknow", "Kanpur", "Agra", "Meerut", "Varanasi",
+  "Prayagraj", "Allahabad", "Ghaziabad", "Noida", "Greater Noida", "Bareilly", "Aligarh",
+  "Moradabad", "Saharanpur", "Gorakhpur", "Firozabad", "Jhansi", "Muzaffarnagar", "Mathura",
+  "Bulandshahr", "Khurja", "Rampur", "Shahjahanpur", "Farrukhabad", "Ayodhya",
+  "Mumbai", "Pune", "Nagpur", "Thane", "Aurangabad", "Chhatrapati Sambhajinagar", "Solapur",
+  "Kolhapur", "Amravati", "Nanded", "Sangli", "Jalgaon", "Akola", "Latur", "Dhule", "Ahmednagar",
+  "Chandrapur", "Parbhani", "Ratnagiri", "Satara", "Wardha", "Yavatmal",
+];
+window.deriveArbitrationVenue = function(address, state) {
+  if (address) {
+    const found = KNOWN_VENUE_CITIES.find(city =>
+      new RegExp("\\b" + city.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i").test(address)
+    );
+    if (found) return found + (state ? ", " + state : "");
+  }
+  return "<Insert City, State>";
+};
+
+// ── Saved Organization Profiles (multiple, keyed by Authority Name) ─────────
+// Lets different teams (e.g. Nashik, Moradabad, Bulandshahr) each keep their
+// own set of fixed organization details on the same install of this tool.
+window.ORG_PROFILES_KEY = "servicesTenderTool.orgProfiles.v1";
+window.ORG_PROFILE_FIELDS = [
+  "authorityName", "bidInvitingOfficer", "authorityAddress", "authorityPhone",
+  "contactOfficer", "contactEmail", "portalWebsite",
+  "bankAccountNo", "ifscCode", "bankName", "authorityLogo",
+];
+window.loadOrgProfiles = function() {
+  try {
+    const raw = localStorage.getItem(ORG_PROFILES_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+};
+window.saveOrgProfiles = function(profiles) {
+  try {
+    localStorage.setItem(ORG_PROFILES_KEY, JSON.stringify(profiles));
+  } catch (e) { /* localStorage unavailable — silently skip persistence */ }
+};
+// Save/update the profile for whichever organization is named in `data.authorityName`.
+window.upsertOrgProfile = function(data) {
+  const name = (data.authorityName || "").trim();
+  if (!name) return;
+  const profiles = loadOrgProfiles();
+  const profile = {};
+  ORG_PROFILE_FIELDS.forEach(k => { if (data[k]) profile[k] = data[k]; });
+  profiles[name] = profile;
+  saveOrgProfiles(profiles);
+};
+window.deleteOrgProfile = function(name) {
+  const profiles = loadOrgProfiles();
+  delete profiles[name];
+  saveOrgProfiles(profiles);
 };
 
 window.formatDate = function(val) {
@@ -20615,7 +20830,8 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
   const {
     Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
     AlignmentType, HeadingLevel, WidthType, BorderStyle, ShadingType,
-    VerticalAlign, LevelFormat, PageBreak,
+    VerticalAlign, LevelFormat, PageBreak, TableOfContents,
+    Header, Footer, PageNumber,
   } = window.docx;
 
   const border = { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" };
@@ -20645,7 +20861,7 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
     return new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun({ text, bold: true, font: "Arial", size: 24 })], spacing: { before: 240, after: 120 } });
   }
   function h3(text) {
-    return new Paragraph({ children: [new TextRun({ text, bold: true, font: "Arial", size: 22 })], spacing: { before: 180, after: 100 } });
+    return new Paragraph({ heading: HeadingLevel.HEADING_3, children: [new TextRun({ text, bold: true, font: "Arial", size: 22 })], spacing: { before: 180, after: 100 } });
   }
   function body(text) {
     return new Paragraph({ children: [new TextRun({ text: text || "", font: "Arial", size: 20 })], spacing: { before: 60, after: 60 }, alignment: AlignmentType.JUSTIFIED });
@@ -20661,12 +20877,12 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
   const turnoverVal  = d.turnoverAmount || (feeLakhs * 2).toFixed(2);
   const authority    = d.authorityName || "<Authority Name>";
   const rfpTitle     = d.rfpTitle || "<RFP Title>";
+  const arbitrationVenue = deriveArbitrationVenue(d.authorityAddress, d.tenderState);
   const officer      = d.bidInvitingOfficer || "the Bid Inviting Officer";
   const selMethod    = SELECTION_METHODS.find(m => m.id === (d.selectionMethod || "L1")) || SELECTION_METHODS[0];
   const emd          = d.emdAmount ? "₹" + d.emdAmount : "<Insert EMD>";
   const procFee      = d.tenderFeeAmount ? "₹" + d.tenderFeeAmount : "<Insert Processing Fee>";
   const pg           = d.performanceGuar || "5%";
-  const feeDisplay   = feeLakhs > 0 ? "₹" + feeLakhs.toFixed(2) + " Lakhs" : "<Insert Fee>";
   const lookback     = d.expLookbackYears || "7 years";
   const isQCBS       = d.selectionMethod === "QCBS_7030" || d.selectionMethod === "QCBS_8020";
   const techWeight   = d.selectionMethod === "QCBS_8020" ? 80 : 70;
@@ -20684,8 +20900,31 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
   const slbRows = (d.slbApplicable === "Yes" && d.slbTable && d.slbTable.length > 0) ? d.slbTable : [];
 
   // Cover
+  const logoParagraphs = [];
+  if (d.authorityLogo && d.authorityLogo.dataUrl) {
+    const maxDim = 130; // pixels — roughly matches the reference cover page emblem size
+    let logoW = d.authorityLogo.width || maxDim;
+    let logoH = d.authorityLogo.height || maxDim;
+    if (logoW > maxDim || logoH > maxDim) {
+      const scale = maxDim / Math.max(logoW, logoH);
+      logoW = Math.round(logoW * scale);
+      logoH = Math.round(logoH * scale);
+    }
+    logoParagraphs.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 160 },
+        children: [new window.docx.ImageRun({
+          data: d.authorityLogo.dataUrl,
+          transformation: { width: logoW, height: logoH },
+        })],
+      })
+    );
+  }
+
   const coverPage = [
-    br(), br(),
+    br(),
+    ...logoParagraphs,
     new Paragraph({ children: [new TextRun({ text: authority.toUpperCase(), bold: true, font: "Arial", size: 36, color: "0B1F3A" })], alignment: AlignmentType.CENTER, spacing: { before: 480, after: 200 } }),
     new Paragraph({ children: [new TextRun({ text: "E-Bid Document", font: "Arial", size: 24, color: "5B6478" })], alignment: AlignmentType.CENTER, spacing: { after: 400 } }),
     new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "1A5CA8", space: 1 } }, children: [new TextRun("")], spacing: { after: 400 } }),
@@ -20716,19 +20955,13 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
   // General Info
   const generalInfoSection = [
     pb(), h1("1. General Information"),
-    body("Kumbh is one of the world's largest religious gatherings and is held on a rotational basis in Haridwar, Prayagraj, Nasik and Ujjain. The next Kumbh is scheduled to be held in Nashik and Trimbakeshwar in 2027. It is estimated that about 12 crore pilgrims from India and abroad are likely to visit during July to October 2027."),
+    body(d.background || "<Insert background for this tender>"),
     br(),
     body(authority + " invites Technical and Financial Bids from interested Bidders for \"" + rfpTitle + "\" on " + selMethod.label + " basis."),
     br(),
-    body("The RFP document can be downloaded from " + (d.portalWebsite || "the e-procurement portal") + ". Key dates for this RFP are as follows:"),
+    body("The RFP document can be downloaded from " + (d.portalWebsite || defaultPortalUrl(d.tenderState)) + ". Key dates for this RFP are set out in the Data Sheet below."),
     br(),
-    bullet("Last date of submission of proposals: " + formatDate(d.bidEndDate)),
-    bullet("Last date to receive pre-bid queries: " + formatDate(d.queryLastDate)),
-    bullet("Date of pre-bid conference (" + (d.preBidMode || "Online/Offline") + "): " + formatDate(d.preBidDate)),
-    bullet("Date of opening of technical bid: " + formatDate(d.techOpenDate)),
-    bullet("Date of opening of financial bid: To be communicated later"),
-    br(),
-    body("In case of a holiday on any of the dates mentioned above, the activities assigned on that date shall be carried out on the next working day."),
+    body("In case of a holiday on any of the dates mentioned in the Data Sheet, the activities assigned on that date shall be carried out on the next working day."),
     br(),
     new Table({
       width: { size: fullW, type: WidthType.DXA }, columnWidths: [2800, 6560],
@@ -20755,14 +20988,14 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
         new TableRow({ children: [cellM("5", 600), cellM("Earnest Money Deposit (EMD)", 3000), cellM(emd + " (refundable, through NEFT/RTGS)", 5760)] }),
         new TableRow({ children: [cellM("6", 600), cellM("Performance Guarantee", 3000), cellM(pg + " of Contract Value in form of Bank Guarantee. Valid for " + (d.pgValidity || "180 days") + " post completion.", 5760)] }),
         new TableRow({ children: [cellM("7", 600), cellM("Exemption to MSEs/Startups", 3000), cellM(d.mseExemption || "Not allowed", 5760)] }),
-        new TableRow({ children: [cellM("8", 600), cellM("Financial Bid with Technical Bid", 3000), cellM(d.financialBidTiming || "Yes", 5760)] }),
+        new TableRow({ children: [cellM("8", 600), cellM("Financial Bid with Technical Bid", 3000), cellM(d.selectionMethod === "QBS" ? "No – Financial Bid invited only after technical evaluation" : "Yes", 5760)] }),
         new TableRow({ children: [cellM("9", 600), cellM("Contact Officer for Queries", 3000), cellM((d.contactOfficer || "<Insert>") + " | Email: " + (d.contactEmail || "<Insert>"), 5760)] }),
         new TableRow({ children: [cellM("10", 600), cellM("Proposal Validity Period", 3000), cellM(d.bidValidity || "180 Days", 5760)] }),
-        new TableRow({ children: [cellM("11", 600), cellM("Proposal Language", 3000), cellM(d.proposalLanguage || "English", 5760)] }),
+        new TableRow({ children: [cellM("11", 600), cellM("Proposal Language", 3000), cellM("English", 5760)] }),
         new TableRow({ children: [cellM("12", 600), cellM("Proposal Currency", 3000), cellM("INR", 5760)] }),
         new TableRow({ children: [cellM("13", 600), cellM("Consortium Allowed", 3000), cellM(d.consortiumAllowed || "No", 5760)] }),
         new TableRow({ children: [cellM("15", 600), cellM("Account Details (EMD & Processing Fee)", 3000), cellM("A/c No: " + (d.bankAccountNo || "<Insert>") + "   IFSC: " + (d.ifscCode || "<Insert>") + "   Bank: " + (d.bankName || "<Insert>"), 5760)] }),
-        new TableRow({ children: [cellM("16", 600), cellM("e-Procurement Portal", 3000), cellM(d.portalWebsite || "https://mahatenders.gov.in", 5760)] }),
+        new TableRow({ children: [cellM("16", 600), cellM("e-Procurement Portal", 3000), cellM(d.portalWebsite || defaultPortalUrl(d.tenderState), 5760)] }),
       ],
     }),
     br(),
@@ -20789,15 +21022,7 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
     h2("3.1 Scope of Services"),
     body(d.scopeSummary || "<Insert detailed scope of services>"),
     br(),
-    h2("3.2 Deliverables"),
-    body("The Applicant shall submit the following key deliverables:"),
-    br(),
-    ...(d.deliverables
-      ? d.deliverables.split("\n").filter(l => l.trim()).map(l => bullet(l.replace(/^[-•]\s*/, "").trim()))
-      : [body("<Insert list of deliverables>")]
-    ),
-    br(),
-    h2("3.3 Team Requirements"),
+    h2("3.2 Team Requirements"),
     body("The Applicant shall provide relevant workforce in sufficient numbers. The key team shall constitute of the members as defined below:"),
     br(),
     new Table({
@@ -20812,7 +21037,7 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
     br(),
     body("Replacement of Key Personnel: " + (d.keyPersonnelChange || "Not permitted without written approval of Client") + "."),
     br(),
-    h2("3.4 Payment Schedule and Timelines"),
+    h2("3.3 Payment Schedule and Timelines"),
     body("Contract Type: " + (d.contractType || "Time & Material (T&M)")),
     br(),
     ...(d.contractType === "Deliverable Based" && Array.isArray(d.paymentMilestones) && d.paymentMilestones.length > 0 ? [
@@ -20830,33 +21055,43 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
       body(typeof d.paymentMilestones === "string" && d.paymentMilestones ? d.paymentMilestones : "<Insert payment schedule and milestone details>"),
     ]),
     br(),
-    h2("3.5 Review and Monitoring"),
+    h2("3.4 Review and Monitoring"),
     body("The Client will check and verify deliverables on a regular basis. The Bidder will be given periodic feedback and necessary action will be taken on any continuous shortfalls."),
     br(),
-    h3("3.5.1 Review and Monitoring Committee"),
+    h3("3.4.1 Review and Monitoring Committee"),
     body("A Monitoring Committee will be created with concerned nodal officers for ensuring optimal implementation of the assignment. The committee shall perform the following functions:"),
     bullet("Supervising, reviewing and approving deliverables"),
     bullet("Technical and context-specific knowledge sharing during preparation of deliverables"),
     bullet("Facilitation of departmental coordination"),
     br(),
-    h3("3.5.2 Control"),
+    h3("3.4.2 Control"),
     body("In case any issues, defects, deficiencies, or flaws are flagged by the Review and Monitoring Committee, the Bidder shall take immediate remedial steps within 24 hours and intimate the same to the Client in the form of an Action Taken Report."),
     br(),
     ...(d.slbApplicable === "Yes" && slbRows.length > 0 ? [
-      h2("3.6 Service Level Benchmarks"),
-      body("Bidders shall be responsible to meet all enlisted Service Level Benchmarks (SLBs) at all times:"),
+      h2("3.5 Service Level Benchmarks & Penalty for Shortfall"),
+      body("The Service Level Benchmarks (SLBs) below are tied to the deliverables/milestones specified in the Payment Schedule at Clause 3.3. Bidders shall be responsible to meet all enlisted SLBs at all times. Failure to meet an SLB against a deliverable shall attract the penalty specified against it below, to be levied per instance of shortfall:"),
       br(),
       new Table({
-        width: { size: fullW, type: WidthType.DXA }, columnWidths: [600, 5000, 3760],
+        width: { size: fullW, type: WidthType.DXA }, columnWidths: [600, 4200, 3060, 1500],
         rows: [
-          new TableRow({ children: [cellM("#", 600, true, "5B6478"), cellM("SLB Description", 5000, true, "5B6478"), cellM("Key Performance Indicator", 3760, true, "5B6478")] }),
+          new TableRow({ children: [cellM("#", 600, true, "5B6478"), cellM("Deliverable / SLB Description", 4200, true, "5B6478"), cellM("Key Performance Indicator", 3060, true, "5B6478"), cellM("Penalty (% of Contract Value per instance)", 1500, true, "5B6478")] }),
           ...slbRows.map((r, i) =>
-            new TableRow({ children: [cellM(String(i+1), 600), cellM(r.description || "<Insert>", 5000), cellM(r.kpi || "<Insert>", 3760)] })
+            new TableRow({ children: [cellM(String(i+1), 600), cellM(r.description || "<Insert>", 4200), cellM(r.kpi || "<Insert>", 3060), cellM((r.penaltyPct || "<Insert>") + "%", 1500, false, null, AlignmentType.CENTER)] })
           ),
         ],
       }),
       br(),
-      body("Penalty for shortfall in SLBs: " + (d.slbShortfallPenalty || "As per GCC Clause 6.1.10 (Liquidated Damages)") + "."),
+      body("Notwithstanding the individual penalty rates specified above, the total penalty levied under this Clause, whether for a single shortfall or cumulatively across multiple shortfalls over the Contract Period, shall not exceed 10% (ten per cent) of the Contract Value."),
+      br(),
+      h3("3.5.1 General Standards"),
+      body("The Bidder shall ensure adherence to national/international standards or accepted professional practices where specific standards are not stated."),
+      br(),
+      body("As applicable basis RFP type, in case any material/service is found to be of non-serviceable quality, the agency shall replace such item. If the replacement is not done within the given timeline, no payment will be made against the same."),
+      br(),
+      h3("3.5.2 Shortfall in Performance"),
+      body("As applicable basis RFP type, in cases where the performance and/or quality of Services is found to be unsatisfactory, the Department or its representatives shall impose damages for the shortfall in performance as per GCC Clause 6.1.10 (Liquidated Damages). This levy of damages shall not absolve the Bidder from rectification or re-performance of the defective Service without further payment."),
+      br(),
+      body("The Bidder shall be liable to share all necessary information and access, as may be needed, to monitor the Bidder's performance in line with the Service Level Benchmarks."),
       br(),
     ] : []),
   ];
@@ -20867,12 +21102,10 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
     new TableRow({ children: [cellM("S.No.", 600, true, "1A5CA8"), cellM("Eligibility Criteria", 5200, true, "1A5CA8"), cellM("Documentary Proof", 3560, true, "1A5CA8")] }),
     new TableRow({ children: [cellM(String(rowNum++), 600), cellM("Bid Processing Fee and EMD as specified in the Data Sheet", 5200), cellM("Payment receipts / NEFT transaction confirmation", 3560)] }),
     new TableRow({ children: [cellM(String(rowNum++), 600), cellM("The Bidder should be a Company registered under the Companies Act, or Partnership Firm under the Partnership Act 1932, or LLP under the LLP Act 2008, or a Proprietorship.", 5200), cellM("Certificate of Incorporation / MoA / AoA / Partnership Deed", 3560)] }),
-    new TableRow({ children: [cellM(String(rowNum++), 600), cellM("Financial Capacity: Minimum average annual turnover of ₹" + turnoverVal + " Lakhs in the last " + (d.turnoverFYCount || "3 financial years") + ".", 5200), cellM("Form 2 — Audited Financial Statements / CA Certificate with UDIN", 3560)] }),
+    new TableRow({ children: [cellM(String(rowNum++), 600), cellM("Financial Capacity: Minimum average annual turnover of ₹" + turnoverVal + " Lakhs in the last " + "3 financial years" + ".", 5200), cellM("Form 2 — Audited Financial Statements / CA Certificate with UDIN", 3560)] }),
     new TableRow({ children: [cellM(String(rowNum++), 600), cellM("Experience: The Applicant should have experience of similar assignments in the past " + lookback + ". Similar work means: " + (d.similarWorkDef || "<Insert definition>") + ".", 5200), cellM("Form 3 — Work Orders and Completion Certificates from competent authority", 3560)] }),
     new TableRow({ children: [cellM(String(rowNum++), 600), cellM("The Bidder should not have been blacklisted by the Central Government, any State Government/UTs, a statutory Department or a public sector undertaking as on the date of the Proposal.", 5200), cellM("Undertaking as per Form 5", 3560)] }),
-    ...(d.gstRequired === "Yes – mandatory" ? [
-      new TableRow({ children: [cellM(String(rowNum++), 600), cellM("Valid GST Registration Certificate", 5200), cellM("Copy of GST Registration Certificate", 3560)] }),
-    ] : []),
+    new TableRow({ children: [cellM(String(rowNum++), 600), cellM("Valid GST Registration Certificate", 5200), cellM("Copy of GST Registration Certificate", 3560)] }),
   ];
 
   const eligibilitySection = [
@@ -20888,18 +21121,19 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
   let evalSection = [br(), h2("4.2 Bid Evaluation")];
   if (d.selectionMethod === "L1") {
     evalSection = [...evalSection,
-      h3("Least Cost Selection (L1)"),
-      body("In this method, the Consultant will submit both a technical proposal and a financial proposal. Technical proposals are evaluated first, and only those meeting the minimum qualifying criteria are considered technically responsive. Financial proposals of technically non-responsive Applicants are returned unopened."),
+      h3("FOR L1"),
+      body("In this method of selection, Consultant will submit both a technical proposal and a financial proposal at the same time. Minimum qualifying marks for quality of the technical proposal are prescribed along with a scheme for allotting marks for various technical criteria/attributes."),
       br(),
-      body("The L1 offer (lowest financial quote) among all technically responsive Applicants shall be selected for award of contract."),
+      body("Technical: Any Applicant that passes the benchmarks is declared as technically qualified for opening of their financial bids. The technical proposals are opened first and evaluated and the offers who are qualifying as per these technical evaluation criteria will only be considered as technically qualified/responsive. The rest would be considered technically non-responsive and would be dropped from the list."),
+      br(),
+      body("Financial: Financial proposals are then opened for only eligible and qualified/responsive offers (Financial bids of other un-responsive Applicants are returned un-opened) and ranked. L-1 offer out of the responsive offers is selected on price criteria alone without giving any additional weightage to marks/ranking of technical proposal."),
     ];
-  } else if (isQCBS) {
+  } else if (d.selectionMethod === "QBS") {
     evalSection = [...evalSection,
-      h3("Quality and Cost Based Selection (QCBS " + techWeight + ":" + finWeight + ")"),
-      body("Under QCBS, proposals are evaluated on both technical quality and cost. The weightage assigned is: Technical = " + techWeight + "%, Financial = " + finWeight + "%."),
+      h3("FOR QBS"),
+      body("Under Quality Based Selection (QBS), proposals are evaluated solely on technical criteria; only a technical proposal is invited and submitted, and no financial bidding takes place at this stage."),
       br(),
-      h3("Technical Evaluation"),
-      body("During evaluation of the technical proposal, a quality score is assigned out of 100 marks as per the criteria below. Applicants scoring less than the minimum qualifying score shall be considered technically non-responsive."),
+      body("During evaluation of the technical proposal, a quality score is assigned out of the maximum 100 (Hundred) marks, to each of the responsive bids, as per the scheme laid down below."),
       br(),
       new Table({
         width: { size: fullW, type: WidthType.DXA }, columnWidths: [600, 7200, 1560],
@@ -20912,15 +21146,39 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
         ],
       }),
       br(),
-      body("Minimum qualifying technical score: " + minScore + ". Only Applicants meeting this score shall have their Financial Bids opened."),
+      body("Applicants passing the minimum qualifying score of " + minScore + " are ranked by technical marks, with the highest-scoring Applicant ranked H-1, followed by H-2, H-3 and so on."),
       br(),
-      h3("Financial Evaluation"),
-      body("Financial proposals are opened only for technically qualified Applicants. The lowest financial proposal (Fm) receives a financial score (Sf) of 100. Other proposals are scored as: Sf = 100 × Fm / Fo."),
+      body("The top-ranked (H-1) Applicant is invited for negotiation of the financial proposal and, upon successful negotiation, is recommended for award of contract."),
+    ];
+  } else if (isQCBS) {
+    evalSection = [...evalSection,
+      h3("FOR QCBS (" + techWeight + ":" + finWeight + ")"),
+      body("In Quality and Cost Based Selection (QCBS) selection, minimum qualifying marks are given as benchmark for quality of the technical proposal which are prescribed along with a scheme for allotting marks for various technical criteria/attributes."),
       br(),
-      h3("Combined Score"),
-      body("Final Score = St × " + techWeight + "% + Sf × " + finWeight + "%"),
+      body("Technical: During evaluation of technical proposal, quality score is assigned out of the maximum 100 (Hundred) marks, to each of the responsive bids, as per the scheme laid down below."),
       br(),
-      body("The Applicant with the highest combined score (H1) shall be recommended for award of contract."),
+      new Table({
+        width: { size: fullW, type: WidthType.DXA }, columnWidths: [600, 7200, 1560],
+        rows: [
+          new TableRow({ children: [cellM("#", 600, true, "152E55"), cellM("Evaluation Criterion", 7200, true, "152E55"), cellM("Max Marks", 1560, true, "152E55")] }),
+          ...techCriteria.map((r, i) =>
+            new TableRow({ children: [cellM(String(i+1), 600), cellM(r.criterion || "<Insert>", 7200), cellM(String(r.marks || 0), 1560, false, null, AlignmentType.CENTER)] })
+          ),
+          new TableRow({ children: [cellM("", 600, true, "EEF1F6"), cellM("TOTAL", 7200, true, "EEF1F6"), cellM("100", 1560, true, "EEF1F6")] }),
+        ],
+      }),
+      br(),
+      body("The Consultants who are qualifying as per the technical evaluation criteria (minimum qualifying score: " + minScore + ") are considered as technically qualified/responsive and the rest would be considered technically non-responsive and would be dropped from the list."),
+      br(),
+      body("Financial: Financial proposals are then opened for only eligible and responsive offers and other financial offers are returned unopened to Applicants. The financial proposals are also given cost-score, based on relative ranking of prices, with 100 (Hundred) marks for the lowest and pro-rated lower marks for higher priced offers."),
+      br(),
+      body("The total score shall be obtained by weighting the quality and cost scores and adding them. The technical proposals and financial proposals will be allotted weightages. Highest Technical scoring proposal (Tm) may be given a technical score (St) of 100 points and other proposals given technical score that are proportional to their technical marks. The technical score of the other proposals (To) shall be computed as follows: St = 100 x To (Other Technical proposal) / Tm (Highest Technical proposal)."),
+      br(),
+      body("Proposal with the lowest cost may be given a financial score of 100 and other proposals given financial scores that are inversely proportional to their prices. Lowest financial proposal (Fm) shall be given a financial score (Sf) of 100 points. The financial score of the other financial proposals (Fo) shall be computed as follows: Sf = 100 x Fm (Lowest financial proposal) / Fo (Other financial proposal)."),
+      br(),
+      body("Proposals shall finally be ranked according to their combined technical (St) and Financial (Sf) scores using the weights (T = the weight given to the technical proposal; F = the weight given to the financial proposal; T+F = 100) indicated below. For QCBS " + techWeight + ":" + finWeight + " — Final Score = St x (T = " + techWeight + "%) + Sf x (F = " + finWeight + "%)."),
+      br(),
+      body("Highest points basis: On the basis of the combined weighted score for quality and cost, the Applicant shall be ranked in terms of the total score obtained. The proposal obtaining the highest total combined score in evaluation of quality and cost will be ranked as H-1 followed by the proposals securing lesser marks as H-2, H-3 etc. The proposal securing the highest combined marks and ranked H-1 will be invited for negotiations, if required and shall be recommended for award of contract."),
     ];
   } else if (d.selectionMethod === "PCT_COST") {
     evalSection = [...evalSection,
@@ -20930,10 +21188,31 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
     ];
   } else if (d.selectionMethod === "EMPANEL") {
     evalSection = [...evalSection,
-      h3("Empanelment of Consultants"),
-      body("Under this method, Applicants are evaluated solely on technical criteria. All technically qualified Applicants meeting the minimum qualifying score shall be empanelled. No rate discovery is done at the empanelment stage."),
+      h3("For Empanelment"),
+      body("The minimum score for qualifying Technical Evaluation will be " + minScore + " and all Applicants with more than or equal to this score will be called the \"Shortlisted Applicants\". The Financial bids of only the Shortlisted Applicants will be opened."),
       br(),
-      body("Work shall be allocated to empanelled Applicants on a rotational basis or through a competitive process per assignment. Rates shall be quoted by empanelled firms for each specific assignment."),
+      body("Financial Bids of only the technically qualified Shortlisted Applicants will be opened and evaluated through the least cost process (L1). The least cost of undertaking Works at the pre-specified page sizes as specified in the Financial Bid format."),
+      br(),
+      body("All the Shortlisted Applicants who agree to match the least cost for the work at the specific page size will be empanelled with the Department (\"Empanelled Applicants\"). The empanelment shall be for a term of <Insert> year from the date of empanelment. Allotment of quantities to the Empanelled Applicants would be decided on rotation basis. The final decision on the allotment of Works to the various empanelled agencies shall be at the discretion of the Client."),
+      br(),
+      new Table({
+        width: { size: fullW, type: WidthType.DXA }, columnWidths: [600, 7200, 1560],
+        rows: [
+          new TableRow({ children: [cellM("#", 600, true, "152E55"), cellM("Evaluation Criterion", 7200, true, "152E55"), cellM("Max Marks", 1560, true, "152E55")] }),
+          ...techCriteria.map((r, i) =>
+            new TableRow({ children: [cellM(String(i+1), 600), cellM(r.criterion || "<Insert>", 7200), cellM(String(r.marks || 0), 1560, false, null, AlignmentType.CENTER)] })
+          ),
+          new TableRow({ children: [cellM("", 600, true, "EEF1F6"), cellM("TOTAL", 7200, true, "EEF1F6"), cellM("100", 1560, true, "EEF1F6")] }),
+        ],
+      }),
+    ];
+  }
+
+  const usesTechScoring = d.selectionMethod === "QBS" || isQCBS || d.selectionMethod === "EMPANEL";
+  if (usesTechScoring) {
+    evalSection = [...evalSection,
+      br(), h2("4.3 Sample Technical Evaluation Criteria"),
+      body("The Applicant shall be selected under the " + selMethod.label + " procedure described in this RFP. The Technical Evaluation of proposals shall be based on the following parameters:"),
       br(),
       new Table({
         width: { size: fullW, type: WidthType.DXA }, columnWidths: [600, 7200, 1560],
@@ -20946,93 +21225,355 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
         ],
       }),
       br(),
-      body("Minimum qualifying score: " + minScore + ". All Applicants meeting this score shall be \"Empanelled Applicants\"."),
+      body("Minimum score of " + minScore + " is required in the evaluation process. Only bids meeting the minimum score shall be eligible for opening of financial bids."),
+      br(),
+      body("Project experience claimed against any criteria \u2014 whether for eligibility or technical evaluation \u2014 must have been executed as the primary/lead consultant by the Applicant's legal entity submitting the bid for this RFP. Extension work orders on an existing project will not be counted as separate projects. All experience should be from India."),
     ];
+    if (d.selectionMethod === "EMPANEL") {
+      evalSection = [...evalSection,
+        br(), h3("Allocation of Work"),
+        body("Where multiple Applicants are empanelled/allocated work under this RFP, the allocation of work amongst them shall be as specified below, or as otherwise decided by the Client at its discretion:"),
+        br(),
+        new Table({
+          width: { size: 9350, type: WidthType.DXA }, columnWidths: [5000, 4350],
+          rows: [
+            new TableRow({ children: [cellM("Bidder", 5000, true, "152E55"), cellM("Allocation of Work (%)", 4350, true, "152E55")] }),
+            new TableRow({ children: [cellM("L1 (Principal Bidder)", 5000), cellM("XX%", 4350, false, null, AlignmentType.CENTER)] }),
+            new TableRow({ children: [cellM("L2", 5000), cellM("XX%", 4350, false, null, AlignmentType.CENTER)] }),
+            new TableRow({ children: [cellM("L3", 5000), cellM("XX%", 4350, false, null, AlignmentType.CENTER)] }),
+            new TableRow({ children: [cellM("Total", 5000, true), cellM("100.00%", 4350, true, null, AlignmentType.CENTER)] }),
+          ],
+        }),
+      ];
+    }
   }
 
   // Instructions to Bidders
   const instructionsSection = [
     pb(), h1("5. Instructions to Bidders"),
     h2("5.1 General Instructions"),
-    body("A detailed description of the objectives, scope of services, deliverables and other requirements relating to this engagement is set out in this Request for Proposal (RFP). Any Applicant possessing the requisite experience, technical capability and eligibility to undertake the proposed assignment may participate in the Selection Process."),
+    body("A detailed description of the objectives, scope of services, deliverables and other requirements relating to this engagement is set out in this Request for Proposal (RFP). Any Applicant possessing the requisite experience, technical capability and eligibility to undertake the proposed assignment may participate in the Selection Process, either individually or as a sole firm, in response to this invitation."),
+    br(),
+    body("The manner in which the Proposal is to be prepared, submitted, evaluated, and accepted is explained in this RFP. Applicants are advised that the selection shall be carried out by the Department in accordance with the Selection Process specified herein."),
+    br(),
+    body("Applicants shall be deemed to have understood and accepted that the Department's decision in respect of the Selection Process shall be final and binding, and that no explanation or justification for any aspect of the Selection Process or the selection decision shall be required to be provided."),
+    br(),
+    body("The Applicant shall submit its Proposal in the form and manner prescribed in this RFP. The Technical Proposal shall not contain any financial information."),
+    br(),
+    body("In case of selection of a single firm, the successful Applicant, upon selection, shall be required to enter into an agreement with the Department in accordance with the terms and conditions specified in this RFP."),
     br(),
     h3("5.1.1 Number of Proposals"),
-    body("No Bidder shall submit more than one (1) Proposal in response to this RFP."),
+    body("No Bidder shall submit more than one (1) Proposal, in response to this RFP."),
     br(),
     h3("5.1.2 Proposal Preparation Cost"),
-    body("The Bidders shall bear all costs associated with the preparation and submission of the Proposal. The Authority will not be responsible for any costs, regardless of the conduct or outcome of the process."),
+    body("The Bidders shall bear all costs associated with the preparation and submission of the Proposal. Department will not be responsible and liable for any costs, regardless of the conduct or outcome of the Proposal/process."),
     br(),
-    h3("5.1.3 Right to Accept or Reject"),
-    body("The Authority reserves the right to accept or reject any Proposal and to annul the bidding process and reject all Proposals at any time, without assigning any reason."),
+    body("Bidders are encouraged to submit their respective Proposals after visiting the office of the Client and ascertaining for themselves the availability of documents and other data with the Client, Applicable Laws and regulations or any other matter considered relevant by them."),
+    br(),
+    body("All papers submitted with the Proposal are neither returnable nor claimable."),
+    br(),
+    h3("5.1.3 Right to Accept and Reject Any or All the Proposals"),
+    body("Notwithstanding anything contained in this RFP, Authority reserves the right to accept or reject any Proposal and to annul the bidding process and reject all the Proposals, at any time without any liability or any obligation for such acceptance, rejection or annulment, without assigning any reason."),
+    br(),
+    body("Authority reserves the right to reject any Proposal if: (a) at any time, a material misrepresentation is made or discovered; (b) the Bidder/s do/does not respond promptly and diligently to requests for supplemental information required for the evaluation of Proposals; or (c) the Bidder does not adhere to the formats provided in the Annexure A to the RFP while furnishing the required information/details."),
     br(),
     h3("5.1.4 Clarifications"),
-    body("Bidders requiring clarification on the RFP may send queries to the Authority by email at " + (d.contactEmail || "<Insert email>") + " with subject: \"" + rfpTitle + "\". The Authority shall endeavour to respond at least 7 days prior to the Proposal Due Date."),
+    body("Bidders are encouraged to inform themselves fully about the assignment and the local conditions before submitting the Proposal by paying a visit to the Authority and the Project site, sending written queries to the Authority, and attending a Pre-Proposal Conference. Bidders requiring any clarification on the RFP may send their queries to the Authority by email at " + (d.contactEmail || "<Insert email>") + " with subject clearly written the following identification: \"" + rfpTitle + "\"."),
+    br(),
+    body("The Authority shall endeavour to respond to the queries within the period specified therein but no later than 7 (seven) days prior to the Proposal Due Date (PDD). The Authority will post the reply to all such queries on the Official Website."),
+    br(),
+    body("The Authority reserves the right not to respond to any queries or provide any clarifications, in its sole discretion, and nothing in this Clause 5.1.4 shall be construed as obliging the authority to respond to any question or to provide any clarification."),
     br(),
     h3("5.1.5 Amendment of the RFP"),
-    body("At any time prior to the PDD, the Authority may modify the RFP by issuance of an addendum on " + (d.portalWebsite || "www.mahatenders.gov.in") + "."),
+    body("At any time prior to the Proposal Due Date (PDD), the Authority, for any reason, whether at its own initiative or in response to a clarification requested by eligible Bidder/s, may modify the RFP by issuance of an addendum. Such amendments shall be uploaded on the e-procurement website " + (d.portalWebsite || defaultPortalUrl(d.tenderState)) + " through a corrigendum and this shall form an integral part of the e-bid/Proposal document. The relevant clauses of the e-bid/Proposal document shall be treated as amended accordingly. It shall be the sole responsibility of the prospective Bidder to check the above-mentioned website from time to time for any amendment in the RFP document/s. In case of failure to get the amendments, if any, the Department shall not be responsible for it."),
+    br(),
+    body("In order to provide the Bidders a reasonable time to examine the addendum, or for any other reason, Department may, at its own discretion, extend the Proposal Due Date."),
+    br(),
+    h3("5.1.6 Data Identification and Collection"),
+    body("It is desirable that the Bidders submit their Proposal/s after verifying the availability of the data, information and/or any other matter considered relevant."),
+    br(),
+    body("It would be deemed that by submitting the Proposal, the Bidder has: made a complete and careful examination and accepted the RFP in totality; received all relevant information requested from Authority; and made a complete and careful examination of the various aspects of the Scope of Work."),
+    br(),
+    body("Authority shall not be liable for any mistake or error on the part of the Bidder in respect of the above."),
     br(),
     h2("5.2 Preparation and Submission of Proposals"),
     h3("5.2.1 Language and Currency"),
-    body("The Proposal and all correspondence shall be in " + (d.proposalLanguage || "English") + ". Currency: INR."),
+    body("The Proposal and all related correspondence and documents should be written in the English language. Supporting documents and printed literature furnished by the Bidders with the Proposal may be in any other language provided that they are accompanied by appropriate translations of the pertinent passages in the English language. Supporting materials, which are not translated into English, may not be considered for evaluation. For the purpose of interpretation and evaluation of the Proposal, the English language translation shall prevail."),
     br(),
-    h3("5.2.2 Proposal Validity"),
-    body("Proposals shall remain valid for " + (d.bidValidity || "180 Days") + " from the Proposal Due Date."),
+    body("The currency for the purpose of the Proposal shall be the Indian National Rupee (INR)."),
     br(),
-    h3("5.2.3 Submission of e-bid"),
-    body("The bid submission module of " + (d.portalWebsite || "www.mahatenders.gov.in") + " enables Bidders to submit Proposals online. Submission can be done till the Proposal Due Date. Bidders need to register on the portal and obtain a user ID and password."),
+    h3("5.2.2 Proposal Validity Period and Extension"),
+    body("Proposals shall remain valid for a period of " + (d.bidValidity || "180 Days") + " from the Proposal Due Date (\"Proposal Validity Period\") and Authority may solicit the Bidder's consent for extension of the period of validity, if required. Authority reserves the right to reject any Proposal, which does not meet this requirement."),
     br(),
-    h3("5.2.4 Deadline for Submission"),
-    body("E-bids must be submitted no later than the time specified on the Proposal Due Date (" + formatDate(d.bidEndDate) + "). Late submissions shall not be accepted."),
+    body("In exceptional circumstances, prior to expiry of the original Proposal Validity Period, Authority may request Bidders to extend the validity period for specified additional period. Bidders, who may not extend the validity period, will deem to have withdrawn their Proposal at the expiry of validity period."),
     br(),
-    h3("5.2.5 Withdrawal and Resubmission"),
-    body("A Bidder may withdraw or resubmit a bid before the Proposal Due Date through the e-procurement portal. No bid may be withdrawn after the PDD during the validity period."),
+    h3("5.2.3 Format and Signing of Proposals"),
+    body("The Bidders shall prepare electronic copies of the technical and financial e-bid/Proposals separately."),
     br(),
-    h3("5.2.6 Conflict of Interest"),
-    body("An Applicant shall not have a Conflict of Interest that may affect the Selection Process. An Applicant shall be deemed to have a Conflict of Interest if it: (a) has a financial interest in another Applicant; (b) has been engaged in preparing this RFP; (c) has a family/personal relationship with any official of the Authority connected with the process; or (d) is engaged in any assignment that could compromise its independence or objectivity."),
+    body("Bidders should provide all the information as per the RFP and in the specified formats. Authority reserves the right to reject any Proposal that is not in the specified formats."),
+    br(),
+    body("In case the Bidders intends to provide additional information for which specified space in the given format is not sufficient, it can be furnished in duly stamped and signed PDFs."),
+    br(),
+    h3("5.2.4 Submission of e-bid/Proposal"),
+    body("The bid submission module of website " + (d.portalWebsite || defaultPortalUrl(d.tenderState)) + " enables the Bidders to submit the Proposal online in response to this RFP published by the Department. Submission can be done till the Proposal Due Date specified in the RFP. Bidders should start the process well in advance so that they can submit their Proposal in time."),
+    br(),
+    body("The Bidders need to register on the website " + (d.portalWebsite || defaultPortalUrl(d.tenderState)) + ". On registration on the website they will be provided with a user id and password by the system through which they can submit their bids online."),
+    br(),
+    body("The Department will not hold any risk and responsibility for uploading of the scanned document, for the invisibility of the scanned document, and any other problem(s) encountered by the Tenderers while submitting his bids online. Department reserves the right to cancel any or all e-bids/Proposals without assigning any reason."),
+    br(),
+    h3("5.2.5 Deadline for Submission"),
+    body("E-bid/Proposal (technical and financial) must be submitted by the Bidder at e-procurement website " + (d.portalWebsite || defaultPortalUrl(d.tenderState)) + " no later than the time specified on the Proposal Due Date (" + formatDate(d.bidEndDate) + "). The Authority may, at its discretion, extend this deadline for submission of Proposal by amending the RFP document, in which case all rights and obligations of the Authority and Bidders previously subject to the deadline will thereafter be subject to the deadline, as extended."),
+    br(),
+    h3("5.2.6 Late Submission"),
+    body("The server time indicated in the bid management window on the e-procurement website will be the time by which the e-bid/Proposal submission activity will be allowed till the permissible date and time scheduled in the e-tender. Once the e-bid/Proposal submission date and time is over, the Bidder cannot submit his/her e-bid/Proposal. Bidder has to start the bid submission well in advance so that the submission process passes off smoothly. The Bidder will only be held responsible if his/her e-bid/Proposal is not submitted in time due to any of his/her problems/faults, for whatsoever reason, during the e-bid/Proposal submission process."),
+    br(),
+    h3("5.2.7 Withdrawal and Resubmission of Proposal"),
+    body("At any point of time, a Bidder can withdraw his/her Proposal submitted online before the Proposal Due Date, through the login process specified on the e-procurement portal, stating reasons for withdrawal. No e-bid/Proposal may be withdrawn in the interval between the Proposal Due Date and the Proposal Validity Period; withdrawal during this interval may result in forfeiture of the Bidder's Proposal security."),
+    br(),
+    body("The Bidder can re-submit his/her e-bid/Proposal as and when required till the e-bid submission end date and time. The e-bid/Proposal submitted earlier will be replaced by the new one. No e-bid can be resubmitted subsequently after the deadline for submission of e-bids."),
+    br(),
+    h3("5.2.8 Selection of the Bidder"),
+    body("From the time the Proposals are opened to the time the contract is awarded, if any Bidder wishes to contact the Department, on any matter related to their Proposal it should do so in writing. Any effort by the Bidders to influence any officer or bearer of the Department in the Proposal evaluation or contract award decisions may result in the rejection of the Bidder's Proposal."),
+    br(),
+    h2("5.3 Proposal Opening"),
+    body("After the technical evaluation, the Department shall prepare a list of prequalified Bidders in terms of Clause 4.1 for opening of their financial bid. A date, time and venue may be notified to all Bidders for announcing the result of evaluation and opening of Financial Bid. Before opening of the Financial Bid, the list of pre-qualified Bidders along with their technical scores will be read out. The opening of Financial Bid may be done in presence of respective representatives of Bidders who choose to be present. The Department will not entertain any query or clarification from Bidder who fail to qualify at any stage of the selection process."),
+    br(),
+    body("Bidders are advised that selection shall be entirely at the discretion of the Department. Bidders shall be deemed to have understood and agreed that the Department shall not be required to provide any explanation or justification in respect of any aspect of the selection process."),
+    br(),
+    body("Any information contained in the Proposal shall not in any way be construed as binding on the Department, its agents, successors or assigns, but shall be binding against the Bidder if the service is subsequently awarded to it."),
+    br(),
+    h3("5.3.1 Opening of Proposals"),
+    body("Department may open all technical e-bids/Proposals, in the presence of Bidder's representatives who choose to attend on the prescribed date of opening at the Department office. The Bidder's representatives who are present shall sign a register evidencing their attendance. In the event of the specified date e-bid/Proposal opening being declared a holiday for the Department, the e-bids shall be opened at the appointed time and place on the next working day."),
+    br(),
+    body("The Bidder who is participating in e-bid/Proposal should ensure that the RTGS of Bid Processing Fee, as mentioned in Data Sheet, must be submitted in the prescribed account of Department within the duration (strictly within opening & closing date and time of individual e-bid/Proposal) of the work as mentioned in RFP, otherwise, in any case, bid shall be rejected."),
+    br(),
+    body("The Bidders names and the presence or absence of requisite e-bid/Proposal security and such other details as the Department at its discretion may consider appropriate, will be announced at the opening. The names of such Bidders not meeting the technical specifications and qualification requirement shall be notified subsequently. The Department will prepare minutes of e-bid/Proposal opening."),
+    br(),
+    h3("5.3.2 Confidentiality"),
+    body("Information relating to the examination, clarification, evaluation and recommendation for the short-listed Bidder/s shall not be disclosed to any person not officially concerned with the process."),
+    br(),
+    body("After opening of the Proposals, no information relating to the examination, clarification, evaluation and comparison of Proposals and recommendations concerning the award of contract shall be disclosed to Bidders or their representatives, if any. Any effort by a Bidder to exert undue or unfair influence in the process of examination, clarification, evaluation and comparison of Proposal/s shall result in outright rejection of the offer, made by the said Bidder."),
+    br(),
+    h3("5.3.3 Tests of Responsiveness"),
+    body("Prior to evaluation of the Proposals, Department will determine whether each Proposal is responsive to the requirements of the RFP. The Proposals shall be considered responsive if: it is received or deemed to be received by the due date and time including any extension thereof pursuant to the Data Sheet; it contains all information as desired in this RFP; information is provided as per the formats specified in the RFP; it mentions the validity period as set out in Data Sheet; and bids are accompanied with Bid Processing Fee and EMD as specified in the Data Sheet of this RFP."),
+    br(),
+    body("Department reserves the right to reject any Proposal which is non-responsive and no request for alteration, modification, substitution or withdrawal shall be entertained by Department in respect of such Proposal."),
+    br(),
+    h3("5.3.4 Clarifications Sought by Department"),
+    body("To assist in the process of evaluation of Proposals, Department may, at its sole discretion, ask any Bidder for clarification on its Proposal. The request for clarification and the response shall be in writing. No change in the substance of the Proposal would be permitted by way of such clarifications."),
+    br(),
+    h3("5.3.5 Proposal Evaluation"),
+    body("Submissions from Bidders would first be checked for responsiveness as set out in Clause 5.3.3. All Proposals as per Form 1 found to be substantially responsive shall be evaluated as per the Technical/Evaluation Criteria set out in Clause 4.1 of this RFP. The Proposal containing the Technical Details in Clause 4.1 of the Bidder/s who do not meet the Technical Criteria shall not be considered for further process."),
+    br(),
+    h3("5.3.6 Conflict of Interest"),
+    body("An Applicant shall not have a conflict of interest that may affect the Selection Process or the Consultancy (the \"Conflict of Interest\"). Any Applicant found to have a Conflict of Interest shall be disqualified."),
+    br(),
+    body("Without limitation to the general scope of Conflict of Interest, an Applicant shall be deemed to have a Conflict of Interest if the Applicant and/or any of its directors, partners, key managerial personnel, proposed team members or affiliates: (a) have a direct or indirect financial, commercial or economic interest in, or any arrangement with, any other Applicant participating in the Selection Process; (b) have any ownership, management control or common business interest with another Applicant; (c) have been engaged by the Department in preparing this RFP, the scope of services, estimated costs, or the bid evaluation framework; (d) have any family, personal or close professional relationship with any official, consultant or advisor of the Department connected with the Selection Process or the Consultancy; or (e) are engaged in or have been engaged in any assignment that would reasonably be perceived to compromise the Applicant's independence, objectivity or ability to perform the Consultancy in the best interest of the Department."),
+    br(),
+    body("Any Applicant found to have a Conflict of Interest shall be disqualified. In the event of disqualification, the Department shall forfeit and appropriate the Performance Security, if available, as mutually agreed, genuine pre-estimated compensation and damages payable to the Department for, inter alia, the time, cost and effort of the Department including consideration of such Applicant's Proposal, without prejudice to any other right or remedy that may be available to the Department hereunder or otherwise."),
   ];
+
 
   // GCC
   const gccSection = [
     pb(), h1("6. General Conditions of Contract (GCC)"),
+    body("The General Conditions set out below are comprehensive in nature and are intended to cover varying scopes of work, including goods and services. The applicability of individual clauses shall be subject to the specific nature of the scope of work and the relevant terms of reference as stipulated in the RFP."),
+    br(),
     h2("6.1 General Conditions"),
     h3("6.1.1 Definitions"),
-    body("\"Client\" means " + authority + ". \"Bidder\" means the firm awarded the contract. \"Contract\" means the signed agreement. \"Services\" means the work to be delivered as per the RFP. \"LOA\" means Letter of Award. \"Performance Security\" means a Bank Guarantee of " + pg + " of the Contract Value."),
+    body("Unless the context otherwise requires, the following terms whenever used in this Contract have the following meanings:"),
+    bullet("\"Applicable Law\" means the laws and any other instruments having the force of law in India as they may be issued and be in force from time to time;"),
+    bullet("\"Authorized Representatives\" shall have the meaning set forth in GCC Clause 6.1.5;"),
+    bullet("\"Bidder\" (including the terms 'Selected Bidder' or 'Contractor' or 'Supplier' or 'Service Provider' or 'Consultant' or 'Firm' or 'Vendor' or 'Manufacturer' or 'Successful Bidder' in specific contexts) means any private or public entity that will provide Goods or Services to the Department (\"the Client\") under the Contract;"),
+    bullet("\"Bid Processing Fee\" shall mean the fee as specified in the RFP Data Sheet;"),
+    bullet("\"Bill of Quantities\" (including the term 'Price Schedule' or 'BOQ') means the priced and completed Bill of Quantities forming part of the Contract;"),
+    bullet("\"Client\" (including the term 'Department') means " + authority + ";"),
+    bullet("\"Contract\" or \"Agreement\" means the Contract signed by the Parties and all the attached documents, if any;"),
+    bullet("\"Confidentiality\" shall have the meaning set forth in GCC Clause 6.2.10;"),
+    bullet("\"Dispute\" shall have the meaning set forth in GCC Clause 6.2.15;"),
+    bullet("\"EMD\" means Earnest Money Deposit submitted by the Bidder;"),
+    bullet("\"Government\" means the Government of the Client's Country/State;"),
+    bullet("\"LOE\" means Letter of Empanelment issued to the selected Bidders by the Client against an empanelment RFP;"),
+    bullet("\"LOA\" means Letter of Award issued to the selected Bidder by the Client issuing directions to commence Services;"),
+    bullet("\"Liquidated Damages\" shall have the meaning set forth in GCC Clause 6.1.10;"),
+    bullet("\"Party\" means the Client or the Bidder as the case may be, and \"Parties\" means both of them;"),
+    bullet("\"Penalty\" shall have the meaning set forth in GCC Clause 6.1.11;"),
+    bullet("\"Performance Security\" (includes the terms 'Security Deposit' or 'Performance Bond' or 'Performance Bank Guarantee' or other specified financial instruments in specific contexts) means a monetary guarantee to be furnished by the Bidder in the form prescribed for the due performance of the Contract;"),
+    bullet("\"Personnel\" means professionals and support staff provided by the Bidder assigned to perform the Services or any part thereof;"),
+    bullet("\"RFP\" means the Request for Proposal in response to which the Bidder has submitted a proposal, towards fulfilling the procurement of a commodity, service, or valuable asset;"),
+    bullet("\"Scheduled Bank\" means Banks specified in the RBI Act, 1932;"),
+    bullet("\"Services\" means the work to be delivered/performed by the Bidder pursuant to the Contract, Terms of Reference and Service Level Benchmarks (SLBs) specified in the RFP;"),
+    bullet("\"Service Level Benchmarks (SLBs)\" refers to Clause 3.5 specified in the RFP;"),
+    bullet("\"Work Order\" means the written document issued by the Client subsequent to signing of Contract requesting delivery of specified Services/materials from the Bidder as per the Contract terms and conditions."),
     br(),
-    h3("6.1.2 Fraud and Corruption"),
-    body("The Client will cancel the Contract if representatives of the Bidder are engaged in corrupt, fraudulent, collusive or coercive practices during selection or execution of the Contract."),
+    h3("6.1.2 Law Governing Contract"),
+    body("This Contract, its meaning and interpretation, and the relation between the Parties shall be governed by the Applicable Law."),
     br(),
-    h3("6.1.3 Taxes and Duties"),
-    body("GST and other applicable taxes shall be as specified in the BOQ / Financial Proposal."),
+    h3("6.1.3 Language"),
+    body("This Contract has been executed in English language, which shall be the binding and controlling language for all matters relating to the meaning or interpretation of this Contract."),
     br(),
-    h3("6.1.4 Liquidated Damages"),
+    h3("6.1.4 Notices"),
+    body("Any notice, request or consent required or permitted to be given or made pursuant to this Contract shall be in writing. Any such notice, request or consent shall be deemed to have been given or made when delivered in person to an Authorized Representative of the Party to whom the communication is addressed."),
+    br(),
+    body("A Party may change its address for notice hereunder by giving the other Party a notice in writing of such change to the address."),
+    br(),
+    h3("6.1.5 Authorized Representatives"),
+    body("Any action required or permitted to be taken, and any document required or permitted to be executed under this Contract by the Client or the Bidder may be taken or executed by the officials specified in the Contract."),
+    br(),
+    h3("6.1.6 Taxes and Duties"),
+    body("GST/other applicable taxes shall be as specified in the BOQ."),
+    br(),
+    h3("6.1.7 Fraud and Corruption"),
+    body("For the purpose of this Contract, the terms set forth below as defined as follows: \"corrupt practice\" means offering, receiving, or soliciting, directly or indirectly, of anything of value to influence the action of a public official in the selection process or in Contract execution; \"fraudulent practice\" means misrepresentation or omission of facts in order to influence the selection process or the execution of a Contract; \"collusive practices\" means a scheme or arrangement between two or more Bidders, with or without the knowledge of the Client, designed to establish prices at artificial, non-competitive levels; \"coercive practices\" means harming or threatening to harm, directly or indirectly, persons or their property to influence their participation in a procurement process, or affect the execution of the Contract."),
+    br(),
+    body("Measures to be taken: The Client will cancel the Contract if representatives of the Bidder are engaged in corrupt, fraudulent, collusive or coercive practices during the selection process or the execution of the Contract. The Client will sanction the Bidder, including declaring the Bidder ineligible, either indefinitely or for a stated period of time, to be awarded a Contract if it at any time determines that the Bidder has, directly or through an agent, engaged in corrupt, fraudulent, collusive or coercive practices in competing for, or in executing, the said Contract."),
+    br(),
+    h3("6.1.8 Limitation of Liability"),
+    body("The Contract will require that the aggregate liability of the Bidder under this Contract, or otherwise in connection with the services to be performed hereunder, shall in no event exceed the total fees payable to the Bidder hereunder. The preceding limitation shall not apply to liability arising as a result of the Bidder's fraud in performance of the services hereunder, or accident caused due to negligence of the Bidder, or the cost of repairing or replacing defective equipment, or to any obligation of the Bidder to indemnify the Procuring Entity concerning IPR infringement."),
+    br(),
+    h3("6.1.9 Insurance"),
+    body("The Bidders are expected to maintain insurance cover for the following events to insure against: (a) loss of or damage to any works and materials, including damages due to human-made disasters like fire, explosion, flooding, electrocution etc.; (b) loss of or damage to any equipment, property in connection with the Contract; (c) personal injury or death of the employees/third party personnel; (d) penalties and demands by labour regulatory Department and any other regulatory authorities."),
+    br(),
+    body("For any accident/mishappening that may occur onsite, the Client does not take any responsibility for insurance coverage."),
+    br(),
+    h3("6.1.10 Liquidated Damages"),
+    body("In case the Services provided by the Bidder are found to be unsatisfactory, of inferior quality, not meeting Service Level Benchmarks (SLBs), uneconomical, leading to delay in completion of Services as specified in the RFP, the following Liquidated Damages shall be imposed:"),
     new Table({
       width: { size: fullW, type: WidthType.DXA }, columnWidths: [4680, 4680],
       rows: [
-        new TableRow({ children: [cellM("Condition", 4680, true, "152E55"), cellM("Rate of Liquidated Damages", 4680, true, "152E55")] }),
-        new TableRow({ children: [cellM("Delay in completion of Services beyond stipulated timeline", 4680), cellM("1% of Contract Value per day, max 10%", 4680)] }),
-        new TableRow({ children: [cellM("Non-compliance with Service Level Benchmarks (SLBs)", 4680), cellM("1% of Contract Value per day, max 10%", 4680)] }),
-        new TableRow({ children: [cellM("Failure to deploy mutually agreed personnel", 4680), cellM("1% of Contract Value per day, max 10%", 4680)] }),
+        new TableRow({ children: [cellM("Conditions for Liquidated Damages to be imposed", 4680, true, "152E55"), cellM("Amount of Liquidated Damages", 4680, true, "152E55")] }),
+        new TableRow({ children: [cellM("Delay in completion of Services", 4680), cellM("1% (one per cent) of the Agreement/Contract Value per day", 4680)] }),
+        new TableRow({ children: [cellM("Non-compliance with Service Level Benchmarks (SLBs)", 4680), cellM("1% (one per cent) of the Agreement/Contract Value per day", 4680)] }),
+        new TableRow({ children: [cellM("Delay due to failure to deploy the mutually agreed human resources", 4680), cellM("1% (one per cent) of the Agreement/Contract Value per day", 4680)] }),
       ],
     }),
     br(),
-    h3("6.1.5 Performance Guarantee"),
-    body("Within 10 days of receipt of the LOA, the Selected Bidder shall deliver a Performance Security of " + pg + " of the Contract Price in the form of a Bank Guarantee. The Bank Guarantee shall be valid for the entire Contract Period plus " + (d.pgValidity || "180 days") + " post-completion."),
+    body("All Liquidated Damages (specified above) can be recovered subject to a maximum of 10% (ten per cent) of the Agreement/Contract Value and shall be imposed and recovered by appropriation from the Performance Security or from final bills. The Client shall have the right to invoke and appropriate the proceeds of the Performance Security, in whole or in part, without written notice to the Bidder in the event of breach of this Agreement or for recovery of Liquidated Damages specified herein. In case of delay due to reasons beyond the control of the Bidder, suitable extension of time may be granted by the Client."),
+    br(),
+    h3("6.1.11 Penalty"),
+    body("After imposition of Liquidated Damages, if the Bidder is unable to remedy the issue for which LD has been issued, the same shall be highlighted to them through a written notice wherein Penalty can be imposed by the Department. The Client may impose Penalties depending upon the quantum of breach for such cases. This Penalty shall be over and above the Liquidated Damages imposed on the Bidder."),
+    br(),
+    body("Without prejudice to any other right of the Client under this Contract, the Client reserves the right to impose a Penalty for any breach of the terms of this Contract, the amount and nature whereof shall be decided by the Client depending upon the quantum and/or severity of the breach in each case, including but not limited to the following Penalties. In the event of failure of the Bidder to recoup the quality in the mutually agreed time frame, the Client shall be entitled to terminate the Contract and forfeit Performance Security."),
+    new Table({
+      width: { size: fullW, type: WidthType.DXA }, columnWidths: [6820, 2540],
+      rows: [
+        new TableRow({ children: [cellM("Conditions for Penalty to be imposed", 6820, true, "152E55"), cellM("Amount of Penalty", 2540, true, "152E55")] }),
+        new TableRow({ children: [cellM("Delay in installation/completion of services/works as per specifications within the stipulated timelines", 6820), cellM("<Insert amount> per such case", 2540)] }),
+        new TableRow({ children: [cellM("Any incidence of misbehavior by the staff of the Bidder", 6820), cellM("<Insert amount> per such case", 2540)] }),
+        new TableRow({ children: [cellM("If any of the Bidder's personnel, on duty or otherwise, is found under the influence of any drug or intoxicants", 6820), cellM("<Insert amount> per such case", 2540)] }),
+        new TableRow({ children: [cellM("If any of the Bidder's personnel, on duty or otherwise, is found guilty of conduct unbecoming of such personnel or found attempt to claim false attendance", 6820), cellM("<Insert amount> per such case", 2540)] }),
+      ],
+    }),
+    br(),
+    h3("6.1.12 Performance Guarantee"),
+    body("i. Within 10 days, or within period as amended Letter of Acceptance (LoA), of receipt of the LoA, the Selected Bidder shall deliver to the Department a Performance Security [to cover the amount of liquidated damages and/or the compensation of the breach of contract] in any of the forms given below for an amount equivalent to " + pg + " of the Contract Price as stipulated in the conditions of contract."),
+    body("ii. Performance Security shall be submitted in the form of Bank Guarantee in the format acceptable to the Department or in the form of payment through RTGS/NEFT as per bank details provided in the data sheet."),
+    body("iii. Failure of the successful Bidder to comply with the requirements of clause 6.1.12 shall constitute sufficient grounds for cancellation of the award and forfeiture of the Bid Security."),
+    body("iv. The performance security shall be submitted for entire Contract Period and shall be valid for " + (d.pgValidity || "180 days") + " after the scheduled completion date."),
+    body("v. It is expressly understood and agreed that the performance security is intended to secure the performance of entire Service Agreement. It is also expressly understood and agreed that the performance security is not to be construed to cover all the damages detailed/stipulated in various clauses in the Contract document."),
+    body("vi. Should the contract period, for whatever reason be extended, the Bidder, shall at his own cost, get the validity period of Bank Guarantee in respect of performance security furnished by him extended and shall furnish the extended/revised Bank Guarantee to the Department before the expiry date of the Bank Guarantee originally furnished."),
+    br(),
+    body("Appropriation of Performance Security: (i) Performance Security submitted by the Bidder shall be forfeited if the Bidder fails to commence operations as per the requirements of this RFP. (ii) In the event the Bidder fails to perform any or all its obligations under the Service Agreement and damages are imposed for such failure, the Department shall have right to appropriate such amount as damages from the Performance Security submitted by the bidder. (iii) Upon occurrence of a Bidder Default or failure to meet any condition as per the Service Agreement, the Department shall, without prejudice to its other rights and remedies hereunder or in law, be entitled to encash and appropriate the relevant amounts from the Performance Security as Damages for such Bidder Default or failure to meet any Condition Precedent. (iv) Upon such appropriation from the Performance Security, the Bidder shall, within 30 (thirty) days thereof, replenish, in case of partial appropriation, to its original value, and in case of appropriation of the entire Performance Security provide a fresh Performance Security, as the case may be, failing which the Department shall be entitled to terminate this Agreement. (v) Upon replenishment or furnishing of a fresh Performance Security as aforesaid, the Bidder shall be entitled to an additional Cure Period of 30 (thirty) days for remedying the Bidder Default or to meet any Condition Precedent, and in the event of the Bidder not curing its default or meeting such Condition Precedent within such Cure Period, the Department shall be entitled to encash and appropriate such Performance Security as Damages, and to terminate this Agreement."),
+    br(),
+    body("Release of Performance Security: Performance Security submitted, will be returned to the Bidder subject to the Department's right to receive or recover amounts, if any, due without any interest 30 days after completion of Contract."),
     br(),
     h2("6.2 Commencement, Completion, Modification and Termination of Contract"),
-    h3("6.2.1 Commencement of Services"),
-    body("The Bidder shall begin carrying out the Services not later than 15 days after the Effective Date specified in the Contract."),
+    h3("6.2.1 Effectiveness of Contract"),
+    body("This Contract shall come into effect from the date the Contract is signed by both Parties."),
     br(),
-    h3("6.2.2 Force Majeure"),
-    body("\"Force Majeure\" means an event beyond the reasonable control of a Party which makes performance impossible, including war, riots, earthquake, fire, flood, strikes or actions by government agencies."),
+    h3("6.2.2 Commencement of Services"),
+    body("The Bidder shall begin carrying out the Services not later than 15 days after the Effective Date specified in the RFP or the Contract."),
     br(),
-    h3("6.2.3 Termination"),
-    body("Either Party may terminate the Contract with 30 days written notice. The Client may terminate immediately in cases of fraud, insolvency or material breach. Upon termination, the Client shall pay for Services satisfactorily performed prior to the termination date."),
+    h3("6.2.3 Expiration of Contract"),
+    body("Unless terminated earlier pursuant to GCC Clause 6.2.7 hereof, this Contract shall expire at the end of such time period after the Effective Date as specified in the Contract."),
     br(),
-    h3("6.2.4 IPR and Confidentiality"),
-    body("All deliverables, data, reports, designs and outputs produced under this Contract shall become and remain the property of the Client. The Bidder shall not share or reproduce any such materials without the Client's prior written consent."),
+    h3("6.2.4 Modifications or Variations"),
+    body("The Client shall have power to order the Bidder to do any or all of the following as considered necessary or advisable during the progress of the work, as applicable: increase or decrease of any item of work included in the Contract or BOQ; omit any item of work in the Contract or BOQ; change the character or quality or kind of any item of work in the Contract or BOQ; change the levels, lines, positions and dimensions of any part of the work in the Contract or BOQ; execute additional items of work of any kind necessary for the completion of the works; change in any specified sequence, methods or timing of construction of any part of the work; change the location of the works; and any other item as desired by the Client."),
     br(),
-    h3("6.2.5 Settlement of Disputes"),
-    body("This Contract shall be governed by the laws of India. Disputes shall first be resolved amicably within 30 days. If unresolved, disputes shall be referred to a sole Arbitrator appointed by mutual consent, under the Arbitration and Conciliation Act, 1996. The venue of arbitration shall be Nashik, Maharashtra."),
+    body("The Bidder shall be bound to carry out the work in accordance with any instructions in this connection, which may be given to them in writing by the Client and such alteration shall not vitiate or invalidate the Contract."),
+    br(),
+    h3("6.2.5 Quantities in the Contract"),
+    body("The quantities set out in the Contract are estimated quantities. Payment shall be made for actual quantities delivered in accordance with the Work Orders issued by the Client subsequent to the signing of the Contract."),
+    br(),
+    body("In case the delivered quantities have to be installed or deployed on site, payments shall be done only for the actual installed quantities. No payments shall be done for material dumped on the site and not installed."),
+    br(),
+    h3("6.2.6 Force Majeure"),
+    body("Definition: For the purposes of this Agreement, \"Force Majeure\" means an event which is beyond the reasonable control of a Party, and which makes a Party's performance of its obligations hereunder impossible or so impractical as reasonably to be considered impossible in the circumstances, and includes, but is not limited to, war, riots, civil disorder, earthquake, fire, explosion, storm, flood or other adverse weather conditions, strikes, lockouts or other industrial action (except where such strikes, lockouts or other industrial action are within the power of the Party invoking Force Majeure to prevent), confiscation or any other action by government agencies."),
+    br(),
+    body("Force Majeure shall not include (i) any event which is caused by the negligence or intentional action of a Party or such Party's Sub-Consultant or agents or employees, nor (ii) any event which a diligent Party could reasonably have been expected to both (A) take into account at the time of the conclusion of this Agreement, and (B) avoid or overcome in the carrying out of its obligations hereunder. Force Majeure shall not include insufficiency of funds or failure to make any payment required hereunder."),
+    br(),
+    body("No Breach of Contract: The failure of a Party to fulfil any of its obligations under the Contract shall not be considered to be a breach of, or default, under this Contract insofar as such inability arises from an event of Force Majeure, provided that the Party affected by such an event (a) has taken all reasonable precautions, due care and reasonable alternative measures in order to carry out the terms and conditions of this Contract, and (b) has informed the other Party as soon as possible about the occurrence of such an event."),
+    br(),
+    body("Extension of Time: Any period within which a Party shall, pursuant to this Contract, complete any action or task, shall be extended for a period equal to the time during which such Party was unable to perform such action as a result of Force Majeure."),
+    br(),
+    body("Payments: During the period of their inability to perform the Services as a result of an event of Force Majeure, the Bidder shall be entitled to continue to be paid under the terms of this Contract, as well as to be reimbursed for additional costs reasonably and necessarily incurred by them during such period for the purposes of the Services and in reactivating the Services after the end of such period."),
+    br(),
+    h3("6.2.7 Termination"),
+    body("Either Party may terminate the Contract with immediate effect by serving prior written notice to the other party if services are not possible to be rendered as per Applicable Laws or professional obligations."),
+    br(),
+    body("By the Client: The Client may terminate this Contract in case of the occurrence of any of the events specified in paragraphs (a) through (f) of this GCC Clause 6.2.7.1. In such an occurrence the Client shall give not less than thirty (30) days' written notice of termination to the Bidder, and sixty (60) days' in the case of the event referred to in (e): (a) if the Bidder does not remedy a failure in the performance of their obligations under the Contract, within thirty (30) days after being notified or within any further period as the Client may have subsequently approved in writing; (b) if the Bidder becomes insolvent or bankrupt; (c) if the Bidder, in the judgment of the Client has engaged in corrupt or fraudulent practices in competing for or in executing the Contract; (d) if, as the result of Force Majeure, the Bidder is unable to perform a material portion of the Services for a period of not less than sixty (60) days; (e) if the Client, in its sole discretion and for any reason whatsoever, decides to terminate this Contract; (f) if the Bidder fails to comply with any final decision reached as a result of arbitration proceedings pursuant to GCC Clause 6.2.15 hereof."),
+    br(),
+    body("By the Bidder: The Bidder may terminate this Contract, by not less than thirty (30) days' written notice to the Client, such notice to be given after the occurrence of any of the events specified in paragraphs (a) through (c) of this GCC Clause 6.2.7.2: (a) if the Client fails to pay any money due to the Bidder pursuant to this Contract and not subject to dispute pursuant to GCC Clause 6.2.15 hereof within forty-five (45) days after receiving written notice from the Bidder that such payment is overdue; (b) if, as the result of Force Majeure, the Bidder is unable to perform a material portion of the Services for a period of not less than sixty (60) days; (c) if the Client fails to comply with any final decision reached as a result of arbitration pursuant to GCC Clause 6.2.15 hereof."),
+    br(),
+    body("Payment upon Termination: Upon termination of this Contract pursuant to GCC Clauses 6.2.7, the Client shall make the following payments to the Bidder: (a) payment pursuant to GCC Clause 6.2.12 for Services satisfactorily performed prior to the termination date; (b) except in the case of termination pursuant to paragraphs (a) through (c) and (f) of GCC Clause 6.2.7.1, reimbursement of any reasonable cost, incident to the prompt and orderly termination of the Contract, including the cost of the return travel of the Personnel and their eligible dependents."),
+    br(),
+    h3("6.2.8 Obligations of the Bidder"),
+    body("Standard of Performance: The Bidder shall perform the Services and carry out their obligations hereunder with all due diligence and efficiency, in accordance with the stated Contract conditions, RFP Terms of Reference and Service Level Benchmarks (SLBs). The Bidder shall observe sound management practices, and employ appropriate technology, safe and effective equipment, machinery, materials and methods. For matters where the Contract does not specify any Standard, the Services delivered shall conform to National/International Standards or generally accepted professional standards, techniques and practices."),
+    br(),
+    body("The Bidder shall always act, in respect of any matter relating to this Contract, as faithful advisers to the Client, and shall at all times support and safeguard the Client's legitimate interests in any dealings with Third Parties."),
+    br(),
+    body("In cases where the performance or/and quality of Services is/are found to be unsatisfactory, Client shall impose Liquidated Damages and/or Penalties for the shortfall in performance as per GCC Clause 6.1.10 and 6.1.11. Imposition of these Liquidated Damages and/or Penalty shall not absolve the Bidder from rectification or reperformance of the defective Service without further payment."),
+    br(),
+    body("Responsibility of the Bidder: The Bidder should commence execution of Services in accordance with GCC Clause 6.2 and shall carry out the Services in accordance with the program submitted by the Bidder, as updated with the approval of the Client. As applicable depending on the nature of scope of services, the workmanship shall be of high order and quality so as to prevent accidents and damaging of the environment and surroundings; no damage in any case shall be caused to an existing structure (the Bidder shall be held responsible in occurrence of any such incident and will be responsible for the cost of required rectifications); site shall be returned to the Client as it was in the original or improved condition and completely free of any garbage and/or temporary structures; and on the conduct of cleaning activities and operation of equipment, the Bidder shall utilize such practicable methods and devices as are reasonably available to control, and minimize air/noise pollution."),
+    br(),
+    body("Notwithstanding anything mentioned in the RFP and Contract, the Bidder shall ensure compliance with all Applicable Laws and any guidelines which have been issued by the government or Client from time to time."),
+    br(),
+    h3("6.2.9 Obligations under Labour Code"),
+    body("The Bidder shall fulfil all obligations under all applicable labour codes and rules and shall indemnify the Client from any and all claims arising out of non-compliance of the aforementioned labour codes."),
+    br(),
+    h3("6.2.10 IPR Rights & Confidentiality"),
+    body("IPR Rights: All deliverables, as applicable depending on the scope of services in the RFP, in the form of data, software, designs, utilities, tools, outputs, plans, drawings, specifications, designs, reports, models, systems and other methodologies and know-how (\"Materials\") submitted by the Bidder under this Contract shall become and remain the property of the Client and subject to laws of copyright and must not be shared with third parties or reproduced, whether in whole or part, without the Client's prior written consent."),
+    br(),
+    body("The Bidder shall, not later than upon termination or expiration of this Contract, deliver all such documents and software to the Client, together with a detailed inventory thereof. The Bidder may retain a copy of such documents and software but shall not use it for any commercial purpose."),
+    br(),
+    body("Confidentiality: All documents, drawings, samples, data, associated correspondence or other information furnished by or on behalf of the Client to the Bidder, in connection with the Contract, whether such information has been furnished before, during or following completion or termination of the Contract, are confidential and shall remain the property of the Client and shall not, without the prior written consent of Client, be divulged by the Bidder to any third party, nor be used by them for any purpose other than the design, procurement, or other services and work required for the performance of this Contract. If advised by the Client, all copies of all such information in original shall be returned on completion of the Bidder's performance and obligations under this Contract."),
+    br(),
+    h3("6.2.11 Accounting"),
+    body("The Bidder shall keep accurate and systematic accounts and records in respect of the Services hereunder, in accordance with internationally accepted accounting principles and in such form and detail as will clearly identify all relevant time changes and costs, and the bases thereof."),
+    br(),
+    h3("6.2.12 Obligations of the Client"),
+    body("Assistance and Exemptions: The Client shall use its best efforts to ensure that the Government shall provide the Bidder such assistance and exemptions as specified in the Contract."),
+    br(),
+    body("Change in the Applicable Law Related to Taxes and Duties: If, after the date of this Contract, there is any change in the Applicable Law with respect to taxes and duties, then the remuneration and reimbursable expenses payable to the Bidder under this Contract shall be increased or decreased accordingly under this Contract."),
+    br(),
+    h3("6.2.13 Payments to the Bidder"),
+    body("Professional fee and Payments: The total payment due to the Bidder shall be governed by the Contract Price (as determined by the financial quote in the RFP stage)."),
+    br(),
+    body("Terms and Conditions of Payment: Payments will be made to the account of the Bidder and according to the payment schedule stated in Clause 3.4 of the RFP. The Payment shall be inclusive of taxes or similar charges, as well as customs, duties or tariffs imposed in respect of the Services. Unless otherwise set forth in the Contract, payment is due within thirty (30) days following receipt of each invoice."),
+    br(),
+    h3("6.2.14 Good Faith and Indemnity"),
+    body("The Parties undertake to act in good faith with respect to each other's rights under this Contract and to adopt all reasonable measures to ensure the realization of the objectives of this Contract."),
+    br(),
+    body("For breach of IPR Rights: The Bidder shall indemnify and hold harmless, free of costs, the Client and its employees and officers from and against all suits, actions or administrative proceedings, claims, demands, losses, damages, costs, and expenses of any nature, including attorney's fees and expenses, which may arise in respect of the Services provided by the Bidder under this Contract, as a result of any infringement or alleged infringement of any patent, utility model, registered design, copyright, or other Intellectual Proprietary Rights (IPR) or trademarks, registered or otherwise existing on the date of the Contract arising out of or in connection with: (a) any design, data, drawing, specification, or other documents or Services provided or designed by the Bidder for or on behalf of the Client; (b) the sale by the Client in any country of the services/products produced by the Services delivered by the Bidder; and (c) the delivery of the Services by the Bidder or the use of the Services at the Client site."),
+    br(),
+    body("Such indemnity shall not cover any use of the Services or any part thereof other than for the purpose indicated by or to be reasonably inferred from the Contract, neither any infringement resulting from the use of the Services or any part thereof, or any service/products produced thereby in association or combination with any other service, equipment, plant, or materials not delivered by the Bidder."),
+    br(),
+    body("If any proceedings are brought, or any claim is made against the Client arising out of the matters referred above, the Client shall give the Bidder a notice thereof. At its own expense and in the Client's name, the Bidder may conduct such proceedings and negotiations to settle any such proceedings or claim, keeping the Client informed. If the Bidder fails to notify the Client within twenty-eight (28) days after receiving such notice that it intends to conduct any such proceedings or claim, then the Client shall be free to conduct the same on its behalf at the risk and cost to the Bidder. At the Bidder's request, the Client shall afford all available assistance to the Bidder in conducting such proceedings or claim and shall be reimbursed by the Bidder for all reasonable expenses incurred in so doing."),
+    br(),
+    body("For Losses and Damages Caused by Bidder: The Bidder shall indemnify and keep harmless the Client, from and against, all actions, suit proceedings, losses, costs, damages, charges, claims, and demands of every nature and description brought or recovered against the Client because of any act or omission or default or negligence or trespass of the Bidder, his agents, or employees despite all reasonable and proper precautions may have been taken, during the execution of the Services. The Bidder shall make good at his own expense all resulting losses and/or damages to: (a) the Services themselves; (b) any other property of the Client; or (c) the lives, persons, or property of others."),
+    br(),
+    body("In case the Client is called upon to make good such costs, loss, or damages, or to pay any compensation, including that payable under the provisions of the Workmen's Compensation Act or any statutory amendments thereof; the amount of any costs or charges including costs and charges in connection with legal proceedings, which the Client may incur about it, shall be charged to the Bidder. All sums payable by way of compensation under any of these conditions shall be considered as reasonable compensation to be applied to the actual loss or damage sustained and whether or not any damage shall have been sustained."),
+    br(),
+    body("The Client shall have the power and right to pay or to defend or compromise any claim of threatened legal proceedings, or in anticipation of legal proceedings being instituted consequent on the action or default of the Bidder, to take such steps as may be considered necessary or desirable to ward off or mitigate the effect of such proceedings, charging to Bidder, as aforesaid, any sum or sums of money which may be paid and any expenses whether for reinstatement or otherwise which may be incurred and the propriety of any such payment, defence or compromise, and the incurring of any such expenses shall not be called in question by the Bidder."),
+    br(),
+    h3("6.2.15 Settlement of Disputes"),
+    body("This Contract shall be governed by, and construed in accordance with, the laws of India."),
+    br(),
+    body("Amicable Settlement: The Parties agree that the avoidance or early resolution of disputes is crucial for a smooth execution of the Contract and the success of the assignment. The Parties shall use their best efforts to settle amicably all disputes arising out of or in connection with this Contract or its interpretation. In the event of any dispute between the Parties arising out of or in connection with the Contract, including the validity thereof, the Parties hereto shall endeavour to settle such dispute amicably in the first instance. The attempt to bring about an amicable settlement shall be treated as having failed as soon as one of the Parties hereto, after reasonable attempts, which shall continue for not less than 30 (thirty) days, gives a notice to this effect, to the other party in writing."),
+    br(),
+    body("Arbitration: In case of such failure, the dispute shall be referred to a sole Arbitrator, who shall be appointed by the Client from the panel of arbitrators nominated by the parties to this agreement with mutual consent and a list of the panel so decided shall form part of this agreement. The Arbitration proceedings shall be governed by the (Indian) Arbitration and Conciliation Act, 1996 along with all the amendments and shall be held at " + arbitrationVenue + ". The language of arbitration shall be English. This Agreement and the rights and obligations of the Parties shall remain in full force and effect, pending the award in any arbitration proceedings hereunder."),
+    br(),
+    body("Jurisdiction: In the event that Parties fail to settle the dispute amicably, the same shall be settled by binding Arbitration conducted by a sole arbitrator appointed jointly by both Parties and governed by the Arbitration and Conciliation Act, 1996. The venue of arbitration shall be " + arbitrationVenue + ". The language of arbitration proceedings shall be English. Any dispute arising in relation to this Contract shall be subjected to Jurisdiction of Courts at " + arbitrationVenue + ". Courts located there shall have exclusive jurisdiction to settle dispute arising under this agreement."),
   ];
 
   // Annexures
@@ -21053,7 +21594,7 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
     body("Address: ____________________________"),
     br(),
     pb(), h2("7.2 Form 2: Financial Capacity of the Bidder"),
-    body("CA certified statement of turnover of the firm in " + (d.turnoverFYCount || "three (3) consecutive financial years") + " from the date of bid submission."),
+    body("CA certified statement of turnover of the firm in " + "three (3) consecutive financial years" + " from the date of bid submission."),
     br(),
     new Table({
       width: { size: fullW, type: WidthType.DXA }, columnWidths: [600, 4380, 4380],
@@ -21134,16 +21675,120 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
     br(),
     body("_______________________"),
     body("NAME OF THE BIDDER AND SEAL"),
+    br(),
+    pb(), h2("7.8 Annexure I: Bill of Quantities"),
+    body("The following BOQs are indicative only. Billing will be done on actuals; i.e. the quantity for which Allotment Slip and work order is received and thereafter supplied by the empanelled Bidder."),
+    br(),
+    body("<Insert BOQ table specific to the scope of this RFP>"),
+    br(),
+    ...(d.consortiumAllowed && d.consortiumAllowed !== "No" ? [
+    pb(), h2("7.9 Format for Power of Attorney for Lead Member of Consortium"),
+    body("Power of Attorney for Lead Member of Consortium"), br(),
+    body("(To be executed on Stamp Paper of Rs. 100/-)"), br(),
+    body("Whereas the Department/Client has invited applications from interested parties for [•] <name of the project> Project in <Name of City>."),
+    br(),
+    body("Project <Name of the project>"),
+    br(),
+    body("Whereas, .......................... And .......................... (collectively the Consortium) being Members of the Consortium are interested in bidding for the Project in accordance with the terms and conditions of the Request for Proposal (RFP) and other connected documents in respect of the Project, and"),
+    br(),
+    body("Whereas, it is necessary for the Members of the Consortium to designate one of them as the Lead Member with all necessary power and Department/Client to do for and on behalf of the Consortium, all acts, deeds and things as may be necessary with the Bid of the Project and its execution."),
+    br(),
+    body("NOW, THEREFORE, KNOW ALL MEN BY THESE PRESENTS"),
+    br(),
+    body("We, ..........................having our registered office at .......................... And M/s. .......................... having our registered office at .........................., (hereinafter collectively referred to as \"Contractor\") do hereby irrevocably designate, nominate, constitute, appoint and authorize M/s. .......................... having its registered office at .........................., being one of the members of the Consortium, as the Lead Member and true and lawful attorney of the Consortium (hereinafter referred to as \"Attorney\"). We hereby irrevocably authorize the Attorney (with power to sub-delegate) to conduct all business for and on behalf of the Consortium and any one of us during the bidding process and; in the event the Consortium is awarded the contract, during the execution of the Project and in this regard, to do on our behalf and on behalf of the Consortium, all or any of such acts, deeds or things as are necessary or required or incidental to the pre-qualification of the Consortium and submission of its bid for the Project, including but not limited to signing and submission of all applications, bids and other documents and writings, participate in the conferences, respond to queries, submit information/documents, sign and execute contracts and undertakings consequent to acceptance of the bid of the Consortium and generally to represent the Consortium in all its dealings with the Department, and/or any other Government Agency or any person, in all matters in connection with or relating to or arising out of the Consortium's Bid for the Project and/or upon award thereof till the contract is entered into with the Department."),
+    br(),
+    body("AND hereby agree to ratify and confirm and do hereby ratify and confirm all acts, deeds and things done or caused to be done by our said Attorney pursuant to and in exercise of the powers conferred by this Power of Attorney and that all acts, deeds and things done by our said Attorney in exercise of the powers hereby conferred shall and shall always be deemed to have been done by us/Consortium."),
+    br(),
+    body("IN WITNESS WHEREOF WE THE PRINCIPALS ABOVE NAMED HAVE EXECUTED THIS POWER OF ATTORNEY ON THIS ...................... <insert date> DAY OF .........., ........."),
+    br(),
+    body("For .......................... (Signature) .......................... (Name & Title)"),
+    body("For .......................... (Signature) .......................... (Name & Title)"),
+    br(),
+    body("Witnesses: 1. ..........  2. .......... ............................................. (Executants)"),
+    body("(To be executed by all the Members of the Consortium)"),
+    br(),
+    body("Notes: The mode of execution of the Power of Attorney should be in accordance with the procedure, if any, laid down by the applicable law and the charter documents of the executant(s) and when it is so required, the same should be under common seal affixed in accordance with the required procedure. Also, wherever required, the Applicant should submit for verification the extract of the charter documents and documents such as a board or shareholders' resolution/power of attorney in favour of the person executing this Power of Attorney for the delegation of power hereunder on behalf of the Applicant. For a Power of Attorney executed and issued overseas, the document will also have to be legalised by the Indian Embassy and notarised in the jurisdiction where the Power of Attorney is being issued. However, the Power of Attorney provided by Applicants from countries that have signed the Hague Legislation Convention, 1961 are not required to be legalised by the Indian Embassy if it carries a conforming Apostille certificate."),
+    br(),
+    ] : []),
+    pb(), h2("7.10 Draft Contract for Consultant's Services"),
+    body("<Project Description>"),
+    br(),
+    body("This CONTRACT (hereinafter called the \"Contract\") is made on the ---------- day of the month of ------------------Year, between, on the one hand, (), (hereinafter called the \"Client\") and, on the other hand, M/s ------------------------------------ in JV with ------------------------------------ and in Association with .................................................... (hereinafter called the \"Consultants\")."),
+    br(),
+    body("WHEREAS (A) the Client has requested the Consultants to provide certain consulting services as defined in the General Conditions attached to this Contract (hereinafter called the \"Services\"); (B) the Consultants, having represented to the Client that they have the required professional skills, personnel and technical resources, have agreed to provide the Services on the terms and conditions set forth in this Contract;"),
+    br(),
+    body("NOW THEREFORE the parties hereto hereby agree as follows:"),
+    br(),
+    body("1. The following documents attached hereto shall be deemed to form an integral part of this Contract: (a) The General Conditions of Contract (hereinafter called \"GC\"); (b) The Special Conditions of contract (hereinafter called \"SC\"); (b) The following Appendices [<Appendices can be added/deleted based on project requirements>]:"),
+    bullet("Appendix A: Terms of reference containing, inter-alia, the Description of the Services and Reporting Requirements"),
+    bullet("Appendix B: Consultants' Sub consultants, Key Personnel and Sub Professional Personnel, Task assignment, work programme, manning schedule, qualification requirements of key personnel, and schedule for submission of various report. [To be modified based on the project requirement]"),
+    bullet("Appendix E: Cost Estimate"),
+    bullet("Appendix F: Copy of letter of invitation"),
+    bullet("Appendix G: Copy of letter of acceptance"),
+    bullet("Appendix H: Copy of Bank Guarantee for Performance Security"),
+    bullet("Appendix-I: Minutes of the pre-bid meeting [If Applicable]"),
+    br(),
+    body("2. The mutual rights and obligations of the Client and the Consultants shall be as set forth in the Contract; in particular: (a) The Consultants shall carry out the Services in accordance with the provisions of the Contract; and (b) Client shall make payments to the Consultants in accordance with the provisions of the Contract."),
+    br(),
+    body("IN WITNESS WHEREOF, the Parties hereto have caused this Contract to be signed in their respective names as of the day and year first above written."),
+    br(),
+    new Table({
+      width: { size: fullW, type: WidthType.DXA }, columnWidths: [4680, 4680],
+      rows: [
+        new TableRow({ children: [cellM("For and on behalf of [Department]", 4680, true), cellM("For and on behalf of Consultant", 4680, true)] }),
+        new TableRow({ children: [cellM("In the presence of:\n1. Name:\n   Address:\n2. Name:\n   Address:", 4680), cellM("In the presence of:\n1. Name:\n   Address:\n2. Name:\n   Address:", 4680)] }),
+      ],
+    }),
+  ];
+
+  // Table of Contents — auto-populates from Heading 1/2/3 styles when opened in Word
+  // (or on pressing F9 / "Update Field" if the viewer doesn't auto-update on open).
+  const tocPage = [
+    pb(),
+    h1("Table of Contents"),
+    new Paragraph({
+      spacing: { after: 200 },
+      children: [new TextRun({ text: "Right-click and select \"Update Field\" (or press F9) if the entries below don't appear when this document is first opened.", italics: true, size: 18, color: "5B6478", font: "Arial" })],
+    }),
+    new TableOfContents("Table of Contents", {
+      hyperlink: true,
+      headingStyleRange: "1-3",
+    }),
   ];
 
   // Assemble
   const allChildren = [
-    ...coverPage, ...disclaimerPage, ...generalInfoSection, ...dataSheet,
+    ...coverPage, ...disclaimerPage, ...tocPage, ...generalInfoSection, ...dataSheet,
     ...torSection, ...eligibilitySection, ...evalSection,
     ...instructionsSection, ...gccSection, ...annexuresSection,
   ];
 
+  const docHeader = new Header({
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "CCCCCC", space: 4 } },
+        children: [new TextRun({ text: rfpTitle, bold: true, size: 16, font: "Arial", color: "5B6478" })],
+      }),
+    ],
+  });
+
+  const docFooter = new Footer({
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({ text: "Page No. ", size: 16, font: "Arial", color: "5B6478" }),
+          new TextRun({ children: [PageNumber.CURRENT], size: 16, font: "Arial", color: "5B6478" }),
+          new TextRun({ text: " / ", size: 16, font: "Arial", color: "5B6478" }),
+          new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 16, font: "Arial", color: "5B6478" }),
+        ],
+      }),
+    ],
+  });
+
   const doc = new window.docx.Document({
+    features: { updateFields: true },
     numbering: {
       config: [
         { reference: "bullets", levels: [{ level: 0, format: LevelFormat.BULLET, text: "•", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } } } }] },
@@ -21160,6 +21805,8 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
     },
     sections: [{
       properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 1440, right: 1080, bottom: 1440, left: 1440 } } },
+      headers: { default: docHeader },
+      footers: { default: docFooter },
       children: allChildren,
     }],
   });
@@ -21245,6 +21892,264 @@ function SelMethodField({
     }, m.desc)));
   }));
 }
+function DateFieldWithWarning({
+  value,
+  onChange,
+  state
+}) {
+  const s = inputStyleObj();
+  let warning = null;
+  if (value) {
+    const dt = isoToDate(value);
+    if (!isNaN(dt.getTime()) && isHolidayOrSunday(dt, state || "Maharashtra")) {
+      const isSun = dt.getDay() === 0;
+      warning = isSun
+        ? "This date falls on a Sunday."
+        : "This date falls on a public holiday in " + (state || "the selected state") + ".";
+    }
+  }
+  return /*#__PURE__*/React.createElement("div", null,
+    /*#__PURE__*/React.createElement("input", {
+      type: "date",
+      style: {
+        ...s,
+        border: `1.5px solid ${warning ? C.danger : C.blue}`,
+        background: warning ? "#FFF5F5" : "#F0F7FF"
+      },
+      value: value || "",
+      onChange: e => onChange(e.target.value)
+    }),
+    warning && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        marginTop: 6,
+        padding: "6px 10px",
+        borderRadius: 6,
+        background: "#FFF3F3",
+        border: "1px solid " + C.danger,
+        color: C.danger,
+        fontSize: 12,
+        fontWeight: 600
+      }
+    }, "\u26A0\uFE0F ", warning, " Consider moving it to the next working day.")
+  );
+}
+
+function LogoUploadField({
+  value,
+  onChange
+}) {
+  const [error, setError] = useState("");
+  const fileInputRef = useRef(null);
+
+  function handleFile(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (!file.type || file.type.indexOf("image/") !== 0) {
+      setError("Please choose an image file (JPEG, PNG, GIF, WebP, etc.).");
+      return;
+    }
+    setError("");
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 500;
+        let width = img.naturalWidth || img.width;
+        let height = img.naturalHeight || img.height;
+        if (width > maxDim || height > maxDim) {
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        let dataUrl;
+        try {
+          dataUrl = canvas.toDataURL("image/png");
+        } catch (err) {
+          setError("Couldn't process this image \u2014 try a different file.");
+          return;
+        }
+        onChange({ dataUrl, width, height });
+      };
+      img.onerror = () => setError("Couldn't read this image \u2014 try a different file.");
+      img.src = reader.result;
+    };
+    reader.onerror = () => setError("Couldn't read this file.");
+    reader.readAsDataURL(file);
+  }
+
+  function handleRemove() {
+    onChange(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  return /*#__PURE__*/React.createElement("div", null,
+    /*#__PURE__*/React.createElement("input", {
+      type: "file",
+      accept: "image/*",
+      ref: fileInputRef,
+      onChange: handleFile,
+      style: { fontSize: 12, fontFamily: "inherit" }
+    }),
+    error && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 8, padding: "6px 10px", borderRadius: 6, background: "#FFF3F3",
+        border: "1px solid " + C.danger, color: C.danger, fontSize: 12
+      }
+    }, "\u26A0\uFE0F " + error),
+    value && value.dataUrl && /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", alignItems: "center", gap: 12, marginTop: 10 }
+    },
+      /*#__PURE__*/React.createElement("img", {
+        src: value.dataUrl,
+        style: {
+          width: 64, height: 64, objectFit: "contain",
+          border: "1px solid " + C.border, borderRadius: 8, background: C.white, padding: 4
+        }
+      }),
+      /*#__PURE__*/React.createElement("button", {
+        onClick: handleRemove,
+        type: "button",
+        style: {
+          fontSize: 12, padding: "5px 12px", borderRadius: 6,
+          border: "1.5px solid " + C.danger, background: "transparent",
+          color: C.danger, cursor: "pointer", fontFamily: "inherit"
+        }
+      }, "Remove logo")
+    ),
+    /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: 6, fontSize: 11, color: C.muted }
+    }, "Saved with this organization's profile and embedded on the cover page of the generated tender, above the authority name.")
+  );
+}
+
+function SimilarExperienceAIField({
+  value,
+  onChange,
+  allData
+}) {
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const scope = (allData.scopeSummary || "").trim();
+  const s = inputStyleObj();
+
+  async function handleDraft() {
+    if (!scope) {
+      setErrorMsg("Enter Scope of Services (Assignment Details section) first \u2014 the draft is based on it.");
+      return;
+    }
+    setLoading(true);
+    setErrorMsg("");
+    try {
+      const draft = await draftSimilarExperience(scope);
+      onChange(draft);
+    } catch (e) {
+      setErrorMsg("Couldn't get an AI draft (" + e.message + "). Check the Groq API key, or just draft this manually below.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return /*#__PURE__*/React.createElement("div", null,
+    /*#__PURE__*/React.createElement("button", {
+      onClick: handleDraft,
+      disabled: loading,
+      type: "button",
+      style: {
+        fontSize: 12, padding: "6px 14px", borderRadius: 7, marginBottom: 8,
+        border: "1.5px solid " + C.blue,
+        background: loading ? C.smoke : C.blue,
+        color: loading ? C.muted : C.white,
+        cursor: "pointer", fontFamily: "inherit", fontWeight: 600
+      }
+    }, loading ? "Drafting\u2026" : "\u2728 Draft with AI (from Scope of Services)"),
+    errorMsg && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 8, padding: "6px 10px", borderRadius: 6, background: "#FFF3F3",
+        border: "1px solid " + C.danger, color: C.danger, fontSize: 12
+      }
+    }, "\u26A0\uFE0F " + errorMsg),
+    /*#__PURE__*/React.createElement("textarea", {
+      style: { ...s, minHeight: 80, resize: "vertical" },
+      value: value || "",
+      placeholder: "e.g. Project Management / Design Consultancy for infrastructure projects\u2026 or click \"Draft with AI\" above.",
+      onChange: e => onChange(e.target.value)
+    }),
+    /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: 6, fontSize: 11, color: C.muted }
+    }, "AI-drafted text is a starting point \u2014 review and edit before finalizing.")
+  );
+}
+
+function OrgProfilePickerField({
+  allData,
+  onChangeField
+}) {
+  const [profiles, setProfiles] = useState(() => loadOrgProfiles());
+  const [selected, setSelected] = useState("");
+  const names = Object.keys(profiles).sort();
+  const s = inputStyleObj();
+
+  function handleSelect(name) {
+    setSelected(name);
+    if (name && profiles[name]) {
+      const p = profiles[name];
+      ORG_PROFILE_FIELDS.forEach(k => {
+        if (p[k] !== undefined) onChangeField(k, p[k]);
+      });
+    }
+  }
+
+  function handleDelete() {
+    if (!selected) return;
+    deleteOrgProfile(selected);
+    setProfiles(loadOrgProfiles());
+    setSelected("");
+  }
+
+  const currentName = (allData.authorityName || "").trim();
+  const currentIsSaved = currentName && profiles[currentName];
+
+  return /*#__PURE__*/React.createElement("div", null,
+    /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 8 } },
+      /*#__PURE__*/React.createElement("select", {
+        style: { ...s, flex: 1, cursor: "pointer" },
+        value: selected,
+        onChange: e => handleSelect(e.target.value)
+      },
+        /*#__PURE__*/React.createElement("option", { value: "" },
+          names.length ? "\u2014 Select a saved organization \u2014" : "No saved organizations yet"
+        ),
+        names.map(n => /*#__PURE__*/React.createElement("option", { key: n, value: n }, n))
+      ),
+      selected && /*#__PURE__*/React.createElement("button", {
+        onClick: handleDelete,
+        style: {
+          fontSize: 12, padding: "0 12px", borderRadius: 7,
+          border: "1.5px solid " + C.danger, background: "transparent",
+          color: C.danger, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap"
+        }
+      }, "Delete")
+    ),
+    /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: 6, fontSize: 11, color: C.muted }
+    },
+      currentIsSaved
+        ? "\u2713 \"" + currentName + "\" is saved \u2014 editing the fields below updates this saved profile."
+        : currentName
+          ? "\"" + currentName + "\" isn't saved yet \u2014 fill in the fields below and it will be saved automatically for next time."
+          : "Pick a saved organization above, or type a new Authority Name below to start a new saved profile."
+    )
+  );
+}
+
 function EmdField({
   value,
   onChange,
@@ -21318,7 +22223,7 @@ function EmdField({
       fontSize: 11,
       color: overridden ? "#7A5A10" : C.muted
     }
-  }, auto > 0 ? overridden ? "✎ Manually overridden" : `⚡ Auto: 2% of ₹${feeLakhs.toFixed(2)}L = ₹${autoF}` : "Will auto-calculate once fee is entered"));
+  }, overridden ? "✎ Manually overridden" : (feeLakhs > 0 ? `⚡ Auto: 2% of ₹${feeLakhs.toFixed(2)}L = ₹${autoF}` : `Default ₹${autoF} (no estimated fee entered)`)));
 }
 function TenderFeeField({
   value,
@@ -21579,7 +22484,7 @@ function TechCriteriaField({
   onChange,
   selectionMethod
 }) {
-  const show = selectionMethod === "QCBS_7030" || selectionMethod === "QCBS_8020" || selectionMethod === "EMPANEL";
+  const show = selectionMethod === "QCBS_7030" || selectionMethod === "QCBS_8020" || selectionMethod === "EMPANEL" || selectionMethod === "QBS";
   if (!show) return /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "10px 14px",
@@ -21949,7 +22854,8 @@ function TeamTableField({
 function SlbTableField({
   value,
   onChange,
-  slbApplicable
+  slbApplicable,
+  deliverables
 }) {
   if (slbApplicable !== "Yes") return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -21964,12 +22870,9 @@ function SlbTableField({
   }, "Set \"SLBs Applicable\" to Yes to configure benchmarks.");
   const rows = value && value.length > 0 ? value : [{
     id: 1,
-    description: "Submission of Monthly Progress Report",
-    kpi: "By 5th of following month"
-  }, {
-    id: 2,
-    description: "Response to Client queries / issues",
-    kpi: "Within 48 hours of receipt"
+    description: (deliverables && deliverables[0]) || "Submission of Monthly Progress Report",
+    kpi: "By 5th of following month",
+    penaltyPct: "10"
   }];
   const nextId = rows.length > 0 ? Math.max(...rows.map(r => r.id)) + 1 : 1;
   const thS = {
@@ -21993,7 +22896,12 @@ function SlbTableField({
     fontFamily: "inherit",
     outline: "none"
   };
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  const hasDeliverables = deliverables && deliverables.length > 0;
+  return /*#__PURE__*/React.createElement("div", null,
+    hasDeliverables && /*#__PURE__*/React.createElement("div", {
+      style: { marginBottom: 8, fontSize: 11, color: C.muted }
+    }, "Description options are pulled from your Payment Schedule \u0026 Milestones deliverables (Assignment Details section)."),
+    /*#__PURE__*/React.createElement("div", {
     style: {
       overflowX: "auto",
       borderRadius: 8,
@@ -22013,9 +22921,11 @@ function SlbTableField({
     }
   }, "#"), /*#__PURE__*/React.createElement("th", {
     style: thS
-  }, "SLB Description"), /*#__PURE__*/React.createElement("th", {
+  }, "Deliverable / SLB Description"), /*#__PURE__*/React.createElement("th", {
     style: thS
   }, "Key Performance Indicator (KPI)"), /*#__PURE__*/React.createElement("th", {
+    style: { ...thS, width: 110 }
+  }, "Penalty % (per instance)"), /*#__PURE__*/React.createElement("th", {
     style: {
       ...thS,
       width: 40
@@ -22033,7 +22943,17 @@ function SlbTableField({
     }
   }, i + 1), /*#__PURE__*/React.createElement("td", {
     style: tdS
-  }, /*#__PURE__*/React.createElement("input", {
+  }, hasDeliverables ? /*#__PURE__*/React.createElement("select", {
+    value: deliverables.includes(r.description) ? r.description : "__custom__",
+    onChange: e => onChange(rows.map(x => x.id === r.id ? {
+      ...x,
+      description: e.target.value === "__custom__" ? "" : e.target.value
+    } : x)),
+    style: { ...inS, cursor: "pointer" }
+  },
+    deliverables.map(d => /*#__PURE__*/React.createElement("option", { key: d, value: d }, d)),
+    /*#__PURE__*/React.createElement("option", { value: "__custom__" }, "\u2014 Custom / other \u2014")
+  ) : /*#__PURE__*/React.createElement("input", {
     type: "text",
     value: r.description || "",
     onChange: e => onChange(rows.map(x => x.id === r.id ? {
@@ -22054,6 +22974,17 @@ function SlbTableField({
     placeholder: "e.g. By 5th of month",
     style: inS
   })), /*#__PURE__*/React.createElement("td", {
+    style: tdS
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: r.penaltyPct || "",
+    onChange: e => onChange(rows.map(x => x.id === r.id ? {
+      ...x,
+      penaltyPct: e.target.value
+    } : x)),
+    placeholder: "e.g. 10",
+    style: inS
+  })), /*#__PURE__*/React.createElement("td", {
     style: {
       ...tdS,
       textAlign: "center"
@@ -22072,8 +23003,9 @@ function SlbTableField({
   }, "\u2715"))))))), /*#__PURE__*/React.createElement("button", {
     onClick: () => onChange([...rows, {
       id: nextId,
-      description: "",
-      kpi: ""
+      description: (hasDeliverables && deliverables[0]) || "",
+      kpi: "",
+      penaltyPct: "10"
     }]),
     style: {
       fontSize: 12,
@@ -22087,286 +23019,11 @@ function SlbTableField({
     }
   }, "+ Add SLB"));
 }
-// ── Holiday Data ─────────────────────────────────────────────────────────────
-window.HOLIDAYS = {
-  Maharashtra: new Set([
-    "2026-01-26","2026-02-15","2026-02-19","2026-03-03","2026-03-19",
-    "2026-03-21","2026-03-26","2026-03-31","2026-04-03","2026-04-14",
-    "2026-05-01","2026-05-28","2026-06-26","2026-08-15","2026-08-26",
-    "2026-09-14","2026-10-02","2026-10-20","2026-11-08","2026-11-10",
-    "2026-11-11","2026-11-24","2026-12-25"
-  ]),
-  "Uttar Pradesh": new Set([
-    "2026-01-01","2026-01-03","2026-01-26","2026-02-15","2026-03-03",
-    "2026-03-21","2026-03-27","2026-03-31","2026-04-01","2026-04-03",
-    "2026-04-14","2026-05-01","2026-05-27","2026-06-26","2026-08-15",
-    "2026-08-25","2026-08-28","2026-09-04","2026-10-02","2026-10-20",
-    "2026-11-08","2026-11-09","2026-11-11","2026-11-24","2026-12-23",
-    "2026-12-25"
-  ])
-};
-
-// ── Schedule helpers ──────────────────────────────────────────────────────────
-window.isHoliday = function(dateStr, state) {
-  if (!dateStr) return false;
-  const h = window.HOLIDAYS[state];
-  return h ? h.has(dateStr) : false;
-};
-
-window.isWeekend = function(dateStr) {
-  if (!dateStr) return false;
-  const d = new Date(dateStr + "T00:00:00");
-  const day = d.getDay();
-  return day === 0 || day === 6; // Sun=0, Sat=6
-};
-
-window.isBlocked = function(dateStr, state) {
-  return window.isWeekend(dateStr) || window.isHoliday(dateStr, state);
-};
-
-window.nextWorkingDay = function(dateStr, state, forward = true) {
-  if (!dateStr) return "";
-  let d = new Date(dateStr + "T00:00:00");
-  let tries = 0;
-  while (window.isBlocked(d.toISOString().slice(0,10), state) && tries < 60) {
-    d.setDate(d.getDate() + (forward ? 1 : -1));
-    tries++;
-  }
-  return d.toISOString().slice(0,10);
-};
-
-window.addWorkingDays = function(startStr, days, state) {
-  // Add `days` calendar days then advance to nearest working day
-  if (!startStr) return "";
-  let d = new Date(startStr + "T00:00:00");
-  d.setDate(d.getDate() + days);
-  return window.nextWorkingDay(d.toISOString().slice(0,10), state, true);
-};
-
-window.computeSchedule = function(uploadDate, callNumber, preBid, state) {
-  // callNumber: 1, 2, 3
-  // preBid: true/false
-  // Returns object with all dates
-  if (!uploadDate || !state) return null;
-
-  const minBidDays = preBid ? 28 : 21; // GFR + 7 days extra for pre-bid
-  // For 2nd and 3rd call we keep same logic — shorter tendering period not GFR
-  // (re-tender still must meet minimum; courts have upheld this)
-
-  // Day 0 = upload date (must itself be a working day)
-  const upload = window.nextWorkingDay(uploadDate, state, true);
-
-  // Pre-bid queries close: Day 7 (working)
-  const queryClose = window.addWorkingDays(upload, 7, state);
-
-  let preBidDate = null;
-  let bidStart = null;
-  let bidEnd = null;
-  let techOpen = null;
-
-  if (preBid) {
-    // Pre-bid meeting: Day 10 (working)
-    preBidDate = window.addWorkingDays(upload, 10, state);
-    // Bid submission opens: Day 11 (working)
-    bidStart   = window.addWorkingDays(upload, 11, state);
-    // Bid submission closes: upload + minBidDays (working) — GFR min 28 days from upload
-    bidEnd     = window.addWorkingDays(upload, minBidDays, state);
-    // Tech opening: next working day after bid close
-    techOpen   = window.addWorkingDays(bidEnd, 1, state);
-  } else {
-    // No pre-bid
-    bidStart   = window.addWorkingDays(upload, 3, state);
-    bidEnd     = window.addWorkingDays(upload, minBidDays, state);
-    techOpen   = window.addWorkingDays(bidEnd, 1, state);
-  }
-
-  return { upload, queryClose, preBidDate, bidStart, bidEnd, techOpen };
-};
-
-window.daysBetween = function(a, b) {
-  if (!a || !b) return 0;
-  return Math.round((new Date(b) - new Date(a)) / 86400000);
-};
-
-window.fmtD = function(s) {
-  if (!s) return "—";
-  const d = new Date(s + "T00:00:00");
-  return d.toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" });
-};
-
-// ── SchedulePanel component ───────────────────────────────────────────────────
-function SchedulePanel({ allData, onChange }) {
-  const { useState: uS, useEffect: uE } = React;
-  const [call,    setCall]    = uS(allData._tenderCall    || "1");
-  const [preBid,  setPreBid]  = uS(allData._preBid        !== undefined ? allData._preBid : true);
-  const [state,   setState]   = uS(allData._tenderState   || "");
-  const [upload,  setUpload]  = uS(allData.tenderUploadDate || "");
-  const [sched,   setSched]   = uS(null);
-  const [warn,    setWarn]    = uS("");
-
-  // Recompute whenever inputs change
-  uE(() => {
-    if (!upload || !state) { setSched(null); return; }
-    const correctedUpload = window.nextWorkingDay(upload, state, true);
-    if (correctedUpload !== upload) {
-      setWarn(`⚠️ ${window.fmtD(upload)} is a ${window.isWeekend(upload) ? "weekend" : "holiday"} — upload date moved to next working day: ${window.fmtD(correctedUpload)}`);
-    } else {
-      setWarn("");
-    }
-    const s = window.computeSchedule(correctedUpload, parseInt(call), preBid, state);
-    setSched(s);
-    // Push computed dates back to parent data
-    if (s) {
-      onChange("_tenderCall",      call);
-      onChange("_preBid",          preBid);
-      onChange("_tenderState",     state);
-      onChange("tenderUploadDate", s.upload);
-      onChange("queryLastDate",    s.queryClose);
-      onChange("preBidDate",       s.preBidDate || "");
-      onChange("bidStartDate",     s.bidStart);
-      onChange("bidEndDate",       s.bidEnd);
-      onChange("techOpenDate",     s.techOpen);
-    }
-  }, [upload, call, preBid, state]);
-
-  const C2 = window.C;
-  const rowStyle = { display:"flex", gap:10, flexWrap:"wrap", marginBottom:14 };
-  const lblStyle = { fontSize:11, color:C2.muted, marginBottom:3, fontWeight:600, textTransform:"uppercase", letterSpacing:".06em" };
-  const inputS   = { ...window.inputStyleObj(), fontSize:13 };
-  const badge    = (label, dateStr) => {
-    const blocked = dateStr && window.isBlocked(dateStr, state);
-    return React.createElement("div", { style:{ flex:"1 1 160px", minWidth:140 } },
-      React.createElement("div", { style: lblStyle }, label),
-      React.createElement("div", { style:{
-        padding:"8px 12px", borderRadius:7, fontSize:13, fontWeight:600,
-        background: blocked ? "#FFF3F3" : "#F0FBF4",
-        border: `1.5px solid ${blocked ? "#E57373" : "#4CAF50"}`,
-        color: blocked ? C2.danger : C2.success
-      }},
-        dateStr ? window.fmtD(dateStr) : "—",
-        blocked ? " 🚫" : " ✓"
-      )
-    );
-  };
-
-  const minDays = preBid ? 28 : 21;
-  const actualDays = sched ? window.daysBetween(sched.upload, sched.bidEnd) : 0;
-
-  return React.createElement("div", { style:{ display:"flex", flexDirection:"column", gap:0 } },
-
-    // ── Controls row ──────────────────────────────────────────────────────
-    React.createElement("div", { style:{ ...rowStyle, alignItems:"flex-end", gap:14 } },
-
-      // State dropdown
-      React.createElement("div", { style:{ flex:"1 1 160px" } },
-        React.createElement("div", { style: lblStyle }, "State"),
-        React.createElement("select", {
-          style:{ ...inputS, border:`1.5px solid ${C2.blue}`, background:"#F0F7FF", cursor:"pointer" },
-          value: state,
-          onChange: e => setState(e.target.value)
-        },
-          React.createElement("option", { value:"" }, "— Select State —"),
-          React.createElement("option", { value:"Maharashtra" }, "Maharashtra"),
-          React.createElement("option", { value:"Uttar Pradesh" }, "Uttar Pradesh")
-        )
-      ),
-
-      // Call number
-      React.createElement("div", { style:{ flex:"1 1 140px" } },
-        React.createElement("div", { style: lblStyle }, "Tender Call"),
-        React.createElement("select", {
-          style:{ ...inputS, border:`1.5px solid ${C2.gold}`, background:"#FFFDF0", cursor:"pointer" },
-          value: call,
-          onChange: e => setCall(e.target.value)
-        },
-          React.createElement("option", { value:"1" }, "1st Call"),
-          React.createElement("option", { value:"2" }, "2nd Call"),
-          React.createElement("option", { value:"3" }, "3rd Call")
-        )
-      ),
-
-      // Pre-bid toggle
-      React.createElement("div", { style:{ flex:"1 1 160px" } },
-        React.createElement("div", { style: lblStyle }, "Pre-Bid Meeting"),
-        React.createElement("div", { style:{ display:"flex", gap:0, borderRadius:7, overflow:"hidden", border:`1.5px solid ${C2.border}` } },
-          ...[["Yes", true],["No", false]].map(([lab, val]) =>
-            React.createElement("button", {
-              key: lab,
-              onClick: () => setPreBid(val),
-              style:{
-                flex:1, padding:"9px 0", fontSize:13, fontWeight:600, cursor:"pointer",
-                border:"none", outline:"none",
-                background: preBid === val ? C2.blue : C2.white,
-                color:       preBid === val ? C2.white : C2.text,
-                transition:  "background .18s"
-              }
-            }, lab)
-          )
-        )
-      ),
-
-      // Upload date
-      React.createElement("div", { style:{ flex:"1 1 160px" } },
-        React.createElement("div", { style: lblStyle }, "Tender Upload Date"),
-        React.createElement("input", {
-          type:"date",
-          style:{ ...inputS, border:`1.5px solid ${C2.blue}`, background:"#F0F7FF" },
-          value: upload,
-          onChange: e => setUpload(e.target.value)
-        })
-      )
-    ),
-
-    // ── Warning bar ───────────────────────────────────────────────────────
-    warn ? React.createElement("div", {
-      style:{ padding:"8px 12px", borderRadius:7, background:"#FFF8E1", border:"1.5px solid #FFB300",
-              fontSize:12, color:"#7A5800", marginBottom:12 }
-    }, warn) : null,
-
-    // ── Audit logic note ──────────────────────────────────────────────────
-    state && React.createElement("div", {
-      style:{ padding:"8px 12px", borderRadius:7, background:"#EEF6FF",
-              border:`1px solid ${C2.border}`, fontSize:11.5, color:C2.muted, marginBottom:12 }
-    },
-      `📋 Basis: GFR 2017 Rule 161 — minimum ${minDays} days bid period from upload date `,
-      `(${preBid ? "28 days with pre-bid meeting" : "21 days without pre-bid"}).`,
-      ` All critical dates advanced past weekends & ${state} public holidays (2026 list).`,
-      call !== "1" ? ` [${call === "2" ? "2nd" : "3rd"} call — same minimum period applies per GFR.]` : ""
-    ),
-
-    // ── Computed dates grid ───────────────────────────────────────────────
-    sched ? React.createElement("div", null,
-      React.createElement("div", { style:{ ...rowStyle } },
-        badge("Upload / Release Date",    sched.upload),
-        badge("Last Date — Pre-bid Queries", sched.queryClose),
-        preBid ? badge("Pre-Bid Conference",       sched.preBidDate) : null
-      ),
-      React.createElement("div", { style:{ ...rowStyle } },
-        badge("Bid Submission Opens",     sched.bidStart),
-        badge("Bid Submission Closes (PDD)", sched.bidEnd),
-        badge("Technical Bid Opening",   sched.techOpen)
-      ),
-      React.createElement("div", {
-        style:{ padding:"10px 14px", borderRadius:7, marginBottom:4,
-                background: actualDays >= minDays ? "#F0FBF4" : "#FFF3F3",
-                border:`1.5px solid ${actualDays >= minDays ? "#4CAF50" : C2.danger}`,
-                fontSize:12.5, fontWeight:600,
-                color: actualDays >= minDays ? C2.success : C2.danger }
-      },
-        `📅 Upload → PDD = ${actualDays} calendar days  (GFR minimum: ${minDays} days) `,
-        actualDays >= minDays ? "✓ COMPLIANT" : "✗ BELOW MINIMUM — extend PDD"
-      )
-    ) : React.createElement("div", {
-      style:{ padding:"16px", textAlign:"center", color:C2.muted,
-              fontSize:13, background:C2.smoke, borderRadius:8 }
-    }, "Select state and upload date to auto-compute schedule")
-  );
-}
-
 function FieldInput({
   field,
   value,
   onChange,
+  onChangeField,
   allData
 }) {
   const {
@@ -22409,26 +23066,26 @@ function FieldInput({
         value: o
       }, o)));
     case "datepicker":
-      return /*#__PURE__*/React.createElement("input", {
-        type: "date",
-        style: {
-          ...s,
-          border: `1.5px solid ${C.blue}`,
-          background: "#F0F7FF"
-        },
-        value: value || "",
-        onChange: e => onChange(e.target.value)
+      return /*#__PURE__*/React.createElement(DateFieldWithWarning, {
+        value: value,
+        onChange: onChange,
+        state: allData.tenderState
       });
-
-    case "schedulepanel":
-      return React.createElement(SchedulePanel, {
+    case "orgprofilepicker":
+      return /*#__PURE__*/React.createElement(OrgProfilePickerField, {
         allData: allData,
-        onChange: (fieldId, val) => {
-          // SchedulePanel pushes multiple fields; we use a special callback
-          if (allData._schedulePanelOnChange) {
-            allData._schedulePanelOnChange(fieldId, val);
-          }
-        }
+        onChangeField: onChangeField
+      });
+    case "similarexpai":
+      return /*#__PURE__*/React.createElement(SimilarExperienceAIField, {
+        value: value,
+        onChange: onChange,
+        allData: allData
+      });
+    case "logoupload":
+      return /*#__PURE__*/React.createElement(LogoUploadField, {
+        value: value,
+        onChange: onChange
       });
 
     case "emd":
@@ -22469,7 +23126,10 @@ function FieldInput({
       return /*#__PURE__*/React.createElement(SlbTableField, {
         value: value,
         onChange: onChange,
-        slbApplicable: allData.slbApplicable
+        slbApplicable: allData.slbApplicable,
+        deliverables: (Array.isArray(allData.paymentMilestones) ? allData.paymentMilestones : [])
+          .map(r => (r.deliverable || "").trim())
+          .filter(Boolean)
       });
     case "paymenttable":
       return /*#__PURE__*/React.createElement(PaymentMilestonesField, {
@@ -22493,12 +23153,13 @@ function SectionCard({
   index
 }) {
   const [open, setOpen] = useState(true);
-  const filled = section.fields.filter(f => {
+  const countableFields = section.fields.filter(f => f.type !== "orgprofilepicker");
+  const filled = countableFields.filter(f => {
     const v = data[f.id];
     if (Array.isArray(v)) return v.length > 0;
     return v && String(v).trim();
   }).length;
-  const total = section.fields.length;
+  const total = countableFields.length;
   const progress = Math.round(filled / total * 100);
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -22571,7 +23232,7 @@ function SectionCard({
     }
   }, section.fields.map(field => /*#__PURE__*/React.createElement("div", {
     key: field.id
-  }, field.type !== "schedulepanel" && /*#__PURE__*/React.createElement("label", {
+  }, /*#__PURE__*/React.createElement("label", {
     style: {
       display: "block",
       fontSize: 12,
@@ -22584,7 +23245,8 @@ function SectionCard({
     field: field,
     value: data[field.id],
     onChange: val => onChange(field.id, val),
-    allData: { ...data, _schedulePanelOnChange: onChange }
+    onChangeField: onChange,
+    allData: data
   })))));
 }
 
@@ -22596,18 +23258,30 @@ function TenderTool() {
   const [docUrl, setDocUrl] = useState(null);
   const [error, setError] = useState(null);
   const generatingRef = useRef(false);
-  const totalFields = SECTIONS.reduce((s, sec) => s + sec.fields.length, 0);
-  const filledFields = SECTIONS.reduce((s, sec) => s + sec.fields.filter(f => {
+  const totalFields = SECTIONS.reduce((s, sec) => s + sec.fields.filter(f => f.type !== "orgprofilepicker").length, 0);
+  const filledFields = SECTIONS.reduce((s, sec) => s + sec.fields.filter(f => f.type !== "orgprofilepicker").filter(f => {
     const v = data[f.id];
     if (Array.isArray(v)) return v.length > 0;
     return v && String(v).trim();
   }).length, 0);
   const overallPct = pct(filledFields, totalFields);
   function handleChange(fieldId, val) {
-    setData(d => ({
-      ...d,
-      [fieldId]: val
-    }));
+    setData(d => {
+      const next = { ...d, [fieldId]: val };
+      if (["tenderUploadDate", "callSelection", "preBidConferenceHeld", "tenderState"].includes(fieldId)) {
+        const sched = computeBidSchedule(
+          next.tenderUploadDate,
+          next.callSelection || "First Call",
+          next.preBidConferenceHeld || "Yes",
+          next.tenderState || "Maharashtra"
+        );
+        Object.assign(next, sched);
+      }
+      if (ORG_PROFILE_FIELDS.includes(fieldId)) {
+        upsertOrgProfile(next);
+      }
+      return next;
+    });
   }
   async function handleGenerate() {
     if (generatingRef.current) return;
@@ -22684,7 +23358,7 @@ function TenderTool() {
       color: "#8FA8C8",
       letterSpacing: ".06em"
     }
-  }, "NASHIK KUMBH MELA AUTHORITY")), /*#__PURE__*/React.createElement("div", {
+  }, "SERVICES TENDER GENERATOR")), /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.white,
       borderRadius: "0 0 12px 12px",
@@ -22719,7 +23393,7 @@ function TenderTool() {
       margin: "0 auto 32px",
       lineHeight: 1.6
     }
-  }, "Based on the Nashik-Trimbakeshwar Kumbh Mela Authority standard RFP template. Auto-calculates EMD, processing fee and turnover from the fee entered."), /*#__PURE__*/React.createElement("div", {
+  }, "Based on a standard Services RFP template for Maharashtra / Uttar Pradesh authorities. Auto-calculates EMD, processing fee and turnover from the fee entered."), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 12,
@@ -23001,7 +23675,7 @@ function TenderTool() {
         margin: "0 auto 32px",
         lineHeight: 1.7
       }
-    }, "A complete, publish-ready Services RFP has been generated based on the Nashik Kumbh Mela Authority standard template."), /*#__PURE__*/React.createElement("div", {
+    }, "A complete, publish-ready Services RFP has been generated based on the standard template."), /*#__PURE__*/React.createElement("div", {
       style: {
         background: "#F0F7FF",
         borderRadius: 10,
@@ -23081,7 +23755,7 @@ function TenderTool() {
         color: C.navyMid,
         letterSpacing: ".05em"
       }
-    }, "POST-DOWNLOAD CHECKLIST"), ["Review all <Insert> placeholders before issuing", "Verify technical criteria marks total exactly 100 (for QCBS / Empanelment)", "Confirm EMD and processing fee amounts match your latest approvals", "Add project-specific BOQ as separate attachment (if applicable)", "Get document approved by competent authority before upload to portal", "Upload on " + (data.portalWebsite || "mahatenders.gov.in") + " and notify bidders"].map(item => /*#__PURE__*/React.createElement("div", {
+    }, "POST-DOWNLOAD CHECKLIST"), ["Review all <Insert> placeholders before issuing", "Verify technical criteria marks total exactly 100 (for QCBS / Empanelment)", "Confirm EMD and processing fee amounts match your latest approvals", "Add project-specific BOQ as separate attachment (if applicable)", "Get document approved by competent authority before upload to portal", "Upload on " + (data.portalWebsite || defaultPortalUrl(data.tenderState)) + " and notify bidders"].map(item => /*#__PURE__*/React.createElement("div", {
       key: item,
       style: {
         display: "flex",
