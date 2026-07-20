@@ -403,6 +403,7 @@ window.SECTIONS = [
       { id: "expLookbackYears",    label: "Experience Look-back Period",                    type: "select",   options: ["5 years","7 years","10 years"] },
       { id: "turnoverAmount",      label: "Minimum Average Annual Turnover",                type: "turnover" },
       { id: "consortiumAllowed",   label: "Consortium Allowed?",                            type: "select",   options: ["No","Yes – Consortium allowed","Yes – JV allowed"] },
+      { id: "subcontractingAllowed", label: "Sub-contracting Allowed?",                     type: "select",   options: ["No","Yes"] },
       { id: "consortiumMaxMembers",label: "Max Members in Consortium (if allowed)",         type: "select",   options: ["N/A","2 members","3 members","4 members"] },
     ],
   },
@@ -469,7 +470,7 @@ window.autoEmd = function(feeLakhs) {
 // deliberate, informed tradeoff made for this internal, password-gated,
 // trusted-team deployment — not a recommended default. Replace the value
 // below with your own Groq API key before deploying.
-window.GROQ_API_KEY = "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";
+window.GROQ_API_KEY = "REPLACE_WITH_YOUR_GROQ_API_KEY";
 window.GROQ_MODEL = "llama-3.3-70b-versatile";
 
 window.draftSimilarExperience = async function(scopeText) {
@@ -533,26 +534,109 @@ window.autoProcessingFee = function(feeLakhs) {
 
 // ── Public Holiday Calendar & Auto-Scheduling Engine ────────────────────────
 // Fixed-date national holidays (MM-DD), observed across all states.
-window.HOLIDAYS_NATIONAL_FIXED = ["01-26", "08-15", "10-02"]; // Republic Day, Independence Day, Gandhi Jayanti
+window.HOLIDAYS_NATIONAL_FIXED = [
+  { mmdd: "01-26", name: "Republic Day" },
+  { mmdd: "08-15", name: "Independence Day" },
+  { mmdd: "10-02", name: "Gandhi Jayanti" },
+];
 
 // Fixed-date state holidays (MM-DD).
 window.HOLIDAYS_STATE_FIXED = {
-  "Maharashtra":    ["02-19", "04-14", "05-01"],  // Shivaji Jayanti, Ambedkar Jayanti, Maharashtra Din
-  "Uttar Pradesh":  ["01-24", "04-14"],            // UP Diwas, Ambedkar Jayanti
+  "Maharashtra": [
+    { mmdd: "02-19", name: "Chhatrapati Shivaji Maharaj Jayanti" },
+    { mmdd: "04-14", name: "Dr. B.R. Ambedkar Jayanti" },
+    { mmdd: "05-01", name: "Maharashtra Din" },
+  ],
+  "Uttar Pradesh": [
+    { mmdd: "01-24", name: "UP Diwas" },
+    { mmdd: "04-14", name: "Dr. B.R. Ambedkar Jayanti" },
+  ],
 };
 
 // Movable festival holidays (exact ISO dates) — best-effort per official state gazette;
-// verify and edit as needed for years/festivals not listed here.
+// VERIFY against the current year's official state gazette notification before
+// relying on this for a live tender, and edit/override as needed. Manual date
+// selection always remains possible (with a warning) regardless of this list.
 window.HOLIDAYS_MOVABLE = {
   "Maharashtra": {
-    2025: ["2025-03-14","2025-03-31","2025-04-06","2025-04-18","2025-08-09","2025-08-16","2025-08-27","2025-09-05","2025-10-01","2025-10-02","2025-10-20","2025-10-21","2025-11-05","2025-12-25"],
-    2026: ["2026-03-04","2026-03-21","2026-03-26","2026-04-03","2026-04-10","2026-08-15","2026-08-28","2026-09-14","2026-10-20","2026-11-08","2026-11-09","2026-12-25"],
-    2027: ["2027-02-21","2027-03-11","2027-03-29","2027-08-15","2027-08-17","2027-09-04","2027-10-09","2027-10-28","2027-10-29","2027-12-25"],
+    2025: [
+      { date: "2025-03-14", name: "Holi" }, { date: "2025-03-31", name: "Eid-ul-Fitr" },
+      { date: "2025-04-06", name: "Ram Navami" }, { date: "2025-04-18", name: "Good Friday" },
+      { date: "2025-08-09", name: "Raksha Bandhan" }, { date: "2025-08-16", name: "Parsi New Year" },
+      { date: "2025-08-27", name: "Ganesh Chaturthi" }, { date: "2025-09-05", name: "Eid-e-Milad-un-Nabi" },
+      { date: "2025-10-01", name: "Dussehra (Vijayadashami)" }, { date: "2025-10-02", name: "Gandhi Jayanti / Dussehra" },
+      { date: "2025-10-20", name: "Diwali (Laxmi Pujan)" }, { date: "2025-10-21", name: "Diwali (Balipratipada)" },
+      { date: "2025-11-05", name: "Guru Nanak Jayanti" }, { date: "2025-12-25", name: "Christmas" },
+    ],
+    2026: [
+      // Official Maharashtra Government Gazetted Holidays 2026 (as provided).
+      // Fixed-date items (Republic Day, Shivaji Maharaj Jayanti, Ambedkar
+      // Jayanti, Maharashtra Din, Independence Day, Gandhi Jayanti) are
+      // already covered by HOLIDAYS_NATIONAL_FIXED / HOLIDAYS_STATE_FIXED
+      // above and are not repeated here.
+      { date: "2026-02-15", name: "Mahashivratri" },
+      { date: "2026-03-03", name: "Holi (Second Day)" },
+      { date: "2026-03-19", name: "Gudhi Padwa" },
+      { date: "2026-03-21", name: "Eid-ul-Fitr (Ramzan Eid)*" }, // *subject to moon sighting
+      { date: "2026-03-26", name: "Ram Navami" },
+      { date: "2026-03-31", name: "Mahavir Janma Kalyanak" },
+      { date: "2026-04-03", name: "Good Friday" },
+      { date: "2026-05-28", name: "Eid-ul-Adha (Bakri Eid)*" }, // *subject to moon sighting
+      { date: "2026-06-26", name: "Muharram*" }, // *subject to moon sighting
+      { date: "2026-08-26", name: "Eid-e-Milad*" }, // *subject to moon sighting
+      { date: "2026-09-14", name: "Ganesh Chaturthi" },
+      { date: "2026-10-20", name: "Dussehra (Vijayadashami)" },
+      { date: "2026-11-09", name: "Diwali Amavasya (Lakshmi Pujan)" },
+      { date: "2026-11-10", name: "Diwali (Balipratipada)" },
+      { date: "2026-11-24", name: "Guru Nanak Jayanti" },
+      { date: "2026-12-25", name: "Christmas" },
+    ],
+    2027: [
+      { date: "2027-02-21", name: "Holi" }, { date: "2027-03-11", name: "Ram Navami" },
+      { date: "2027-03-29", name: "Eid-ul-Fitr" }, { date: "2027-08-15", name: "Parsi New Year" },
+      { date: "2027-08-17", name: "Ganesh Chaturthi" }, { date: "2027-09-04", name: "Eid-e-Milad-un-Nabi" },
+      { date: "2027-10-09", name: "Dussehra (Vijayadashami)" }, { date: "2027-10-28", name: "Diwali (Laxmi Pujan)" },
+      { date: "2027-10-29", name: "Diwali (Balipratipada)" }, { date: "2027-12-25", name: "Christmas" },
+    ],
   },
   "Uttar Pradesh": {
-    2025: ["2025-03-14","2025-03-31","2025-04-06","2025-04-18","2025-08-09","2025-08-16","2025-09-05","2025-10-01","2025-10-02","2025-10-20","2025-10-21","2025-11-05","2025-12-25"],
-    2026: ["2026-03-04","2026-03-21","2026-03-26","2026-04-03","2026-08-15","2026-08-28","2026-09-14","2026-10-20","2026-11-08","2026-11-09","2026-12-25"],
-    2027: ["2027-02-21","2027-03-11","2027-03-29","2027-08-15","2027-08-17","2027-09-04","2027-10-09","2027-10-28","2027-10-29","2027-12-25"],
+    2025: [
+      { date: "2025-03-14", name: "Holi" }, { date: "2025-03-31", name: "Eid-ul-Fitr" },
+      { date: "2025-04-06", name: "Ram Navami" }, { date: "2025-04-18", name: "Good Friday" },
+      { date: "2025-08-09", name: "Raksha Bandhan" }, { date: "2025-08-16", name: "Janmashtami" },
+      { date: "2025-09-05", name: "Eid-e-Milad-un-Nabi" }, { date: "2025-10-01", name: "Dussehra (Vijayadashami)" },
+      { date: "2025-10-02", name: "Gandhi Jayanti / Dussehra" }, { date: "2025-10-20", name: "Diwali (Laxmi Pujan)" },
+      { date: "2025-10-21", name: "Diwali (Govardhan Puja)" }, { date: "2025-11-05", name: "Guru Nanak Jayanti" },
+      { date: "2025-12-25", name: "Christmas" },
+    ],
+    2026: [
+      // Official UP Government Gazetted Holidays 2026 (as provided).
+      // Fixed-date items (Republic Day, Ambedkar Jayanti, Independence Day,
+      // Gandhi Jayanti) are already covered by HOLIDAYS_NATIONAL_FIXED /
+      // HOLIDAYS_STATE_FIXED above and are not repeated here.
+      { date: "2026-02-15", name: "Maha Shivratri" },
+      { date: "2026-03-04", name: "Holi" },
+      { date: "2026-03-21", name: "Eid-ul-Fitr*" }, // *subject to moon sighting
+      { date: "2026-03-26", name: "Ram Navami" },
+      { date: "2026-03-31", name: "Mahavir Jayanti" },
+      { date: "2026-04-03", name: "Good Friday" },
+      { date: "2026-05-01", name: "Buddha Purnima / May Day" },
+      { date: "2026-05-27", name: "Eid-ul-Adha (Bakrid)*" }, // *subject to moon sighting
+      { date: "2026-06-26", name: "Muharram*" }, // *subject to moon sighting
+      { date: "2026-08-26", name: "Eid-e-Milad*" }, // *subject to moon sighting
+      { date: "2026-09-04", name: "Janmashtami" },
+      { date: "2026-10-20", name: "Dussehra (Vijayadashami)" },
+      { date: "2026-11-08", name: "Diwali" },
+      { date: "2026-11-24", name: "Guru Nanak Jayanti" },
+      { date: "2026-12-25", name: "Christmas" },
+    ],
+    2027: [
+      { date: "2027-02-21", name: "Holi" }, { date: "2027-03-11", name: "Ram Navami" },
+      { date: "2027-03-29", name: "Eid-ul-Fitr" }, { date: "2027-08-15", name: "Janmashtami" },
+      { date: "2027-08-17", name: "Ganesh Chaturthi" }, { date: "2027-09-04", name: "Eid-e-Milad-un-Nabi" },
+      { date: "2027-10-09", name: "Dussehra (Vijayadashami)" }, { date: "2027-10-28", name: "Diwali (Laxmi Pujan)" },
+      { date: "2027-10-29", name: "Diwali (Govardhan Puja)" }, { date: "2027-12-25", name: "Christmas" },
+    ],
   },
 };
 
@@ -560,21 +644,40 @@ window.pad2 = function(n) { return String(n).padStart(2, "0"); };
 window.dateToISO = function(dt) { return dt.getFullYear() + "-" + pad2(dt.getMonth() + 1) + "-" + pad2(dt.getDate()); };
 window.isoToDate = function(s) { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
 
-window.isHolidayOrSunday = function(dt, state) {
-  if (dt.getDay() === 0) return true; // Sunday
+// Returns { type: "sunday"|"national"|"state"|"movable", name: string } if dt is a
+// non-working day for the given state, or null if it's a normal working day.
+// Named holidays are checked first so a festival that happens to fall on a
+// Sunday still shows its actual name (e.g. "Diwali (Sunday)") rather than
+// just "Sunday".
+window.getHolidayInfo = function(dt, state) {
+  const isSun = dt.getDay() === 0;
   const mmdd = pad2(dt.getMonth() + 1) + "-" + pad2(dt.getDate());
-  if (HOLIDAYS_NATIONAL_FIXED.includes(mmdd)) return true;
-  const stateFixed = HOLIDAYS_STATE_FIXED[state] || [];
-  if (stateFixed.includes(mmdd)) return true;
-  const movable = (HOLIDAYS_MOVABLE[state] && HOLIDAYS_MOVABLE[state][dt.getFullYear()]) || [];
-  if (movable.includes(dateToISO(dt))) return true;
-  return false;
+  const nat = HOLIDAYS_NATIONAL_FIXED.find(h => h.mmdd === mmdd);
+  if (nat) return { type: "national", name: nat.name + (isSun ? " (Sunday)" : "") };
+  const stateFixed = (HOLIDAYS_STATE_FIXED[state] || []).find(h => h.mmdd === mmdd);
+  if (stateFixed) return { type: "state", name: stateFixed.name + (isSun ? " (Sunday)" : "") };
+  const iso = dateToISO(dt);
+  const movable = ((HOLIDAYS_MOVABLE[state] && HOLIDAYS_MOVABLE[state][dt.getFullYear()]) || []).find(h => h.date === iso);
+  if (movable) return { type: "movable", name: movable.name + (isSun ? " (Sunday)" : "") };
+  if (isSun) return { type: "sunday", name: "Sunday" };
+  return null;
+};
+
+window.isHolidayOrSunday = function(dt, state) {
+  return !!getHolidayInfo(dt, state);
 };
 
 // Push a date forward, day by day, until it lands on a working day.
 window.nextWorkingDay = function(dt, state) {
   const d = new Date(dt.getTime());
   while (isHolidayOrSunday(d, state)) d.setDate(d.getDate() + 1);
+  return d;
+};
+
+// Pull a date backward, day by day, until it lands on a working day.
+window.previousWorkingDay = function(dt, state) {
+  const d = new Date(dt.getTime());
+  while (isHolidayOrSunday(d, state)) d.setDate(d.getDate() - 1);
   return d;
 };
 
@@ -603,7 +706,13 @@ window.computeBidSchedule = function(uploadISO, call, preBidHeld, state) {
   let queryLastISO;
   if (includePreBid) {
     const preBid = addDaysAndAdjust(upload, 7, st);
-    const queryLast = addDaysAndAdjust(upload, 10, st);
+    // Query deadline must fall BEFORE the pre-bid meeting (so queries can be
+    // addressed at it) — one calendar day earlier, pulled back further if
+    // that lands on a Sunday/holiday, and never earlier than the upload date.
+    const dayBeforePreBid = new Date(preBid.getTime());
+    dayBeforePreBid.setDate(dayBeforePreBid.getDate() - 1);
+    let queryLast = previousWorkingDay(dayBeforePreBid, st);
+    if (queryLast.getTime() < upload.getTime()) queryLast = nextWorkingDay(upload, st);
     preBidISO = dateToISO(preBid);
     queryLastISO = dateToISO(queryLast);
   } else {
@@ -20832,6 +20941,7 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
     AlignmentType, HeadingLevel, WidthType, BorderStyle, ShadingType,
     VerticalAlign, LevelFormat, PageBreak, TableOfContents,
     Header, Footer, PageNumber,
+    Comment, CommentRangeStart, CommentRangeEnd, CommentReference,
   } = window.docx;
 
   const border = { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" };
@@ -20840,12 +20950,13 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
   const noBorders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder };
   const fullW = 9360;
 
-  function cellM(text, width, bold, bg, align) {
+  function cellM(text, width, bold, bg, align, colSpan) {
     return new TableCell({
       borders,
       width: { size: width, type: WidthType.DXA },
       margins: { top: 80, bottom: 80, left: 120, right: 120 },
       ...(bg ? { shading: { fill: bg, type: ShadingType.CLEAR } } : {}),
+      ...(colSpan ? { columnSpan: colSpan } : {}),
       verticalAlign: VerticalAlign.CENTER,
       children: [new Paragraph({
         alignment: align || AlignmentType.LEFT,
@@ -20872,9 +20983,36 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
     return new Paragraph({ numbering: { reference: "bullets", level: 0 }, children: [new TextRun({ text, font: "Arial", size: 20 })], spacing: { before: 40, after: 40 } });
   }
 
+  // ── Review Comments ─────────────────────────────────────────────────────
+  // Attaches a real Word comment (visible in the right-hand margin, same as
+  // Review > New Comment) to a short inline flag, so the person finalizing
+  // the tender can see exactly what still needs attention without hunting
+  // through the whole document. Only called where a genuine gap is detected.
+  let nextCommentId = 1;
+  const reviewComments = [];
+  function reviewFlag(commentText) {
+    const id = nextCommentId++;
+    reviewComments.push({
+      id,
+      author: "Services Tender Generator",
+      initials: "STG",
+      children: [new Paragraph({ children: [new TextRun({ text: commentText, size: 20, font: "Arial" })] })],
+    });
+    return new Paragraph({
+      spacing: { before: 40, after: 120 },
+      children: [
+        new CommentRangeStart(id),
+        new TextRun({ text: "\u26A0 Please review before issuing this tender \u2014 see comment.", italics: true, bold: true, color: "B45309", size: 18, font: "Arial" }),
+        new CommentRangeEnd(id),
+        new TextRun({ children: [new CommentReference(id)] }),
+      ],
+    });
+  }
   const d = data;
   const { feeLakhs } = computeFeeDetails(d);
-  const turnoverVal  = d.turnoverAmount || (feeLakhs * 2).toFixed(2);
+  const turnoverPhrase = d.turnoverAmount
+    ? ("\u20b9" + d.turnoverAmount + " Lakhs")
+    : (feeLakhs > 0 ? ("\u20b9" + (feeLakhs * 2).toFixed(2) + " Lakhs") : "<Insert amount>");
   const authority    = d.authorityName || "<Authority Name>";
   const rfpTitle     = d.rfpTitle || "<RFP Title>";
   const arbitrationVenue = deriveArbitrationVenue(d.authorityAddress, d.tenderState);
@@ -20941,15 +21079,20 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
   // Disclaimer
   const disclaimerPage = [
     pb(), h1("Disclaimer"),
-    body(officer + " on behalf of \"" + authority + "\" is inviting Request for Proposal for \"" + rfpTitle + "\"."),
+    body(officer + " on behalf of \"" + authority + "\" shall be inviting Request for Proposal for " + rfpTitle + "."),
     br(),
-    body("This Request for Proposal (RFP) Document has been prepared by " + officer + ", solely for the purpose of providing information to potential bidders. It is provided on a confidential basis and is not to be distributed or reproduced in whole or in part without the prior written consent of the Client."),
+    body("This Request for Proposal (RFP) Document has been prepared by the " + officer + ", solely for the purpose of providing information to potential bidders. It is provided on a confidential basis and is not to be distributed or reproduced in whole or in part without the prior written consent of the Client."),
     br(),
-    body("The information contained in this RFP document is provided to bidders on the terms and conditions set out in this RFP document. This RFP is not an agreement and is not an offer or invitation by " + officer + ", or its representatives to any other party."),
+    body("The information contained in this RFP document or subsequently provided to bidders whether verbally or in documentary form by or on behalf of the " + officer + " and Bid Inviting Department, or any of their employees or advisors, is provided to bidders on the terms and conditions set out in this RFP document and any other terms and conditions subject to which such information is provided."),
     br(),
-    body("Each applicant should conduct its own investigations and analysis and should check the accuracy, reliability and completeness of the information in this RFP document and obtain independent advice from appropriate sources."),
+    body("This RFP is not an agreement and is not an offer or invitation by the " + officer + ", or its representatives to any other party. The purpose of this Tender is to provide interested parties with information to assist the formulation of their proposal. This RFP document does not purport to contain all the information each applicant may require."),
     br(),
-    body(officer + " may, in its absolute discretion, but without being under any obligation to do so, update, amend or supplement the information in this RFP document."),
+    body("This RFP document may not be appropriate for all persons, and it is not possible for the " + officer + " to consider the investment objectives, financial situation and particular needs of each entity/bidder who reads or uses this RFP document. Certain bidders may have a better knowledge of the proposed project than others. Each applicant should conduct its own investigations and analysis and should check the accuracy, reliability and completeness of the information in this RFP document and obtain independent advice from appropriate sources. The " + officer + ", its employees and advisors make no representation or warranty and shall not incur any liability under any law, statute, rules or regulations as to the accuracy, reliability or completeness of this RFP document."),
+    br(),
+    body("The " + officer + " may, in its absolute discretion, but without being under any obligation to do so, update, amend or supplement the information in this RFP document."),
+    br(),
+    body(officer),
+    body("<Insert name of bid inviting department>"),
   ];
 
   // General Info
@@ -20957,11 +21100,11 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
     pb(), h1("1. General Information"),
     body(d.background || "<Insert background for this tender>"),
     br(),
-    body(authority + " invites Technical and Financial Bids from interested Bidders for \"" + rfpTitle + "\" on " + selMethod.label + " basis."),
+    body(authority + " invites Technical and Financial Bids from interested Bidders (the \"Proposals\") for \"" + rfpTitle + "\" on " + selMethod.label + " basis. The Department intends to select the Bidder through an open competitive process in accordance with the procedure set out herein."),
     br(),
     body("The RFP document can be downloaded from " + (d.portalWebsite || defaultPortalUrl(d.tenderState)) + ". Key dates for this RFP are set out in the Data Sheet below."),
     br(),
-    body("In case of a holiday on any of the dates mentioned in the Data Sheet, the activities assigned on that date shall be carried out on the next working day."),
+    body("In case of a holiday on any of the dates mentioned in the Data Sheet, the activities assigned on that date shall be carried out on the next working day. The Department reserves full right to change the terms and conditions in the RFP and scope herein and/or terminate the RFP process at any stage without assigning any reasons and without any prior notice and no claim of any nature from anyone in this regard shall be entertained."),
     br(),
     new Table({
       width: { size: fullW, type: WidthType.DXA }, columnWidths: [2800, 6560],
@@ -20994,6 +21137,7 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
         new TableRow({ children: [cellM("11", 600), cellM("Proposal Language", 3000), cellM("English", 5760)] }),
         new TableRow({ children: [cellM("12", 600), cellM("Proposal Currency", 3000), cellM("INR", 5760)] }),
         new TableRow({ children: [cellM("13", 600), cellM("Consortium Allowed", 3000), cellM(d.consortiumAllowed || "No", 5760)] }),
+        new TableRow({ children: [cellM("14", 600), cellM("Sub-contracting Allowed", 3000), cellM(d.subcontractingAllowed || "No", 5760)] }),
         new TableRow({ children: [cellM("15", 600), cellM("Account Details (EMD & Processing Fee)", 3000), cellM("A/c No: " + (d.bankAccountNo || "<Insert>") + "   IFSC: " + (d.ifscCode || "<Insert>") + "   Bank: " + (d.bankName || "<Insert>"), 5760)] }),
         new TableRow({ children: [cellM("16", 600), cellM("e-Procurement Portal", 3000), cellM(d.portalWebsite || defaultPortalUrl(d.tenderState), 5760)] }),
       ],
@@ -21055,7 +21199,7 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
       body(typeof d.paymentMilestones === "string" && d.paymentMilestones ? d.paymentMilestones : "<Insert payment schedule and milestone details>"),
     ]),
     br(),
-    h2("3.4 Review and Monitoring"),
+    h2("3.4 Review and Monitoring of the Applicant's Work"),
     body("The Client will check and verify deliverables on a regular basis. The Bidder will be given periodic feedback and necessary action will be taken on any continuous shortfalls."),
     br(),
     h3("3.4.1 Review and Monitoring Committee"),
@@ -21066,6 +21210,8 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
     br(),
     h3("3.4.2 Control"),
     body("In case any issues, defects, deficiencies, or flaws are flagged by the Review and Monitoring Committee, the Bidder shall take immediate remedial steps within 24 hours and intimate the same to the Client in the form of an Action Taken Report."),
+    br(),
+    body("In case of failure to remedy any issues, defects, deficiencies or flaws flagged or pointed out in the course of review and monitoring of the Bidder's work within 24 hours from the flagging of such issues, or such time as may be directed, the Client may, in its discretion and without prejudice to its right to charge liquidated damages, impose a penalty as per Clause 6.1.10 and 6.1.11 of the GCC for every such failure."),
     br(),
     ...(d.slbApplicable === "Yes" && slbRows.length > 0 ? [
       h2("3.5 Service Level Benchmarks & Penalty for Shortfall"),
@@ -21081,6 +21227,7 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
         ],
       }),
       br(),
+      reviewFlag("Service Level Benchmarks: confirm each SLB is measurable, each penalty % is realistic for the deliverable it's tied to, and no SLB row was left with a placeholder KPI or penalty before issuing."),
       body("Notwithstanding the individual penalty rates specified above, the total penalty levied under this Clause, whether for a single shortfall or cumulatively across multiple shortfalls over the Contract Period, shall not exceed 10% (ten per cent) of the Contract Value."),
       br(),
       h3("3.5.1 General Standards"),
@@ -21102,7 +21249,7 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
     new TableRow({ children: [cellM("S.No.", 600, true, "1A5CA8"), cellM("Eligibility Criteria", 5200, true, "1A5CA8"), cellM("Documentary Proof", 3560, true, "1A5CA8")] }),
     new TableRow({ children: [cellM(String(rowNum++), 600), cellM("Bid Processing Fee and EMD as specified in the Data Sheet", 5200), cellM("Payment receipts / NEFT transaction confirmation", 3560)] }),
     new TableRow({ children: [cellM(String(rowNum++), 600), cellM("The Bidder should be a Company registered under the Companies Act, or Partnership Firm under the Partnership Act 1932, or LLP under the LLP Act 2008, or a Proprietorship.", 5200), cellM("Certificate of Incorporation / MoA / AoA / Partnership Deed", 3560)] }),
-    new TableRow({ children: [cellM(String(rowNum++), 600), cellM("Financial Capacity: Minimum average annual turnover of ₹" + turnoverVal + " Lakhs in the last " + "3 financial years" + ".", 5200), cellM("Form 2 — Audited Financial Statements / CA Certificate with UDIN", 3560)] }),
+    new TableRow({ children: [cellM(String(rowNum++), 600), cellM("Financial Capacity: Minimum average annual turnover of " + turnoverPhrase + " in the last " + "3 financial years" + ".", 5200), cellM("Form 2 — Audited Financial Statements / CA Certificate with UDIN", 3560)] }),
     new TableRow({ children: [cellM(String(rowNum++), 600), cellM("Experience: The Applicant should have experience of similar assignments in the past " + lookback + ". Similar work means: " + (d.similarWorkDef || "<Insert definition>") + ".", 5200), cellM("Form 3 — Work Orders and Completion Certificates from competent authority", 3560)] }),
     new TableRow({ children: [cellM(String(rowNum++), 600), cellM("The Bidder should not have been blacklisted by the Central Government, any State Government/UTs, a statutory Department or a public sector undertaking as on the date of the Proposal.", 5200), cellM("Undertaking as per Form 5", 3560)] }),
     new TableRow({ children: [cellM(String(rowNum++), 600), cellM("Valid GST Registration Certificate", 5200), cellM("Copy of GST Registration Certificate", 3560)] }),
@@ -21115,6 +21262,7 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
     new Table({ width: { size: fullW, type: WidthType.DXA }, columnWidths: [600, 5200, 3560], rows: eligibilityRows }),
     br(),
     body("Note: Similar work for above shall mean: " + (d.similarWorkDef || "<Insert definition>") + ". Ongoing projects shall not be considered; only successfully completed similar assignments shall be counted."),
+    reviewFlag("Similar Work Definition determines who is eligible to bid \u2014 confirm the wording is specific enough to exclude unrelated experience, and matches the scale/nature of this assignment, before issuing."),
   ];
 
   // Evaluation
@@ -21131,24 +21279,15 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
   } else if (d.selectionMethod === "QBS") {
     evalSection = [...evalSection,
       h3("FOR QBS"),
-      body("Under Quality Based Selection (QBS), proposals are evaluated solely on technical criteria; only a technical proposal is invited and submitted, and no financial bidding takes place at this stage."),
+      body("Under Quality Based Selection (QBS), the proposals shall be evaluated solely on the basis of technical criteria."),
       br(),
-      body("During evaluation of the technical proposal, a quality score is assigned out of the maximum 100 (Hundred) marks, to each of the responsive bids, as per the scheme laid down below."),
+      body("In this method of selection, Consultant will submit only a technical proposal. Minimum qualifying marks for quality of the technical proposal are prescribed along with a scheme for allotting marks for various technical criteria/attributes."),
       br(),
-      new Table({
-        width: { size: fullW, type: WidthType.DXA }, columnWidths: [600, 7200, 1560],
-        rows: [
-          new TableRow({ children: [cellM("#", 600, true, "152E55"), cellM("Evaluation Criterion", 7200, true, "152E55"), cellM("Max Marks", 1560, true, "152E55")] }),
-          ...techCriteria.map((r, i) =>
-            new TableRow({ children: [cellM(String(i+1), 600), cellM(r.criterion || "<Insert>", 7200), cellM(String(r.marks || 0), 1560, false, null, AlignmentType.CENTER)] })
-          ),
-          new TableRow({ children: [cellM("", 600, true, "EEF1F6"), cellM("TOTAL", 7200, true, "EEF1F6"), cellM("100", 1560, true, "EEF1F6")] }),
-        ],
-      }),
+      body("Technical: Any Applicant that passes the benchmarks is declared as technically qualified. The technical proposals are opened first and evaluated and the offers who are qualifying as per these technical evaluation criteria will only be considered as technically qualified/responsive. The rest would be considered technically non-responsive and would be dropped from the list."),
       br(),
-      body("Applicants passing the minimum qualifying score of " + minScore + " are ranked by technical marks, with the highest-scoring Applicant ranked H-1, followed by H-2, H-3 and so on."),
+      body("All the technically qualified bidders are then ranked basis highest technical marks with H1 being the highest followed by the proposals securing lesser marks as H-2, H-3 etc."),
       br(),
-      body("The top-ranked (H-1) Applicant is invited for negotiation of the financial proposal and, upon successful negotiation, is recommended for award of contract."),
+      body("The proposal securing the highest marks and ranked H-1 will be invited for negotiations, if required and shall be recommended for award of contract."),
     ];
   } else if (isQCBS) {
     evalSection = [...evalSection,
@@ -21156,17 +21295,6 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
       body("In Quality and Cost Based Selection (QCBS) selection, minimum qualifying marks are given as benchmark for quality of the technical proposal which are prescribed along with a scheme for allotting marks for various technical criteria/attributes."),
       br(),
       body("Technical: During evaluation of technical proposal, quality score is assigned out of the maximum 100 (Hundred) marks, to each of the responsive bids, as per the scheme laid down below."),
-      br(),
-      new Table({
-        width: { size: fullW, type: WidthType.DXA }, columnWidths: [600, 7200, 1560],
-        rows: [
-          new TableRow({ children: [cellM("#", 600, true, "152E55"), cellM("Evaluation Criterion", 7200, true, "152E55"), cellM("Max Marks", 1560, true, "152E55")] }),
-          ...techCriteria.map((r, i) =>
-            new TableRow({ children: [cellM(String(i+1), 600), cellM(r.criterion || "<Insert>", 7200), cellM(String(r.marks || 0), 1560, false, null, AlignmentType.CENTER)] })
-          ),
-          new TableRow({ children: [cellM("", 600, true, "EEF1F6"), cellM("TOTAL", 7200, true, "EEF1F6"), cellM("100", 1560, true, "EEF1F6")] }),
-        ],
-      }),
       br(),
       body("The Consultants who are qualifying as per the technical evaluation criteria (minimum qualifying score: " + minScore + ") are considered as technically qualified/responsive and the rest would be considered technically non-responsive and would be dropped from the list."),
       br(),
@@ -21194,17 +21322,6 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
       body("Financial Bids of only the technically qualified Shortlisted Applicants will be opened and evaluated through the least cost process (L1). The least cost of undertaking Works at the pre-specified page sizes as specified in the Financial Bid format."),
       br(),
       body("All the Shortlisted Applicants who agree to match the least cost for the work at the specific page size will be empanelled with the Department (\"Empanelled Applicants\"). The empanelment shall be for a term of <Insert> year from the date of empanelment. Allotment of quantities to the Empanelled Applicants would be decided on rotation basis. The final decision on the allotment of Works to the various empanelled agencies shall be at the discretion of the Client."),
-      br(),
-      new Table({
-        width: { size: fullW, type: WidthType.DXA }, columnWidths: [600, 7200, 1560],
-        rows: [
-          new TableRow({ children: [cellM("#", 600, true, "152E55"), cellM("Evaluation Criterion", 7200, true, "152E55"), cellM("Max Marks", 1560, true, "152E55")] }),
-          ...techCriteria.map((r, i) =>
-            new TableRow({ children: [cellM(String(i+1), 600), cellM(r.criterion || "<Insert>", 7200), cellM(String(r.marks || 0), 1560, false, null, AlignmentType.CENTER)] })
-          ),
-          new TableRow({ children: [cellM("", 600, true, "EEF1F6"), cellM("TOTAL", 7200, true, "EEF1F6"), cellM("100", 1560, true, "EEF1F6")] }),
-        ],
-      }),
     ];
   }
 
@@ -21465,6 +21582,8 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
       ],
     }),
     br(),
+    reviewFlag("Penalty amounts are still placeholders (\"<Insert amount>\"). Set actual figures appropriate to this contract's value before issuing \u2014 an unfilled penalty clause is unenforceable."),
+    br(),
     h3("6.1.12 Performance Guarantee"),
     body("i. Within 10 days, or within period as amended Letter of Acceptance (LoA), of receipt of the LoA, the Selected Bidder shall deliver to the Department a Performance Security [to cover the amount of liquidated damages and/or the compensation of the breach of contract] in any of the forms given below for an amount equivalent to " + pg + " of the Contract Price as stipulated in the conditions of contract."),
     body("ii. Performance Security shall be submitted in the form of Bank Guarantee in the format acceptable to the Department or in the form of payment through RTGS/NEFT as per bank details provided in the data sheet."),
@@ -21476,6 +21595,8 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
     body("Appropriation of Performance Security: (i) Performance Security submitted by the Bidder shall be forfeited if the Bidder fails to commence operations as per the requirements of this RFP. (ii) In the event the Bidder fails to perform any or all its obligations under the Service Agreement and damages are imposed for such failure, the Department shall have right to appropriate such amount as damages from the Performance Security submitted by the bidder. (iii) Upon occurrence of a Bidder Default or failure to meet any condition as per the Service Agreement, the Department shall, without prejudice to its other rights and remedies hereunder or in law, be entitled to encash and appropriate the relevant amounts from the Performance Security as Damages for such Bidder Default or failure to meet any Condition Precedent. (iv) Upon such appropriation from the Performance Security, the Bidder shall, within 30 (thirty) days thereof, replenish, in case of partial appropriation, to its original value, and in case of appropriation of the entire Performance Security provide a fresh Performance Security, as the case may be, failing which the Department shall be entitled to terminate this Agreement. (v) Upon replenishment or furnishing of a fresh Performance Security as aforesaid, the Bidder shall be entitled to an additional Cure Period of 30 (thirty) days for remedying the Bidder Default or to meet any Condition Precedent, and in the event of the Bidder not curing its default or meeting such Condition Precedent within such Cure Period, the Department shall be entitled to encash and appropriate such Performance Security as Damages, and to terminate this Agreement."),
     br(),
     body("Release of Performance Security: Performance Security submitted, will be returned to the Bidder subject to the Department's right to receive or recover amounts, if any, due without any interest 30 days after completion of Contract."),
+    br(),
+    reviewFlag("Performance Security: confirm the guarantee percentage (" + pg + " of Contract Price) and validity period (" + (d.pgValidity || "180 days") + ") match this authority's current policy before issuing \u2014 these figures are often authority- or scheme-specific."),
     br(),
     h2("6.2 Commencement, Completion, Modification and Termination of Contract"),
     h3("6.2.1 Effectiveness of Contract"),
@@ -21587,6 +21708,13 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
     br(),
     body("We hereby declare that all the information and statements made in this Proposal are true and accept that any misinterpretation contained in it may lead to our disqualification."),
     br(),
+    body("If negotiations are held during the Proposal Validity Period, we undertake to negotiate on the basis of the quoted rate. Our Proposal is binding upon us and subject to the modifications resulting from Contract negotiations."),
+    br(),
+    body("We undertake, if our Proposal is accepted, to initiate the services related to the assignment at a date mutually agreed between us."),
+    br(),
+    body("We understand you are not bound to accept any Proposal you receive."),
+    br(),
+    body("We remain,"), br(),
     body("Yours sincerely,"), br(),
     body("Authorized Signature: ____________________________"),
     body("Name and Title of Signatory: ____________________________"),
@@ -21620,14 +21748,33 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
       ],
     }),
     br(),
+    body("Note: Using the format below, provide information for each assignment for which your firm, and each associate for this assignment, was legally contracted either individually as a corporate entity or as one of the major companies within an association, for carrying out consulting services similar to the ones requested under this assignment."),
+    br(),
+    new Table({
+      width: { size: fullW, type: WidthType.DXA }, columnWidths: [4675, 4685],
+      rows: [
+        new TableRow({ children: [cellM("Assignment name:", 4675), cellM("", 4685)] }),
+        new TableRow({ children: [cellM("Country / Location within country:", 4675), cellM("Duration of assignment (months):", 4685)] }),
+        new TableRow({ children: [cellM("Name of Client:", 4675), cellM("Total No. of man-months of the assignment:", 4685)] }),
+        new TableRow({ children: [cellM("Address:", 4675), cellM("Amount of consulting fee received by your firm (INR):", 4685)] }),
+        new TableRow({ children: [cellM("Start date (month/year):", 4675), cellM("Completion date (month/year):", 4685)] }),
+        new TableRow({ children: [cellM("Name of associated Applicants, if any:", 4675), cellM("Project Value (in Crore):", 4685)] }),
+        new TableRow({ children: [cellM("Narrative description of Project:", 9360, false, null, null, 2)] }),
+        new TableRow({ children: [cellM("Description of actual services provided by your staff within the assignment:", 9360, false, null, null, 2)] }),
+        new TableRow({ children: [cellM("Firm's Name:", 9360, false, null, null, 2)] }),
+      ],
+    }),
+    br(),
     pb(), h2("7.4 Form 4: Bidder's Organisation and Experience"),
-    body("[Provide here a brief (two pages) description of the background, organisation, and expertise of your firm/entity]"),
+    body("[Provide here a brief (two pages) description of the background and organization of your firm/entity]"),
     br(),
     pb(), h2("7.5 Form 5: Declaration — Not Blacklisted"),
+    body("Declaration"), br(),
     body("(To be printed on Letter Head)"), br(),
     body("Sir/Madam,"), br(),
-    body("This is to notify you that our Company / LLP / Partnership / Society / Proprietorship intends to submit a proposal in response to \"" + rfpTitle + "\". We also declare that our firm has not been blacklisted by any Central / State Government Department / Public Sector Undertaking as on the date of the Proposal submission."),
+    body("This is to notify you that our Company / LLP / Partnership / Society / Proprietorship <Please delete whichever is not applicable> intends to submit a proposal in response to \"" + rfpTitle + "\", we also declare that our Company / LLP / Partnership / Society / Proprietorship <Please delete whichever is not applicable> has not been blacklisted by any Central / State Government Department/ Public Sector Undertaking as on the date of the Proposal submission."),
     br(),
+    body("Sincerely,"), br(),
     body("___________________________"),
     body("(Signature of the Authorized Person)"),
     body("Name:"), body("Designation:"),
@@ -21652,23 +21799,28 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
     }),
     br(),
     body("8. Work undertaken that best illustrates capability to handle the tasks assigned:"),
-    body("   Assignment Name: ___________________"),
+    body("   Name of assignment or project: ___________________"),
     body("   Year: ___________________"),
     body("   Location: ___________________"),
-    body("   Client: ___________________"),
-    body("   Positions Held / Activities Performed: ___________________"),
+    body("   Authority: ___________________"),
+    body("   Main project features: ___________________"),
+    body("   Positions held: ___________________"),
+    body("   Activities performed: ___________________"),
     br(),
     pb(), h2("7.7 Form 7: Financial Proposal"),
     br(),
     body("[Date]"), br(),
     body("To: [Name and address of Client — " + authority + "]"), br(),
-    body("Subject: Financial Proposal for \"" + rfpTitle + "\""), br(),
+    body("Subject: Financial Proposal"), br(),
+    body("Reference: (Insert name of the bidder)"), br(),
     body("Dear Sirs,"), br(),
     body("We have read and examined the RFP document complete with the Terms of Reference, Instructions to Bidders and General Conditions of Contract."),
     br(),
-    body("We hereby quote our all-inclusive lump sum fee as per the BOQ uploaded on the tender portal, inclusive of all taxes, travel, incidentals and out-of-pocket expenses unless otherwise stated in the RFP."),
+    body("We hereby quote the rates in the BOQ, as the percent of cost of works assigned, as uploaded in the tender portal."),
     br(),
-    body("Our Financial Proposal shall be binding upon us up to expiration of the validity period of the proposal."),
+    body("The Financial Proposal submitted is unconditional and fulfils all the requirements of the RFP document. Provisions for GST and reimbursable expenses shall be as per the terms stated in Clause 6.1.6 and Clause 6.2.12 of the RFP document respectively."),
+    br(),
+    body("Our Financial Proposal shall be binding upon us up to expiration of the validity period of the proposal. We understand the Department is not bound to accept any proposal that is received."),
     br(),
     body("____________________________________"),
     body("Signature and Name of the Authorised Person"),
@@ -21741,15 +21893,15 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
     }),
   ];
 
-  // Table of Contents — auto-populates from Heading 1/2/3 styles when opened in Word
-  // (or on pressing F9 / "Update Field" if the viewer doesn't auto-update on open).
+  // Table of Contents — auto-populates from Heading 1/2/3 styles when opened in Word.
+  // NOTE for whoever generates this document: open the file once, press Ctrl+A
+  // then F9 to force a full field update (twice, if page numbers still show "1"
+  // after the first pass — a known quirk with freshly generated documents),
+  // then save. That bakes correct page numbers into the file so every bidder
+  // who opens it afterward sees them immediately, with no action on their part.
   const tocPage = [
     pb(),
     h1("Table of Contents"),
-    new Paragraph({
-      spacing: { after: 200 },
-      children: [new TextRun({ text: "Right-click and select \"Update Field\" (or press F9) if the entries below don't appear when this document is first opened.", italics: true, size: 18, color: "5B6478", font: "Arial" })],
-    }),
     new TableOfContents("Table of Contents", {
       hyperlink: true,
       headingStyleRange: "1-3",
@@ -21789,6 +21941,7 @@ window.generateDocxClientSide = async function(data, _content, setDocUrl, setPha
 
   const doc = new window.docx.Document({
     features: { updateFields: true },
+    comments: { children: reviewComments },
     numbering: {
       config: [
         { reference: "bullets", levels: [{ level: 0, format: LevelFormat.BULLET, text: "•", alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } } } }] },
@@ -21892,32 +22045,198 @@ function SelMethodField({
     }, m.desc)));
   }));
 }
+function CalendarPopup({
+  value,
+  onSelect,
+  onClose,
+  state
+}) {
+  const initial = value ? isoToDate(value) : new Date();
+  const [viewYear, setViewYear] = useState(initial.getFullYear());
+  const [viewMonth, setViewMonth] = useState(initial.getMonth()); // 0-11
+  const [pending, setPending] = useState(null); // ISO string awaiting override confirmation
+  const popupRef = useRef(null);
+
+  useEffect(() => {
+    function handleOutside(e) {
+      if (popupRef.current && !popupRef.current.contains(e.target)) onClose();
+    }
+    function handleEsc(e) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("keydown", handleEsc);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, []);
+
+  const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const weekdayNames = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+
+  function changeMonth(delta) {
+    let m = viewMonth + delta, y = viewYear;
+    if (m < 0) { m = 11; y -= 1; }
+    if (m > 11) { m = 0; y += 1; }
+    setViewMonth(m); setViewYear(y);
+    setPending(null);
+  }
+
+  const firstOfMonth = new Date(viewYear, viewMonth, 1);
+  const startOffset = firstOfMonth.getDay(); // 0=Sun
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < startOffset; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  // Holidays falling in the visible month, for the legend.
+  const monthHolidays = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dt = new Date(viewYear, viewMonth, d);
+    const info = getHolidayInfo(dt, state);
+    if (info && info.type !== "sunday") monthHolidays.push({ day: d, name: info.name });
+  }
+
+  function handleDayClick(d) {
+    const dt = new Date(viewYear, viewMonth, d);
+    const iso = dateToISO(dt);
+    const info = getHolidayInfo(dt, state);
+    if (info) {
+      setPending(iso === pending ? null : iso); // toggle warning panel
+    } else {
+      onSelect(iso);
+    }
+  }
+
+  const pendingInfo = pending ? getHolidayInfo(isoToDate(pending), state) : null;
+
+  return /*#__PURE__*/React.createElement("div", {
+    ref: popupRef,
+    style: {
+      position: "absolute", zIndex: 50, top: "calc(100% + 4px)", left: 0,
+      background: C.white, border: "1px solid " + C.border, borderRadius: 10,
+      boxShadow: "0 8px 24px rgba(0,0,0,0.12)", padding: 12, width: 280,
+      fontFamily: "inherit"
+    }
+  },
+    // Header
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }
+    },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", onClick: () => changeMonth(-1),
+        style: { border: "none", background: "transparent", cursor: "pointer", fontSize: 14, padding: "2px 8px", color: C.text }
+      }, "\u2039"),
+      /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 13 } }, monthNames[viewMonth] + " " + viewYear),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", onClick: () => changeMonth(1),
+        style: { border: "none", background: "transparent", cursor: "pointer", fontSize: 14, padding: "2px 8px", color: C.text }
+      }, "\u203A")
+    ),
+    // Weekday row
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: 2 }
+    }, weekdayNames.map((wd, i) => /*#__PURE__*/React.createElement("div", {
+      key: wd, style: { textAlign: "center", fontSize: 10, fontWeight: 700, color: i === 0 ? C.danger : C.muted, padding: "2px 0" }
+    }, wd))),
+    // Day grid
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }
+    }, cells.map((d, i) => {
+      if (d === null) return /*#__PURE__*/React.createElement("div", { key: "e" + i });
+      const dt = new Date(viewYear, viewMonth, d);
+      const iso = dateToISO(dt);
+      const info = getHolidayInfo(dt, state);
+      const isSelected = value === iso;
+      const isPending = pending === iso;
+      return /*#__PURE__*/React.createElement("button", {
+        key: iso,
+        type: "button",
+        title: info ? info.name : undefined,
+        onClick: () => handleDayClick(d),
+        style: {
+          height: 30, borderRadius: 6, fontSize: 12, cursor: "pointer",
+          border: isSelected ? "1.5px solid " + C.blue : isPending ? "1.5px solid " + C.danger : "1px solid transparent",
+          background: isSelected ? C.blue : info ? "#FBE4E4" : "transparent",
+          color: isSelected ? C.white : info ? C.danger : C.text,
+          fontWeight: info || isSelected ? 700 : 500,
+          textDecoration: info ? "line-through" : "none",
+        }
+      }, d);
+    })),
+    // Override confirmation for a clicked holiday/Sunday
+    pendingInfo && /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: 8, padding: "8px 10px", borderRadius: 6, background: "#FFF3F3", border: "1px solid " + C.danger }
+    },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.danger, fontWeight: 600, marginBottom: 6 } },
+        "\u26A0\uFE0F " + pendingInfo.name + " \u2014 this is a non-working day. Select it anyway?"),
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6 } },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: () => onSelect(pending),
+          style: { fontSize: 11, padding: "4px 10px", borderRadius: 5, border: "1px solid " + C.danger, background: C.danger, color: C.white, cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }
+        }, "Select anyway"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: () => setPending(null),
+          style: { fontSize: 11, padding: "4px 10px", borderRadius: 5, border: "1px solid " + C.border, background: "transparent", color: C.text, cursor: "pointer", fontFamily: "inherit" }
+        }, "Cancel")
+      )
+    ),
+    // Legend of holidays in the visible month
+    monthHolidays.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: 10, paddingTop: 8, borderTop: "1px solid " + C.border }
+    },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: C.muted, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.3 } }, "Holidays this month"),
+      monthHolidays.map(h => /*#__PURE__*/React.createElement("div", {
+        key: h.day, style: { fontSize: 11, color: C.danger, display: "flex", gap: 6, padding: "1px 0" }
+      }, /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, minWidth: 18 } }, h.day), h.name))
+    ),
+    /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: 8, fontSize: 10, color: C.muted }
+    }, "Sundays and holidays are struck through and disabled by default \u2014 click one to override with a warning.")
+  );
+}
+
 function DateFieldWithWarning({
   value,
   onChange,
   state
 }) {
+  const [open, setOpen] = useState(false);
   const s = inputStyleObj();
+  const containerRef = useRef(null);
   let warning = null;
   if (value) {
     const dt = isoToDate(value);
-    if (!isNaN(dt.getTime()) && isHolidayOrSunday(dt, state || "Maharashtra")) {
-      const isSun = dt.getDay() === 0;
-      warning = isSun
-        ? "This date falls on a Sunday."
-        : "This date falls on a public holiday in " + (state || "the selected state") + ".";
+    if (!isNaN(dt.getTime())) {
+      const info = getHolidayInfo(dt, state || "Maharashtra");
+      if (info) {
+        warning = info.type === "sunday"
+          ? "This date falls on a Sunday."
+          : "This date falls on a public holiday (" + info.name + ") in " + (state || "the selected state") + ".";
+      }
     }
   }
-  return /*#__PURE__*/React.createElement("div", null,
-    /*#__PURE__*/React.createElement("input", {
-      type: "date",
+  return /*#__PURE__*/React.createElement("div", { style: { position: "relative" }, ref: containerRef },
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => setOpen(o => !o),
       style: {
         ...s,
+        textAlign: "left",
+        cursor: "pointer",
         border: `1.5px solid ${warning ? C.danger : C.blue}`,
-        background: warning ? "#FFF5F5" : "#F0F7FF"
-      },
-      value: value || "",
-      onChange: e => onChange(e.target.value)
+        background: warning ? "#FFF5F5" : "#F0F7FF",
+        color: value ? C.text : C.muted,
+      }
+    }, value ? formatDate(value) : "Select date\u2026"),
+    open && /*#__PURE__*/React.createElement(CalendarPopup, {
+      value: value,
+      state: state || "Maharashtra",
+      onSelect: (iso) => { onChange(iso); setOpen(false); },
+      onClose: () => setOpen(false),
     }),
     warning && /*#__PURE__*/React.createElement("div", {
       style: {
@@ -21940,6 +22259,7 @@ function DateFieldWithWarning({
 function LogoUploadField({
   value,
   onChange
+
 }) {
   const [error, setError] = useState("");
   const fileInputRef = useRef(null);
@@ -23755,7 +24075,7 @@ function TenderTool() {
         color: C.navyMid,
         letterSpacing: ".05em"
       }
-    }, "POST-DOWNLOAD CHECKLIST"), ["Review all <Insert> placeholders before issuing", "Verify technical criteria marks total exactly 100 (for QCBS / Empanelment)", "Confirm EMD and processing fee amounts match your latest approvals", "Add project-specific BOQ as separate attachment (if applicable)", "Get document approved by competent authority before upload to portal", "Upload on " + (data.portalWebsite || defaultPortalUrl(data.tenderState)) + " and notify bidders"].map(item => /*#__PURE__*/React.createElement("div", {
+    }, "POST-DOWNLOAD CHECKLIST"), ["Open the file, select all (Ctrl+A) and press F9 to update the Table of Contents page numbers, then save \u2014 do this before sharing so bidders see correct numbers immediately", "Review all <Insert> placeholders before issuing", "Verify technical criteria marks total exactly 100 (for QCBS / Empanelment)", "Confirm EMD and processing fee amounts match your latest approvals", "Add project-specific BOQ as separate attachment (if applicable)", "Get document approved by competent authority before upload to portal", "Upload on " + (data.portalWebsite || defaultPortalUrl(data.tenderState)) + " and notify bidders"].map(item => /*#__PURE__*/React.createElement("div", {
       key: item,
       style: {
         display: "flex",
