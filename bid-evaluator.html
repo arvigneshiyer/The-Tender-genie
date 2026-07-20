@@ -102,7 +102,7 @@ button.ghost:hover { background:#EEF4FC; }
 .col-resp  { width:24%; }
 .col-pg    { width:68px; }
 .col-status{ width:90px; text-align:center; }
-.col-ai    { width:80px; text-align:center; }
+.col-match    { width:80px; text-align:center; }
 
 /* Status select */
 .status-select { border:1px solid #CBD3E1; border-radius:4px; padding:3px 6px; font-size:11px; font-family:inherit; cursor:pointer; width:100%; }
@@ -118,11 +118,11 @@ button.ghost:hover { background:#EEF4FC; }
 .badge-query { background:#FFF8E1; color:#A06000; border:1px solid #F9D98A; }
 .badge-na    { background:#F3F4F6; color:#6B7280; border:1px solid #D1D5DB; }
 
-/* AI suggestion chip */
-.ai-chip { display:inline-block; font-size:10px; padding:2px 7px; border-radius:8px; cursor:pointer; font-weight:700; border:1px solid; margin:1px; }
-.ai-chip.found   { background:#E6F4EA; color:#1E7E34; border-color:#A8D5B5; }
-.ai-chip.missing { background:#FBE8E6; color:#C0392B; border-color:#F5B7B1; }
-.ai-chip.partial { background:#FFF8E1; color:#A06000; border-color:#F9D98A; }
+/* Document match chip */
+.match-chip { display:inline-block; font-size:10px; padding:2px 7px; border-radius:8px; cursor:pointer; font-weight:700; border:1px solid; margin:1px; }
+.match-chip.found   { background:#E6F4EA; color:#1E7E34; border-color:#A8D5B5; }
+.match-chip.missing { background:#FBE8E6; color:#C0392B; border-color:#F5B7B1; }
+.match-chip.partial { background:#FFF8E1; color:#A06000; border-color:#F9D98A; }
 
 /* Extracted text panel */
 .text-preview { background:#F8F9FB; border:1px solid #E0E6F0; border-radius:6px; padding:10px 14px; font-size:11.5px; color:#3A4560; max-height:120px; overflow-y:auto; margin-top:8px; white-space:pre-wrap; line-height:1.6; font-family:'Courier New',monospace; }
@@ -310,7 +310,7 @@ button.ghost:hover { background:#EEF4FC; }
 <!-- ═══════════════════ STEP 4: BIDDERS ═══════════════════ -->
 <div class="card" id="biddersCard">
   <h2><span class="step-num">4</span> Bidders</h2>
-  <p class="card-sub">Upload each bidder's technical bid PDF — the bidder name and data are extracted automatically, nothing to type.</p>
+  <p class="card-sub">Upload each bidder's technical bid PDF — name, GST, financials, experience and other eligibility evidence are extracted directly from the document text layer.</p>
 
   <div id="bidderDropZone" class="dropzone"
        ondragover="event.preventDefault(); this.classList.add('drag')"
@@ -360,10 +360,10 @@ button.ghost:hover { background:#EEF4FC; }
   <!-- ── Bid Document Upload & Evaluate ── -->
   <div style="border:1px solid #D0E4F7;border-radius:8px;background:#F4F8FE;padding:16px 18px;margin-bottom:20px">
     <div style="font-weight:700;font-size:14px;color:#1A5CA8;margin-bottom:4px">📂 Upload Bid Documents &amp; Evaluate</div>
-    <div style="font-size:12px;color:#5B6478;margin-bottom:14px">Upload each bidder's technical bid PDF below, then click <strong>Evaluate All</strong> to auto-fill responses and page numbers from the documents.</div>
+    <div style="font-size:12px;color:#5B6478;margin-bottom:14px">Upload each bidder's technical bid PDF below, then click <strong>Extract &amp; Evaluate All</strong> to parse responses and page references directly from the document text layer. No AI involved — all extraction is rule-based.</div>
     <div id="summaryBidUploads"></div>
     <div class="toolbar" style="margin-top:12px">
-      <button onclick="evaluateAllBidders()" id="evalAllBtn" style="background:#1A5CA8;color:#fff;font-weight:700;font-size:13px;padding:9px 22px;border:none;border-radius:6px;cursor:pointer">▶ Evaluate All Bidders</button>
+      <button onclick="evaluateAllBidders()" id="evalAllBtn" style="background:#1A5CA8;color:#fff;font-weight:700;font-size:13px;padding:9px 22px;border:none;border-radius:6px;cursor:pointer">▶ Extract & Evaluate All Bidders</button>
       <button class="secondary" onclick="renderSummaryUploads()">↻ Refresh List</button>
     </div>
     <div id="evalAllStatus" style="margin-top:8px"></div>
@@ -457,7 +457,7 @@ async function extractPDFText(file, onProgress) {
 // bucket every fragment into "row number" / "condition" / "proof" by x position,
 // and bound each row's content by y position (between this row's number and the
 // next one). This is deterministic and works for any tender using this common
-// 3-column layout — entirely client-side, no AI call involved.
+// 3-column layout — entirely client-side. No AI, no API calls. All extraction is regex/pattern-based on the PDF text layer.
 const TBL_COND_HEADER_RE = /eligibility\s*conditions?/i;
 const TBL_PROOF_HEADER_RE = /documentary|proof\s*to\s*be\s*submitted|proof\s*required/i;
 const TBL_END_RE = /^note\s*:|^evaluation$|^\d\.\d\.?$|^financial\s+bid|^scope\s+of\s+work|^annexure|^instructions?\s+to\s+bidders|^general\s+terms|^special\s+conditions|^general\s+conditions/i;
@@ -625,56 +625,487 @@ function matchKeywordsInText(text, keywords) {
   return keywords.filter(kw => lowerText.includes(kw.toLowerCase()));
 }
 
-function findRelevantPages(pages, keywords, maxPages=5) {
+function findRelevantPages(pages, keywords, maxPages=5, minScore=1) {
   const scored = pages.map(p => {
     const lowerText = p.text.toLowerCase();
     const hits = keywords.filter(kw => lowerText.includes(kw.toLowerCase()));
     return { pageNo: p.pageNo, hits, text: p.text, score: hits.length };
-  }).filter(p => p.score > 0);
+  }).filter(p => p.score >= minScore);
   scored.sort((a,b) => b.score - a.score);
   return scored.slice(0, maxPages);
 }
 
-function autoAnalyseBid(bidder) {
+// ═══════════════════════════════════════════════════════════════════════
+//  DEEP EXTRACTION HELPERS
+//  Each function searches the bid PDF text and pages for specific facts.
+// ═══════════════════════════════════════════════════════════════════════
+
+// Return up to `n` lines from `text` starting at position `pos`, cleaned up.
+function linesAround(text, pos, before=0, after=4) {
+  const start = Math.max(0, text.lastIndexOf('\n', pos - 1));
+  let end = pos;
+  let newlines = 0;
+  while (end < text.length && newlines <= after) {
+    if (text[end] === '\n') newlines++;
+    end++;
+  }
+  // also grab `before` lines
+  let realStart = start;
+  let nb = 0;
+  let scan = start - 1;
+  while (scan > 0 && nb <= before) {
+    if (text[scan] === '\n') nb++;
+    scan--;
+  }
+  realStart = Math.max(0, scan);
+  return text.slice(realStart, end).replace(/\s+/g, ' ').trim();
+}
+
+// Extract incorporation/entity type and registration details
+function extractIncorporation(pages, fullText) {
+  const hits = [];
+
+  // Firm/company name
+  const firmM = fullText.match(/name\s*of\s*(?:the\s*)?(?:firm|company|tenderer|bidder|contractor)\s*[-:]\s*([^\n\r]{3,80})/i) ||
+                fullText.match(/^[-\u2013]\s*([A-Z][A-Za-z0-9\s&.,()-]{3,60})$/m);
+  if (firmM) hits.push(firmM[1].trim().replace(/\s+/g,' '));
+
+  // Consortium: extract member names + equity
+  const isCons = /consortium|memorandum\s*of\s*understanding|mou\s*executed|lead\s*member/i.test(fullText);
+  if (isCons) {
+    const memberLines = [];
+    // "M/s. Ritesh Associates Lead Member 51%"
+    const memRe = /(?:1\.?|2\.?|lead\s*member|participant\s*member)[^\n]{0,20}([A-Z][A-Za-z0-9\s&.,()-]{3,60})(?:[^\n]{0,30}(\d{1,3})\s*%)?/gi;
+    const mems = [...fullText.matchAll(memRe)];
+    mems.slice(0,4).forEach(m => {
+      const pct = m[2] ? ` (${m[2]}%)` : '';
+      memberLines.push(m[1].trim().replace(/\s+/g,' ') + pct);
+    });
+    if (memberLines.length) hits.push('Consortium: ' + memberLines.join(' + '));
+    else hits.push('Consortium MOU submitted');
+  }
+
+  // Incorporation certificate date
+  const incM = fullText.match(/certificate\s*of\s*incorporation\s*(?:dated?|no\.?)?\s*[:\-]?\s*([^\n\r]{5,60})/i);
+  if (incM) hits.push('Incorp. Cert: ' + incM[1].trim().substring(0,60));
+
+  // Constitution of Business from GST cert
+  const constM = fullText.match(/constitution\s*of\s*(?:business|firm)\s*[:\|]?\s*([^\n\r]{3,50})/i);
+  if (constM) hits.push('Constitution: ' + constM[1].trim());
+
+  // Registration number (CIN / GST / firm reg)
+  const cinM = fullText.match(/\b(U\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6})\b/); // CIN
+  if (cinM) hits.push('CIN: ' + cinM[1]);
+
+  const keySet = ['certificate of incorporation','registration certificate','constitution','pvt ltd','private limited','proprietorship','partnership','memorandum of association','consortium'];
+  const relPages = findRelevantPages(pages, keySet, 4).filter(p => p.score >= 1);
+  const topPage = relPages.length ? relPages[0].pageNo : null;
+  const pgNos = relPages.map(p=>p.pageNo);
+
+  const response = [...new Set(hits)].slice(0,4).join('\n') || '';
+  return { response, topPage, pgNos, strength: response ? 'found' : 'missing' };
+}
+
+// Extract civil works / construction experience
+function extractCivilWorks(pages, fullText) {
+  const hits = [];
+
+  function parseAmt(str) { return parseFloat(str.replace(/,/g,'')); }
+  function fmtAmt(str) {
+    const v = parseAmt(str);
+    if (isNaN(v) || v < 10000) return null;
+    return `₹${str} (~${(v/1e7).toFixed(2)} Cr)`;
+  }
+
+  // Appendix 3A / eligible assignments section
+  const appendixM = fullText.match(/(?:appendix\s*3[aA]|eligible\s*assignments?|appendix\s*3\b)[^\n]{0,60}\n([\s\S]{50,1200}?)(?=appendix|\n\n\n|$)/i);
+  if (appendixM) {
+    const block = appendixM[1];
+    const projLines = block.match(/[^\n]{10,150}/g) || [];
+    projLines.slice(0,8).forEach(l => {
+      if (/inr|rs\.?|crore|lakh|duration|noida|gnida|nmrc|authority|months?/i.test(l)) {
+        hits.push(l.replace(/\s+/g,' ').trim());
+      }
+    });
+  }
+
+  // Work name patterns (English)
+  const woMatches = [...fullText.matchAll(/(?:name\s*of\s*work|assignment\s*name|work\s*of)\s*[:\-]?\s*([^\n\r]{10,150})/gi)];
+  woMatches.slice(0,4).forEach(m => {
+    const t = m[1].trim().replace(/\s+/g,' ');
+    if (t.length >= 10) hits.push(t);
+  });
+
+  // English experience certificate patterns (NOIDA / GNIDA letters)
+  const expCertM = [...fullText.matchAll(/(?:anubandh\s*(?:dhanaraashi|dhanrashi)?|contract\s*amount|awarded?\s*value|anubandh\s*sankhya|अनुबन्धित\s*धनराशि)[^\d\n]{0,20}(\d[\d,]{4,}(?:\.\d+)?)/gi)];
+  expCertM.slice(0,4).forEach(m => {
+    const fmt = fmtAmt(m[1]);
+    if (fmt) hits.push('Contract amount: ' + fmt);
+  });
+
+  // Hindi / Devanagari amount patterns: "रूपये 2,88,05,562" or "रूपये 2,87,51,039"
+  const hindiAmtM = [...fullText.matchAll(/(?:रूपये|रुपये|धनराशि)[\s\-]*(\d[\d,]{4,}(?:\.\d+)?)/g)];
+  hindiAmtM.slice(0,3).forEach(m => {
+    const fmt = fmtAmt(m[1]);
+    if (fmt) hits.push('Contract: ' + fmt);
+  });
+
+  // NOIDA letter pattern: "Senior Manager, Work Circle" + amount
+  const noidaLetterM = [...fullText.matchAll(/(?:senior\s*manager|work\s*circle|noida\s*authority)[^\n]{0,200}?(\d[\d,]{5,}(?:\.\d+)?)/gi)];
+  noidaLetterM.slice(0,3).forEach(m => {
+    const fmt = fmtAmt(m[1]);
+    if (fmt) hits.push('NOIDA WO: ' + fmt);
+  });
+
+  // Completion certificate indicators
+  if (/completion\s*certificate|satisfactorily\s*(?:completed|executed)|work\s*completed/i.test(fullText)) {
+    hits.push('Completion Certificate(s) submitted');
+  }
+
+  const keySet = ['work order','completion certificate','drain','road','bridge','infrastructure','civil','construction','noida','gnida','senior manager','work circle'];
+  const relPages = findRelevantPages(pages, keySet, 5).filter(p => p.score >= 2);
+  const topPage = relPages.length ? relPages[0].pageNo : null;
+  const pgNos = relPages.map(p=>p.pageNo);
+
+  const deduped = [...new Set(hits.map(h=>h.substring(0,120)))].slice(0,6);
+  const response = deduped.join('\n') || '';
+  return { response, topPage, pgNos, strength: response ? 'found' : 'missing' };
+}
+
+// Extract advertising / OOH experience
+function extractAdvertising(pages, fullText) {
+  const hits = [];
+
+  // License agreements: "License Agreement ... NMRC / DMRC / authority"
+  const licM = fullText.match(/license\s*agreement[^\n]{0,120}/gi) || [];
+  licM.slice(0,3).forEach(l => hits.push(l.trim()));
+
+  // Station/metro/hoarding contracts
+  const metroM = [...fullText.matchAll(/(?:advertising\s*rights?|co.branding|out.of.home|ooh|metro\s*station|hoarding)[^\n]{0,100}/gi)];
+  metroM.slice(0,3).forEach(m => hits.push(m[0].trim()));
+
+  // Work orders referencing advertising
+  const woM = [...fullText.matchAll(/(?:work\s*order|letter\s*of\s*award|notice\s*of\s*award)[^\n]{0,100}/gi)];
+  woM.slice(0,2).forEach(m => hits.push(m[0].trim()));
+
+  const keySet = ['advertising','out-of-home','ooh','hoarding','license','metro','station','nmrc','dmrc','media'];
+  const relPages = findRelevantPages(pages, keySet, 4);
+  const topPage = relPages.length ? relPages[0].pageNo : null;
+  const pgNos = relPages.map(p=>p.pageNo);
+
+  const deduped = [...new Set(hits.map(h=>h.replace(/\s+/g,' ').trim()))].slice(0,4);
+  const response = deduped.join('\n') || '';
+  return { response, topPage, pgNos, strength: response ? 'found' : 'partial' };
+}
+
+// Extract net worth and average turnover from CA certificate / balance sheet
+function extractNetWorthTurnover(pages, fullText) {
+  const hits = [];
+  const bidderNameM = fullText.match(/(?:name\s*of\s*(?:firm|bidder|company)|legal\s*name|trade\s*name)[^\S\r\n]*:?\s*([A-Z][A-Za-z0-9\s&.,()\-]{3,50})/);
+  const bidderLabel = bidderNameM ? bidderNameM[1].trim() : '';
+
+  // Minimum digit guard: rupee amounts must be >= 5 digits (at least 10,000)
+  function parseRupeeAmt(str) {
+    const v = str.replace(/,/g,'');
+    return parseFloat(v);
+  }
+  function fmtAmt(str) {
+    const v = parseRupeeAmt(str);
+    if (isNaN(v) || v < 10000) return null; // reject years, single digits
+    const cr = (v/1e7).toFixed(2);
+    return `INR ${str} (~${cr} Cr)`;
+  }
+
+  // Net worth — requires >=5 digit amount after keyword
+  const nwM = fullText.match(/net\s*worth[^\d\n]{0,40}((?:[\d,]{5,}(?:\.\d+)?))/i) ||
+              fullText.match(/capital\s*(?:account\s*)?balance[^\d\n]{0,40}((?:[\d,]{5,}(?:\.\d+)?))/i) ||
+              fullText.match(/(?:rs\.?|₹|inr)\s*([\d,]{5,}(?:\.\d+)?)(?:[^\n]{0,30}net\s*worth|[^\n]{0,30}capital)/i);
+  if (nwM) {
+    const fmt = fmtAmt(nwM[1]);
+    if (fmt) hits.push('Net Worth: ' + fmt);
+  }
+
+  // Turnover table: look for "YYYY-YY amount" where amount must be >= 5 digits
+  // Pattern: year group followed by whitespace/separator then digits (NOT immediately the year digits)
+  const fyRe = /(20\d\d[-–\/](?:20)?\d{2})\s*(?:[^\d\n]{0,20})?\b(\d[\d,]{4,}(?:\.\d+)?)\b/g;
+  const fyMatches = [...fullText.matchAll(fyRe)];
+  const seenYears = new Set();
+  const fyLines = [];
+  for (const m of fyMatches) {
+    const yr = m[1];
+    const amtRaw = m[2];
+    if (seenYears.has(yr)) continue;
+    const fmt = fmtAmt(amtRaw);
+    if (!fmt) continue;
+    seenYears.add(yr);
+    fyLines.push(`${yr}: ${fmt}`);
+    if (fyLines.length >= 5) break;
+  }
+  if (fyLines.length) hits.push('Turnover:\n' + fyLines.join('\n'));
+
+  // Average turnover calculation
+  if (fyLines.length >= 3) {
+    const amts = fyLines.map(l => {
+      const m = l.match(/INR ([\d,]+)/);
+      return m ? parseRupeeAmt(m[1]) : 0;
+    }).filter(v => v > 0);
+    if (amts.length >= 3) {
+      const avg = amts.slice(0,3).reduce((a,b)=>a+b,0)/3;
+      hits.push(`Avg Turnover (last 3 yrs): INR ~${(avg/1e7).toFixed(2)} Cr`);
+    }
+  }
+
+  // CA / auditor certificate reference
+  const caM = fullText.match(/(?:chartered\s*accountant|statutory\s*auditor|ca\s*firm)[^\n]{0,80}/i);
+  if (caM) hits.push(caM[0].trim().substring(0,100));
+
+  const keySet = ['net worth','turnover','chartered accountant','ca certificate','balance sheet','audited','financial year'];
+  const relPages = findRelevantPages(pages, keySet, 4).filter(p => p.score >= 2);
+  const topPage = relPages.length ? relPages[0].pageNo : null;
+  const pgNos = relPages.map(p=>p.pageNo);
+
+  const prefix = bidderLabel ? bidderLabel + '\n' : '';
+  const response = (prefix + hits.join('\n')).trim();
+  return { response, topPage, pgNos, strength: nwM ? 'found' : (hits.length ? 'partial' : 'missing') };
+}
+
+// Extract solvency certificate details
+function extractSolvency(pages, fullText) {
+  const hits = [];
+
+  function parseRupeeAmt(str) { return parseFloat(str.replace(/,/g,'')); }
+  function fmtAmt(str) {
+    const v = parseRupeeAmt(str);
+    if (isNaN(v) || v < 10000) return null;
+    return `₹${str} (~${(v/1e7).toFixed(2)} Cr)`;
+  }
+
+  // Solvency amount — require >= 5 digits
+  // Match Indian formats: 3,00,71,000 or 30071000
+  const solPatterns = [
+    /solvent\s*up\s*to\s*(?:a\s*limit\s*of\s*)?(?:inr|rs\.?|₹|rupees)?\s*(\d[\d,]{4,}(?:\.\d+)?)/i,
+    /solvency[^\d\n]{0,40}(?:inr|rs\.?|₹|rupees)?\s*(\d[\d,]{4,}(?:\.\d+)?)/i,
+    /(?:inr|rs\.?|₹)\s*(\d[\d,]{4,}(?:\.\d+)?)(?:[^\n]{0,40}solven)/i,
+    // Hindi: "हैसियत रू. 30071000" 
+    /(?:रू\.?|rupees)\s*(\d[\d,]{4,}(?:\.\d+)?)/,
+    // "credit limit of INR X"
+    /credit\s*limit\s*(?:of\s*)?(?:inr|rs\.?|₹)?\s*(\d[\d,]{4,}(?:\.\d+)?)/i,
+  ];
+  let solAmt = null;
+  for (const re of solPatterns) {
+    const m = fullText.match(re);
+    if (m && m[1]) { solAmt = m[1]; break; }
+  }
+  if (solAmt) {
+    const fmt = fmtAmt(solAmt);
+    if (fmt) hits.push('Solvency: ' + fmt);
+  }
+
+  // Bank name
+  const bankM = fullText.match(/(?:name\s*of\s*(?:the\s*)?bank|issued?\s*by)[^\n]{0,60}(?:bank|canara|sbi|icici|hdfc|pnb|ubi|axis)[^\n]{0,40}/i) ||
+                fullText.match(/(canara\s*bank|state\s*bank(?:\s*of\s*india)?|\bsbi\b|icici\s*bank|hdfc\s*bank|punjab\s*national\s*bank|union\s*bank|axis\s*bank|bank\s*of\s*baroda|bank\s*of\s*india)/i);
+  if (bankM) hits.push('Bank: ' + (bankM[1]||bankM[0]).trim().replace(/\s+/g,' '));
+
+  // Date
+  const dateM = fullText.match(/(?:dated?|issued\s*on)\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\d{1,2}\s+\w+\s+\d{4})/i);
+  if (dateM) hits.push('Dated: ' + dateM[1]);
+
+  // DM office / Haisiyat Pramaan Patra (UP solvency)
+  if (/dm\s*office|district\s*magistrate|haisiyat|हैसियत/i.test(fullText)) {
+    hits.push('DM Office Solvency Certificate (Haisiyat Pramaan Patra) submitted');
+  }
+
+  const keySet = ['solvency','bank certificate','solvent','credit limit','haisiyat','financial soundness'];
+  const relPages = findRelevantPages(pages, keySet, 3).filter(p => p.score >= 2);
+  const topPage = relPages.length ? relPages[0].pageNo : null;
+  const pgNos = relPages.map(p=>p.pageNo);
+
+  return { response: hits.join('\n'), topPage, pgNos, strength: hits.length ? 'found' : 'missing' };
+}
+
+// Extract GST registration
+function extractGST(pages, fullText) {
+  const hits = [];
+  const gstins = [...fullText.matchAll(/\b([0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1})\b/g)];
+  const uniqueGst = [...new Set(gstins.map(m=>m[1]))];
+  uniqueGst.forEach(g => hits.push(`GSTIN: ${g}`));
+
+  // Legal name from GST cert
+  const legalM = fullText.match(/legal\s*name\s*[:\|]\s*([A-Z][A-Za-z0-9\s&.]{3,50})/i);
+  if (legalM) hits.push('Legal Name: ' + legalM[1].trim());
+
+  const keySet = ['gstin','gst registration','registration number','registration certificate'];
+  const relPages = findRelevantPages(pages, keySet, 3);
+  const topPage = relPages.length ? relPages[0].pageNo : null;
+  const pgNos = relPages.map(p=>p.pageNo);
+
+  return { response: hits.join('\n'), topPage, pgNos, strength: uniqueGst.length ? 'found' : 'missing' };
+}
+
+// Extract litigation / blacklist declaration
+function extractLitigation(pages, fullText) {
+  const hits = [];
+
+  // Appendix 5 or 6 reference
+  if (/appendix\s*5|appendix\s*6|not\s*been\s*blacklisted|not\s*barred/i.test(fullText)) {
+    hits.push('Declaration submitted (Appendix 5/6)');
+  }
+  if (/no\s*pending\s*litigation|no\s*(?:court|legal)\s*case|no\s*arbitration/i.test(fullText)) {
+    hits.push('No pending litigation declared');
+  }
+  if (/not\s*been\s*expelled|no\s*agreement\s*terminated/i.test(fullText)) {
+    hits.push('No agreement terminated declaration submitted');
+  }
+
+  const keySet = ['blacklisted','barred','litigation','declaration','appendix 5','appendix 6','not been expelled'];
+  const relPages = findRelevantPages(pages, keySet, 3);
+  const topPage = relPages.length ? relPages[0].pageNo : null;
+  const pgNos = relPages.map(p=>p.pageNo);
+
+  return { response: hits.join('\n'), topPage, pgNos, strength: hits.length ? 'found' : 'missing' };
+}
+
+// Extract stamp paper / notarisation evidence
+function extractStampPaper(pages, fullText) {
+  const hits = [];
+
+  if (/india\s*non\s*judicial|non\s*judicial\s*stamp/i.test(fullText)) hits.push('Non-judicial stamp paper submitted');
+  if (/e[\s\-]?stamp/i.test(fullText)) hits.push('e-Stamp purchased');
+
+  // e-Stamp certificate numbers: IN-UP..., IN-DL..., etc. (allow alphanumeric + hyphen)
+  const certNos = [...fullText.matchAll(/(?:certificate\s*no\.?|cert\.?\s*no\.?)\s*[:\-]?\s*(IN-[A-Z0-9\-]{5,30})/gi)];
+  // Also match bare IN-XX pattern without "Certificate No." label
+  const bareNos = [...fullText.matchAll(/\b(IN-[A-Z]{2}[0-9A-Z]{8,25})/g)];
+  const allNos = [...new Set([...certNos.map(m=>m[1]), ...bareNos.map(m=>m[1])])];
+  allNos.slice(0,3).forEach(n => hits.push('Stamp Cert No: ' + n));
+
+  // Stamp duty amount
+  const dutyM = fullText.match(/stamp\s*duty\s*amount[^\d]{0,20}(\d[\d,]{1,})/i) ||
+                fullText.match(/stamp\s*duty[^\d]{0,10}(\d+)/i);
+  if (dutyM) hits.push('Stamp Duty: ₹' + dutyM[1]);
+
+  // Notary
+  if (/notary|notarised|notarized/i.test(fullText)) hits.push('Notarised');
+  if (/revenue\s*stamp/i.test(fullText)) hits.push('Revenue stamp affixed');
+
+  const keySet = ['non judicial','e-stamp','stamp paper','revenue stamp','notary','certificate no'];
+  const relPages = findRelevantPages(pages, keySet, 3);
+  const topPage = relPages.length ? relPages[0].pageNo : null;
+  const pgNos = relPages.map(p=>p.pageNo);
+
+  return { response: hits.join('\n'), topPage, pgNos, strength: hits.length ? 'found' : 'missing' };
+}
+
+// Extract consortium / MOU details
+function extractConsortium(pages, fullText) {
+  const hits = [];
+
+  // MOU parties
+  const mouM = fullText.match(/memorandum\s*of\s*understanding[^\n]{0,20}\n[\s\S]{0,400}/i);
+  if (mouM) {
+    // Extract party names
+    const parties = [...mouM[0].matchAll(/(?:first\s*party|second\s*party|lead\s*member|participant)[^\n]{0,80}/gi)];
+    parties.slice(0,4).forEach(p => hits.push(p[0].trim()));
+  }
+
+  // Shareholding table
+  const shareM = [...fullText.matchAll(/(\d{1,3})\s*%/g)];
+  if (shareM.length) {
+    const stakes = shareM.slice(0,4).map(m=>m[0]);
+    if (stakes.length >= 2) hits.push('Equity: ' + stakes.join(', '));
+  }
+
+  // Lead member
+  const leadM = fullText.match(/lead\s*member[^\n]{0,80}/i);
+  if (leadM) hits.push(leadM[0].trim());
+
+  const keySet = ['mou','consortium','lead member','equity','joint venture','memorandum of understanding'];
+  const relPages = findRelevantPages(pages, keySet, 3);
+  const topPage = relPages.length ? relPages[0].pageNo : null;
+  const pgNos = relPages.map(p=>p.pageNo);
+
+  return { response: hits.slice(0,4).join('\n'), topPage, pgNos, strength: hits.length ? 'found' : 'missing' };
+}
+
+// Extract Power of Attorney / Board Resolution
+function extractPOA(pages, fullText) {
+  const hits = [];
+  if (/power\s*of\s*attorney/i.test(fullText)) hits.push('Power of Attorney submitted');
+  if (/board\s*resolution/i.test(fullText)) hits.push('Board Resolution submitted');
+  const authM = fullText.match(/authoris[ei]d?\s*signatory[^\n]{0,80}/i);
+  if (authM) hits.push(authM[0].trim());
+  const nameM = fullText.match(/name\s*and\s*title\s*of\s*signatory\s*[-:]\s*([^\n\r]{3,60})/i);
+  if (nameM) hits.push('Authorised Person: ' + nameM[1].trim());
+
+  const keySet = ['power of attorney','board resolution','authorised signatory','authorized signatory'];
+  const relPages = findRelevantPages(pages, keySet, 3);
+  const topPage = relPages.length ? relPages[0].pageNo : null;
+  const pgNos = relPages.map(p=>p.pageNo);
+
+  return { response: hits.join('\n'), topPage, pgNos, strength: hits.length ? 'found' : 'missing' };
+}
+
+// Extract GNIDA-specific affidavit / declaration (Appendix E / 9)
+function extractDeclaration(pages, fullText) {
+  const hits = [];
+  if (/appendix\s*9|appendix\s*['"]?e['"]?|शपथ.पत्र|shpath/i.test(fullText)) hits.push('Appendix 9 / Declaration submitted');
+  if (/no\s*relative.*gnida|gnida.*no\s*relative/i.test(fullText)) hits.push('GNIDA relative declaration submitted');
+  if (/affidavit/i.test(fullText)) hits.push('Affidavit submitted');
+
+  const keySet = ['appendix 9','declaration','affidavit','gnida relative'];
+  const relPages = findRelevantPages(pages, keySet, 2);
+  const topPage = relPages.length ? relPages[0].pageNo : null;
+  const pgNos = relPages.map(p=>p.pageNo);
+
+  return { response: hits.join('\n'), topPage, pgNos, strength: hits.length ? 'found' : 'missing' };
+}
+
+// Master dispatcher: classify the condition and run the appropriate extractor
+function extractResponseForCondition(cond, pages, fullText) {
+  const t = cond.text.toLowerCase();
+  const p = (cond.proof||'').toLowerCase();
+
+  if (/\bgst\b|gstin|goods\s*and\s*services\s*tax/i.test(t)) return extractGST(pages, fullText);
+  if (/incorporat|constitution\s*of\s*business|proprietorship|partnership|private\s*limited|public\s*limited|company\s*registration/i.test(t)) return extractIncorporation(pages, fullText);
+  if (/civil\s*work|construction\s*work|foot\s*over\s*bridge|\bfob\b|bridge|drain|road|pedestrian|walkway|infrastructure|civil.*experience/i.test(t)) return extractCivilWorks(pages, fullText);
+  if (/advertis|out.of.home|\booh\b|hoarding|billboard|outdoor\s*media|media\s*compan/i.test(t)) return extractAdvertising(pages, fullText);
+  if (/net\s*worth/i.test(t)) return extractNetWorthTurnover(pages, fullText);
+  if (/average.*turnover|annual.*turnover|turnover.*three|turnover.*5\s*year/i.test(t)) return extractNetWorthTurnover(pages, fullText);
+  if (/solvency/i.test(t)) return extractSolvency(pages, fullText);
+  if (/litigation|blacklist|debarr|failed\s*to\s*perform|expelled|terminated/i.test(t)) return extractLitigation(pages, fullText);
+  if (/barred\s*by\s*government|government.*agency.*barred|supreme\s*court/i.test(t)) return extractLitigation(pages, fullText);
+  if (/stamp\s*paper|non\s*judicial|revenue\s*stamp/i.test(t)) return extractStampPaper(pages, fullText);
+  if (/declaration|appendix\s*9|appendix\s*e\b/i.test(t)) return extractDeclaration(pages, fullText);
+  if (/consortium|mou|joint\s*venture|memorandum\s*of\s*understanding/i.test(t)) return extractConsortium(pages, fullText);
+  if (/power\s*of\s*attorney|\bpoa\b|board\s*resolution|authoris/i.test(t)) return extractPOA(pages, fullText);
+
+  // Fallback: keyword-scored snippet
+  const keySet = (t.match(/\b\w{5,}\b/g) || []).slice(0, 10);
+  const relPages = findRelevantPages(pages, keySet, 3);
+  const topPage = relPages.length ? relPages[0].pageNo : null;
+  const pgNos = relPages.map(p=>p.pageNo);
+  const snippet = relPages.length ? relPages[0].text.replace(/\s+/g,' ').trim().substring(0,250) : '';
+  const matched = matchKeywordsInText(fullText, keySet);
+  const strength = matched.length >= 3 ? 'found' : matched.length >= 1 ? 'partial' : 'missing';
+  return { response: snippet, topPage, pgNos, strength };
+}
+
+function matchBidToConditions(bidder) {
   if (!bidder.pdfText) return [];
   const suggestions = [];
+  const pages = bidder.pdfPages || [];
+  const fullText = bidder.pdfText;
 
   conditions.forEach(cond => {
-    const condLower = cond.text.toLowerCase();
-    // Infer which keyword category this condition maps to
-    let keySet = [];
-    if (/incorporat|registr|gst|pan/i.test(condLower)) keySet = ELIGIBILITY_KEYWORDS.incorporation;
-    else if (/civil|construct|work order|complet/i.test(condLower)) keySet = ELIGIBILITY_KEYWORDS.civil_works;
-    else if (/advertis|ooh|out.of.home|media|hoarding/i.test(condLower)) keySet = ELIGIBILITY_KEYWORDS.advertising;
-    else if (/net\s*worth/i.test(condLower)) keySet = ELIGIBILITY_KEYWORDS.networth;
-    else if (/turnover|revenue/i.test(condLower)) keySet = ELIGIBILITY_KEYWORDS.turnover;
-    else if (/solvency/i.test(condLower)) keySet = ELIGIBILITY_KEYWORDS.solvency;
-    else if (/litigat|blacklist|debarr|declar/i.test(condLower)) keySet = ELIGIBILITY_KEYWORDS.litigation;
-    else if (/emd|earnest money/i.test(condLower)) keySet = ELIGIBILITY_KEYWORDS.emd;
-    else if (/consortium|mou|joint venture/i.test(condLower)) keySet = ELIGIBILITY_KEYWORDS.consortium;
-    else if (/power of attorney|poa|authoris/i.test(condLower)) keySet = ELIGIBILITY_KEYWORDS.poa;
-
-    if (!keySet.length) {
-      // Fallback: use words from the condition text itself
-      keySet = condLower.match(/\b\w{5,}\b/g) || [];
-    }
-
-    const matched = matchKeywordsInText(bidder.pdfText, keySet);
-    const relevantPages = findRelevantPages(bidder.pdfPages || [], keySet, 3);
-    const topPage = relevantPages.length ? relevantPages[0].pageNo : null;
-    const snippet = relevantPages.length ? relevantPages[0].text.substring(0, 200) : '';
-
-    let strength = 'missing';
-    if (matched.length >= 3) strength = 'found';
-    else if (matched.length >= 1) strength = 'partial';
-
+    const extracted = extractResponseForCondition(cond, pages, fullText);
     suggestions.push({
       condId: cond.id,
-      matched,
-      strength,
-      topPage,
-      snippet,
-      relevantPages: relevantPages.map(p => p.pageNo),
+      matched: [],           // legacy field — no longer used for strength
+      strength: extracted.strength,
+      topPage: extracted.topPage,
+      snippet: extracted.response,
+      relevantPages: extracted.pgNos || [],
+      extractedResponse: extracted.response,
     });
   });
 
@@ -1324,25 +1755,34 @@ function toggleManualBidderEntry() {
 // Try to find the bidder/company name inside the extracted PDF text.
 // Falls back to the filename (cleaned up) if nothing matches.
 function guessBidderNameFromText(text, filename) {
-  const head = text.slice(0, 6000); // name almost always appears on early pages
+  const head = text.slice(0, 8000);
   const patterns = [
-    /name\s*of\s*(?:the\s*)?bidder\s*[:\-]\s*([^\n]{3,90})/i,
-    /bidder'?s?\s*name\s*[:\-]\s*([^\n]{3,90})/i,
-    /name\s*of\s*(?:the\s*)?(?:firm|company|contractor|agency)\s*[:\-]\s*([^\n]{3,90})/i,
-    /name\s*of\s*the\s*applicant\s*[:\-]\s*([^\n]{3,90})/i,
+    // Appendix 1 form fields (GNIDA / standard GOI tender forms)
+    /name\s*of\s*(?:the\s*)?(?:firm|company|tenderer|bidder|contractor|agency|applicant)\s*[-:\u2013]\s*([^\n]{3,90})/i,
+    /(?:firm|company|tenderer|bidder)\s*name\s*[-:]\s*([^\n]{3,90})/i,
+    // "- Ritesh Associates" style (value on same line after dash)
+    /^[-\u2013]\s*((?:[A-Z][a-zA-Z0-9&.,()\s]{3,70}))$/m,
+    // M/s prefix
     /\b(M\/s\.?\s+[A-Z][A-Za-z0-9&.,'\- ]{3,80})/,
+    // GST Legal Name
+    /(?:legal\s*name|trade\s*name)[^:\n]{0,5}[:\|]\s*([A-Z][A-Za-z0-9\s&.,()-]{3,60})/i,
+    // Board Resolution / POA "For <Name>"
+    /^(?:for|for\s+and\s+on\s+behalf\s+of)\s+([A-Z][A-Za-z0-9\s&.,()-]{4,70})$/im,
   ];
   for (const re of patterns) {
     const m = head.match(re);
     if (m && m[1]) {
-      let name = m[1].trim().replace(/\s{2,}/g,' ').replace(/[:\-]+$/,'').trim();
+      let name = m[1].trim().replace(/\s{2,}/g,' ').replace(/[-:]+$/, '').trim();
       name = name.split(/\n/)[0].trim();
-      if (name.length >= 3 && name.length <= 100) return name;
+      // Reject clearly bad matches: all-caps abbreviations, too short, junk words
+      if (name.length < 3 || name.length > 100) continue;
+      if (/^(yes|no|submitted|nil|na|n\/a|india|delhi|noida|uttar)$/i.test(name)) continue;
+      return name;
     }
   }
-  // Fallback: clean the filename
+  // Fallback: clean filename
   let base = filename.replace(/\.pdf$/i, '').replace(/[_\-]+/g,' ').trim();
-  base = base.replace(/\b(technical|bid|tender|document|rfp|proposal|final|scan(ned)?)\b/gi,'').replace(/\s{2,}/g,' ').trim();
+  base = base.replace(/\b(technical|bid|tender|document|rfp|proposal|final|scan(ned)?|package|tech)\b/gi,'').replace(/\s{2,}/g,' ').trim();
   return base || filename;
 }
 
@@ -1374,7 +1814,7 @@ async function handleBidDropFiles(fileList) {
         id, name, portalId: '',
         pdfText: fullText, pdfPages: pages, pdfLoaded: true,
         pdfFileName: file.name, pdfTotalPages: totalPages,
-        aiSuggestions: [],
+        docMatches: [],
         receivables: { fee:'', emd:'' },
         responses: [],
         generalRemarks: '',
@@ -1388,7 +1828,7 @@ async function handleBidDropFiles(fileList) {
       if (emdM) b.receivables.emd = emdM[1].replace(/,/g,'');
 
       // Run local keyword matching against eligibility conditions immediately
-      b.aiSuggestions = autoAnalyseBid(b);
+      b.docMatches = matchBidToConditions(b);
 
       bidders.push(b);
 
@@ -1418,7 +1858,7 @@ function addBidder() {
   bidders.push({
     id, name, portalId: pid,
     pdfText: '', pdfPages: [], pdfLoaded: false,
-    aiSuggestions: [],
+    docMatches: [],
     receivables: { fee:'', emd:'' },
     responses: [],
     generalRemarks: '',
@@ -1483,10 +1923,10 @@ async function handleBidPDF(bidderId, file) {
     if (emdM && !b.receivables.emd) b.receivables.emd = emdM[1].replace(/,/g,'');
 
     // Run keyword matching against conditions
-    b.aiSuggestions = autoAnalyseBid(b);
+    b.docMatches = matchBidToConditions(b);
 
     if (progressEl) progressEl.style.display = 'none';
-    showBidUploadStatus(statusId, `✓ ${totalPages} pages extracted. Keywords matched against ${conditions.length} eligibility condition(s). Review suggestions in the table.`, 'ok');
+    showBidUploadStatus(statusId, `✓ ${totalPages} pages extracted. Evidence matched against ${conditions.length} eligibility condition(s) — review and adjust below.`, 'ok');
 
     // Re-render only this bidder's panel
     const panelDiv = document.getElementById(`panel_${bidderId}`);
@@ -1503,24 +1943,34 @@ function showBidUploadStatus(id, msg, type) {
   if (el) el.innerHTML = `<div class="status ${type}" style="margin:8px 0">${msg}</div>`;
 }
 
-function applySuggestion(bId, cId, strength, topPage, snippet) {
+function applyMatch(bId, cId) {
   const b = getBidder(bId);
   if (!b) return;
   const r = b.responses.find(r => r.condId === cId);
   if (!r) return;
-  if (topPage) r.pg = String(topPage);
-  if (snippet && !r.response) r.response = snippet.trim().substring(0, 200);
-  // Auto-set status from strength
+  const sug = b.docMatches.find(s => s.condId === cId);
+  if (!sug) return;
+
+  const extracted = sug.extractedResponse || sug.snippet || '';
+  if (extracted) r.response = extracted.trim().substring(0, 500);
+
+  if (sug.relevantPages && sug.relevantPages.length) {
+    r.pg = sug.relevantPages.slice(0, 5).join(',\n');
+  } else if (sug.topPage) {
+    r.pg = String(sug.topPage);
+  }
+
   if (!r.status || r.status === '') {
-    if (strength === 'found') r.status = 'pass';
-    else if (strength === 'partial') r.status = 'query';
-    else r.status = 'fail';
+    if (sug.strength === 'found')        r.status = 'pass';
+    else if (sug.strength === 'partial') r.status = 'query';
+    else                                 r.status = 'fail';
   }
   const panelDiv = document.getElementById(`panel_${bId}`);
   if (panelDiv) panelDiv.innerHTML = buildPanel(b);
   renderTabs();
   refreshSummary();
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════
 //  PANEL RENDERING
@@ -1622,13 +2072,13 @@ function buildPanel(b) {
     <th class="col-resp">Response / Documents Submitted</th>
     <th class="col-pg">Pg. No.</th>
     <th class="col-status">Status</th>
-    <th class="col-ai">AI Hint</th>
+    <th class="col-match">Match</th>
   </tr></thead><tbody>`;
 
   conditions.forEach((c, i) => {
     const resp = b.responses.find(r => r.condId === c.id) || {};
     const statusCls = resp.status || 'na';
-    const sug = b.aiSuggestions.find(s => s.condId === c.id);
+    const sug = b.docMatches.find(s => s.condId === c.id);
 
     const corrigNote = c.corrigNote ? `<div style="font-size:10px;color:#A06000;margin-top:3px">📝 ${escHtml(c.corrigNote)}</div>` : '';
 
@@ -1637,11 +2087,12 @@ function buildPanel(b) {
       const chipCls = sug.strength === 'found' ? 'found' : sug.strength === 'partial' ? 'partial' : 'missing';
       const chipLabel = sug.strength === 'found' ? '✓ Found' : sug.strength === 'partial' ? '? Partial' : '✗ Missing';
       const pagesLabel = sug.relevantPages.length ? `p.${sug.relevantPages.join(',')}` : '';
+      const previewText = (sug.extractedResponse || sug.snippet || '').replace(/\n/g,' ').substring(0,120);
       aiCell = `
         <div>
-          <span class="ai-chip ${chipCls}" title="${escHtml(sug.matched.join(', '))}" onclick="applySuggestion(${b.id},${c.id},'${sug.strength}',${sug.topPage||'null'},'${(sug.snippet||'').replace(/'/g,"\\'").replace(/\n/g,' ').substring(0,150)}')">${chipLabel}</span>
+          <span class="match-chip ${chipCls}" title="${escHtml(previewText)}" onclick="applyMatch(${b.id},${c.id})">${chipLabel}</span>
           ${pagesLabel ? `<div style="font-size:10px;color:#9AA5B8;margin-top:2px">${pagesLabel}</div>` : ''}
-          <div style="font-size:10px;color:#B0B8C8;margin-top:2px">click to apply</div>
+          <div style="font-size:10px;color:#B0B8C8;margin-top:2px">click to fill</div>
         </div>`;
     }
 
@@ -1668,7 +2119,7 @@ function buildPanel(b) {
           <option value="na"    ${resp.status==='na'   ?'selected':''}>N/A</option>
         </select>
       </td>
-      <td class="col-ai">${aiCell}</td>
+      <td class="col-match">${aiCell}</td>
     </tr>`;
   });
 
@@ -1811,74 +2262,163 @@ function exportXLSX() {
   const tFee  = v('tenderFee') || '';
   const emd   = v('emdAmount') || '';
 
+  // Helper: cell address
+  function enc(r, c) { return XLSX.utils.encode_cell({r, c}); }
+
+  // Helper: detect if a bidder has any FAIL responses
+  function isFlagged(b) {
+    return conditions.some(c => {
+      const r = b.responses.find(r => r.condId === c.id);
+      return r && r.status === 'fail';
+    });
+  }
+
+  // Helper: get response text for a condition by domain keyword
+  function getDomainResponse(b, ...kwds) {
+    for (const kw of kwds) {
+      const cond = conditions.find(c => c.text.toLowerCase().includes(kw));
+      if (!cond) continue;
+      const r = b.responses.find(r => r.condId === cond.id);
+      if (r && r.response) return r.response;
+    }
+    return '';
+  }
+
   // ── SUMMARY SHEET ──
-  const sumRows = [];
-  sumRows.push([`TECHNICAL BID EVALUATION — ${tName}${org?' | '+org:''}${tNo?' | NIT: '+tNo:''}`]);
-  sumRows.push([`Evaluation Method: ${v('evalMethod')||''} | Tender Type: ${v('tenderType')||''}`]);
-  sumRows.push([]);
-  sumRows.push(['Sr. No.','Bidder Name','Portal ID','Tender Fee','EMD',
-    ...conditions.map((_,i)=>`Cond. ${i+1}`),
-    'Recommendation','Remarks'
-  ]);
-  bidders.forEach((b,i) => {
-    sumRows.push([
-      i+1, b.name, b.portalId||'',
-      b.receivables.fee||'', b.receivables.emd||'',
-      ...conditions.map(c => {
-        const r = b.responses.find(r=>r.condId===c.id);
-        if (!r || !r.status) return '—';
-        return r.status === 'pass' ? 'PASS' : r.status === 'fail' ? 'FAIL' : r.status === 'query' ? 'QUERY' : 'N/A';
-      }),
-      b.recommendation || 'Pending',
-      b.generalRemarks || '',
-    ]);
+  // Structure: blank rows 1-2, title merged A3:H3, blank row 4,
+  // headers row 5, bidder rows 6+
+  const sumWs = {};
+  const RED_FILL = { patternType: 'solid', fgColor: { rgb: 'FFFF0000' } };
+  const HDR_FILL = { patternType: 'solid', fgColor: { rgb: 'FF1F3864' } };
+  const HDR_FONT = { bold: true, color: { rgb: 'FFFFFFFF' }, sz: 11 };
+  const BOLD    = { bold: true };
+
+  // Row 3 (index 2): title
+  sumWs[enc(2,0)] = { v: tName, t:'s', s:{ font:{ bold:true, sz:12 }, alignment:{ horizontal:'center', wrapText:true } } };
+
+  // Row 5 (index 4): headers
+  const sumHdrs = ['Sr. No.','Name of Bidder','Firm Incorporation','Civil works','Advertising works','Net worth','Average Annual Turnover','Solvency'];
+  sumHdrs.forEach((h, ci) => {
+    sumWs[enc(4,ci)] = { v:h, t:'s', s:{ font:HDR_FONT, fill:HDR_FILL, alignment:{horizontal:'center',wrapText:true} } };
   });
 
-  const sumWs = XLSX.utils.aoa_to_sheet(sumRows);
-  sumWs['!cols'] = [8,35,12,12,12,...conditions.map(()=>({wch:10})),22,35].map(w=>typeof w==='number'?{wch:w}:w);
+  // Bidder rows starting row 6 (index 5)
+  bidders.forEach((b, i) => {
+    const rowIdx = 5 + i;
+    const flagged = isFlagged(b);
+    const cellStyle = flagged ? { fill:RED_FILL } : {};
+
+    const firmIncorp  = getDomainResponse(b,'incorporat','proprietorship','partnership','private limited','public limited','constitution');
+    const civilWorks  = getDomainResponse(b,'civil work','construction','foot over bridge','fob','drain','road','pedestrian','walkway','infrastructure');
+    const advWorks    = getDomainResponse(b,'advertis','out-of-home','ooh','hoarding','billboard','media','licensing');
+    const netWorth    = getDomainResponse(b,'net worth','networth','capital');
+    const avgTurnover = getDomainResponse(b,'turnover','annual turnover','average');
+    const solvency    = getDomainResponse(b,'solvency');
+
+    const rowVals = [i+1, b.name||'', firmIncorp, civilWorks, advWorks, netWorth, avgTurnover, solvency];
+    rowVals.forEach((val, ci) => {
+      const cell = { v: val===null||val===undefined?'':val, t: typeof val==='number'?'n':'s' };
+      if (flagged) cell.s = { fill:RED_FILL };
+      sumWs[enc(rowIdx, ci)] = cell;
+    });
+  });
+
+  sumWs['!ref']    = XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:5+bidders.length, c:7}});
+  sumWs['!merges'] = [{s:{r:2,c:0}, e:{r:2,c:7}}];
+  sumWs['!cols']   = [7,24,21,42,40,14,15,24].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(wb, sumWs, 'SUMMARY');
 
   // ── PER-BIDDER SHEETS ──
+  // Benchmark layout:
+  //   Row 1:  blank
+  //   Row 2:  B=Eligibility Conditions | C=Documentary proof | D=Response | E=pg. no.
+  //   Row 3:  B=bidder label | E=total pages
+  //   Row 4:  B=Receivables
+  //   Row 5:  B=Tender fee | C=amount | D=Yes/No | E=page
+  //   Row 6:  B=EMD        | C=amount | D=Yes/No | E=page
+  //   Row 7:  blank
+  //   Row 8+: conditions (A=no, B=condition, C=proof, D=response, E=pg.nos)
+  //   Last row: GST (condition 10)
+  // NO Status column, NO Remarks column.
+
   bidders.forEach(b => {
-    const rows = [];
-    rows.push([`TECHNICAL BID EVALUATION — ${tName}`]);
-    rows.push([`Organisation: ${org} | Tender No.: ${tNo}`]);
-    rows.push([`Bidder: ${b.name}${b.portalId?' ('+b.portalId+')':''}`]);
-    rows.push([]);
-    rows.push(['', 'Eligibility Conditions', 'Documentary Proof Required', 'Response / Documents Submitted', 'Pg. No.', 'Status', 'Remarks']);
+    const ws = {};
 
-    // Receivables
-    rows.push(['', 'RECEIVABLES', '', '', '', '', '']);
-    rows.push(['', 'Tender Fee', `Required: ₹${tFee||'?'}`, b.receivables.fee||'', '', b.receivables.fee?'PAID':'?', '']);
-    rows.push(['', 'EMD', `Required: ₹${emd||'?'}`, b.receivables.emd||'', '', b.receivables.emd?'PAID':'?', '']);
-    rows.push([]);
-    rows.push(['', 'ELIGIBILITY CONDITIONS', '', '', '', '', '']);
+    // Row 2 (index 1): headers
+    ws[enc(1,1)] = { v:'Eligibility Conditions', t:'s', s:{ font:BOLD } };
+    ws[enc(1,2)] = { v:'Documentary proof',      t:'s', s:{ font:BOLD } };
+    ws[enc(1,3)] = { v:'Response',               t:'s', s:{ font:BOLD } };
+    ws[enc(1,4)] = { v:'pg. no.',                t:'s', s:{ font:BOLD } };
 
+    // Row 3 (index 2): bidder name in B3
+    const bidderLabel = b.portalId ? `${b.name} (${b.portalId})` : b.name;
+    ws[enc(2,1)] = { v: bidderLabel, t:'s' };
+    if (b.pdfTotalPages) ws[enc(2,4)] = { v: String(b.pdfTotalPages), t:'s' };
+
+    // Row 4 (index 3): Receivables label
+    ws[enc(3,1)] = { v:'Receivables', t:'s', s:{ font:BOLD } };
+
+    // Row 5 (index 4): Tender fee
+    ws[enc(4,1)] = { v:'Tender fee', t:'s' };
+    if (tFee) ws[enc(4,2)] = { v: tFee, t:'s' };
+    ws[enc(4,3)] = { v: (b.receivables && b.receivables.fee) ? 'Yes' : '', t:'s' };
+    if (b.receivables && b.receivables.feePg) ws[enc(4,4)] = { v: String(b.receivables.feePg), t:'s' };
+
+    // Row 6 (index 5): EMD
+    ws[enc(5,1)] = { v:'EMD', t:'s' };
+    if (emd) ws[enc(5,2)] = { v: emd, t:'s' };
+    ws[enc(5,3)] = { v: (b.receivables && b.receivables.emd) ? 'Yes' : '', t:'s' };
+    if (b.receivables && b.receivables.emdPg) ws[enc(5,4)] = { v: String(b.receivables.emdPg), t:'s' };
+
+    // Row 7 (index 6): blank
+
+    // Rows 8+ (index 7+): eligibility conditions
+    let condRow = 7;
     conditions.forEach((c, i) => {
       const r = b.responses.find(r => r.condId === c.id) || {};
-      const statusLabel = r.status==='pass'?'PASS':r.status==='fail'?'FAIL':r.status==='query'?'QUERY':r.status==='na'?'N/A':'';
-      rows.push([
-        i+1,
-        c.text + (c.corrigNote ? ` [${c.corrigNote}]` : ''),
-        c.proof,
-        r.response||'',
-        r.pg||'',
-        statusLabel,
-        r.remarks||'',
-      ]);
+      const condText = c.text + (c.corrigNote ? ` [Corr: ${c.corrigNote}]` : '');
+      ws[enc(condRow, 0)] = { v: String(i+1), t:'s' };
+      ws[enc(condRow, 1)] = { v: condText,    t:'s' };
+      ws[enc(condRow, 2)] = { v: c.proof||'', t:'s' };
+      ws[enc(condRow, 3)] = { v: r.response||'', t:'s' };
+      ws[enc(condRow, 4)] = { v: r.pg||'',    t:'s' };
+      condRow++;
     });
 
-    rows.push([]);
-    rows.push(['', 'General Remarks', '', b.generalRemarks||'', '', '', '']);
-    rows.push(['', 'Recommendation', '', b.recommendation||'', '', '', '']);
+    // Condition 10: GST — always append unless already in conditions
+    const hasGSTCond = conditions.some(c => /\bgst\b|gstin/i.test(c.text));
+    if (!hasGSTCond) {
+      // Find GST response from docMatches
+      const gstMatch = b.docMatches && b.docMatches.find(s => {
+        const c = conditions.find(cc => cc.id === s.condId);
+        return c && /\bgst\b|gstin/i.test(c.text);
+      });
+      // Extract GSTINs directly from pdfText
+      let gstResponse = '';
+      if (b.pdfText) {
+        const gstins = [...b.pdfText.matchAll(/\b([0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z])\b/g)];
+        const uniq = [...new Set(gstins.map(m=>m[1]))];
+        gstResponse = uniq.join('\n');
+      }
+      ws[enc(condRow, 0)] = { v: String(conditions.length + 1), t:'s' };
+      ws[enc(condRow, 1)] = { v: 'GST', t:'s' };
+      ws[enc(condRow, 2)] = { v: 'GST Registration Certificate', t:'s' };
+      ws[enc(condRow, 3)] = { v: gstResponse, t:'s' };
+      ws[enc(condRow, 4)] = { v: '', t:'s' };
+      condRow++;
+    }
 
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [6,40,28,36,10,12,30].map(w=>({wch:w}));
-    const sheetName = b.name.replace(/[\/\\*?\[\]]/g,'').substring(0,31);
+    ws['!ref']  = XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:condRow, c:4}});
+    ws['!cols'] = [6, 48, 27, 39, 35].map(w=>({wch:w}));
+
+    // Sheet name: "Bidder Name (PortalID)" max 31 chars
+    let sheetName = b.portalId ? `${b.name} (${b.portalId})` : b.name;
+    sheetName = sheetName.replace(/[\/\\*?\[\]:]/g,'').substring(0,31).trim();
+    if (!sheetName) sheetName = `Bidder_${b.id}`;
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   });
 
-  // ── CORRIGENDUM SHEET ──
+  // ── CORRIGENDUM SHEET (only if corrigenda exist) ──
   if (corrigenda.length) {
     const cRows = [['No.','Clause Ref.','Original Text','Amended Text','Source']];
     corrigenda.forEach((c,i) => cRows.push([i+1, c.clauseRef, c.original, c.amended, c.source]));
@@ -1887,14 +2427,7 @@ function exportXLSX() {
     XLSX.utils.book_append_sheet(wb, cWs, 'Corrigendum');
   }
 
-  // ── CONDITIONS REF SHEET ──
-  const condRows = [['No.','Eligibility Condition','Documentary Proof Required','Corrigendum Note']];
-  conditions.forEach((c,i) => condRows.push([i+1, c.text, c.proof, c.corrigNote||'']));
-  const condWs = XLSX.utils.aoa_to_sheet(condRows);
-  condWs['!cols'] = [6,55,35,22].map(w=>({wch:w}));
-  XLSX.utils.book_append_sheet(wb, condWs, 'Eligibility Conditions');
-
-  const fname = `BidEval_${(org||'Tender').replace(/\s/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`;
+  const fname = `BidEval_${(org||tName||'Tender').replace(/[\s\/\\:*?[\]]/g,'_').substring(0,30)}_${new Date().toISOString().slice(0,10)}.xlsx`;
   XLSX.writeFile(wb, fname);
   showStatus('globalStatus', `✓ Exported: ${fname}`, 'ok');
 }
@@ -1971,7 +2504,7 @@ async function handleSummaryBidPDF(bidderId, file) {
     b.pdfLoaded      = true;
     b.pdfFileName    = file.name;
     b.pdfTotalPages  = totalPages;
-    b.aiSuggestions  = autoAnalyseBid(b);
+    b.docMatches  = matchBidToConditions(b);
     if (statusEl) statusEl.innerHTML = `<span style="color:#1E7E34">✓ ${totalPages} pages</span>`;
     renderSummaryUploads(); // refresh labels
   } catch(e) {
@@ -1995,7 +2528,7 @@ function evaluateAllBidders() {
   let filled = 0;
   loaded.forEach(b => {
     // Re-run keyword matching
-    b.aiSuggestions = autoAnalyseBid(b);
+    b.docMatches = matchBidToConditions(b);
 
     // Ensure response array exists
     conditions.forEach(c => {
@@ -2012,16 +2545,21 @@ function evaluateAllBidders() {
     if (emdM && !b.receivables.emd) b.receivables.emd = emdM[1].replace(/,/g,'');
 
     // Apply suggestions to response rows
-    b.aiSuggestions.forEach(sug => {
+    b.docMatches.forEach(sug => {
       const r = b.responses.find(r => r.condId === sug.condId);
       if (!r) return;
       // Only fill if currently empty — don't overwrite manual entries
-      if (!r.response && sug.snippet) r.response = sug.snippet.trim().substring(0, 300);
-      if (!r.pg && sug.topPage)       r.pg = String(sug.topPage);
+      const extracted = sug.extractedResponse || sug.snippet || '';
+      if (!r.response && extracted) r.response = extracted.trim().substring(0, 500);
+      if (!r.pg && sug.relevantPages && sug.relevantPages.length) {
+        r.pg = sug.relevantPages.slice(0,5).join(',\n');
+      } else if (!r.pg && sug.topPage) {
+        r.pg = String(sug.topPage);
+      }
       if (!r.status) {
-        if (sug.strength === 'found')   r.status = 'pass';
+        if (sug.strength === 'found')    r.status = 'pass';
         else if (sug.strength === 'partial') r.status = 'query';
-        else                            r.status = 'fail';
+        else                             r.status = 'fail';
       }
       filled++;
     });
