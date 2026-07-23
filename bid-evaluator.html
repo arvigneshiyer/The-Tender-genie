@@ -1,2599 +1,1000 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Bid Evaluation Tool — Gov/PSU Procurement</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Tender Genie — Bid Evaluator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-* { box-sizing: border-box; }
-body { font-family: 'Georgia','Times New Roman',serif; background:#EEF1F6; color:#1A1F2E; margin:0; padding:24px; }
-.wrap { max-width:1440px; margin:0 auto; }
-
-/* Header */
-.tool-header { background:linear-gradient(135deg,#0B1F3A 0%,#1A3A5C 100%); border-radius:10px 10px 0 0; padding:18px 28px; display:flex; align-items:center; gap:14px; box-shadow:0 2px 12px rgba(11,31,58,.18); }
-.tool-header-icon { font-size:28px; }
-.tool-header-title { color:#fff; font-weight:700; font-size:19px; letter-spacing:.03em; }
-.tool-header-sub { color:#8FA8C8; font-size:11px; letter-spacing:.06em; margin-top:2px; }
-.tool-header-right { margin-left:auto; text-align:right; }
-.header-badge { background:rgba(232,187,74,.15); border:1px solid rgba(232,187,74,.35); color:#E8BB4A; font-size:10px; font-weight:700; letter-spacing:.08em; padding:3px 9px; border-radius:10px; }
-
-/* Cards */
-.card { background:#fff; border-radius:8px; padding:22px; margin-bottom:20px; box-shadow:0 2px 8px rgba(11,31,58,.08); }
-.card h2 { color:#1A5CA8; font-size:16px; margin-top:0; margin-bottom:6px; border-bottom:2px solid #E8BB4A; padding-bottom:7px; display:flex; align-items:center; gap:8px; }
-.card-sub { color:#5B6478; font-size:12px; margin-bottom:14px; margin-top:0; }
-
-/* Form */
-.row { display:flex; gap:16px; flex-wrap:wrap; }
-.col { flex:1; min-width:200px; }
-.col-sm { flex:0 0 175px; }
-.col-xs { flex:0 0 130px; }
-label { font-size:11.5px; color:#5B6478; display:block; margin-bottom:4px; font-weight:700; letter-spacing:.02em; text-transform:uppercase; }
-input[type=text], input[type=date], input[type=number], textarea, select {
-  width:100%; padding:8px 10px; border:1px solid #CBD3E1; border-radius:6px;
-  font-family:inherit; font-size:13px; background:#fff; color:#1A1F2E;
-}
-input:focus, textarea:focus, select:focus { outline:none; border-color:#1A5CA8; background:#F5F9FF; }
-textarea { resize:vertical; min-height:56px; }
-
-/* Buttons */
-button { background:#1A5CA8; color:#fff; border:none; padding:9px 16px; border-radius:6px; font-size:13px; cursor:pointer; font-family:inherit; font-weight:600; transition:background .15s; }
-button:hover { background:#0B1F3A; }
-button:disabled { background:#CBD3E1; color:#9AA5B8; cursor:not-allowed; }
-button.secondary { background:#E8BB4A; color:#0B1F3A; }
-button.secondary:hover { background:#d4a83d; }
-button.danger { background:#c0392b; color:#fff; }
-button.danger:hover { background:#922b21; }
-button.success { background:#1E7E34; color:#fff; }
-button.success:hover { background:#155724; }
-button.sm { padding:5px 10px; font-size:12px; }
-button.ghost { background:transparent; color:#1A5CA8; border:1px solid #1A5CA8; }
-button.ghost:hover { background:#EEF4FC; }
-
-/* Toolbar */
-.toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
-.dropzone { border:2px dashed #C7D4E6; border-radius:8px; padding:28px 16px; text-align:center; cursor:pointer; transition:.15s; background:#F8FAFD; }
-.dropzone:hover { border-color:#1A5CA8; background:#EEF4FC; }
-.dropzone.drag { border-color:#1A5CA8; background:#E4EEFB; }
-.upload-row { display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid #E3E8F0; border-radius:6px; margin-bottom:6px; font-size:13px; }
-.upload-row .name { font-weight:600; flex:1; }
-.upload-row .meta { color:#9AA5B8; font-size:11.5px; }
-.upload-row .badge-ok { color:#1E8E3E; }
-.upload-row .badge-err { color:#D93025; }
-
-/* Status */
-.status { font-size:12px; padding:8px 12px; border-radius:6px; margin-top:8px; }
-.status.ok   { background:#E6F4EA; color:#1E7E34; border:1px solid #A8D5B5; }
-.status.err  { background:#FBE8E6; color:#C0392B; border:1px solid #F5B7B1; }
-.status.info { background:#E8F0FB; color:#1A5CA8; border:1px solid #B3CCEF; }
-.status.warn { background:#FFF8E1; color:#A06000; border:1px solid #F9D98A; }
-
-/* Upload Zone */
-.upload-zone { border:2px dashed #CBD3E1; border-radius:8px; padding:18px 22px; background:#FAFBFC; display:flex; align-items:center; gap:16px; cursor:pointer; transition:all .15s; margin-bottom:14px; }
-.upload-zone:hover { border-color:#1A5CA8; background:#EEF4FF; }
-.upload-zone.active { border-color:#1E7E34; background:#F0FAF4; }
-.upload-zone.loading { border-color:#1A5CA8; background:#EEF4FF; }
-.upload-icon { font-size:28px; flex-shrink:0; }
-.upload-title { font-weight:700; color:#1A5CA8; font-size:14px; }
-.upload-hint { font-size:12px; color:#5B6478; margin-top:2px; }
-
-/* Progress */
-.progress-wrap { background:#E8EDF4; border-radius:4px; height:8px; margin-top:8px; overflow:hidden; }
-.progress-bar  { background:linear-gradient(90deg,#1A5CA8,#2E8BD0); border-radius:4px; height:8px; transition:width .4s ease; }
-
-/* Bidder Tabs */
-.bidder-tabs { display:flex; gap:0; flex-wrap:wrap; margin-bottom:0; border-bottom:2px solid #CBD3E1; }
-.bidder-tab { padding:8px 18px; font-size:13px; cursor:pointer; border:1px solid #CBD3E1; border-bottom:none; border-radius:6px 6px 0 0; background:#F5F7FA; color:#5B6478; margin-right:4px; font-family:inherit; transition:all .15s; }
-.bidder-tab.active { background:#0B1F3A; color:#E8BB4A; border-color:#0B1F3A; font-weight:700; }
-.bidder-tab:hover:not(.active) { background:#E8F0FB; color:#1A5CA8; }
-.bidder-tab.has-issues { border-top:3px solid #E8BB4A; }
-.bidder-tab.flagged { border-top:3px solid #c0392b; }
-
-/* Eval Table */
-.eval-table { width:100%; border-collapse:collapse; font-size:12.5px; }
-.eval-table th { background:#0B1F3A; color:#E8BB4A; padding:8px 10px; text-align:left; font-size:12px; border:1px solid #1A3A5C; white-space:nowrap; }
-.eval-table td { border:1px solid #CBD3E1; padding:7px 9px; vertical-align:top; }
-.eval-table tr:nth-child(even) td { background:#F9FAFB; }
-.eval-table tr:hover td { background:#EEF4FC; }
-.col-no    { width:36px; text-align:center; font-weight:700; color:#1A5CA8; }
-.col-cond  { width:26%; }
-.col-proof { width:17%; color:#5B6478; }
-.col-resp  { width:24%; }
-.col-pg    { width:68px; }
-.col-status{ width:90px; text-align:center; }
-.col-match    { width:80px; text-align:center; }
-
-/* Status select */
-.status-select { border:1px solid #CBD3E1; border-radius:4px; padding:3px 6px; font-size:11px; font-family:inherit; cursor:pointer; width:100%; }
-.status-select.pass  { background:#E6F4EA; color:#1E7E34; font-weight:700; }
-.status-select.fail  { background:#FBE8E6; color:#C0392B; font-weight:700; }
-.status-select.query { background:#FFF8E1; color:#A06000; font-weight:700; }
-.status-select.na    { background:#F3F4F6; color:#6B7280; }
-
-/* Badges */
-.badge { display:inline-block; border-radius:10px; padding:2px 9px; font-size:11px; font-weight:700; }
-.badge-pass  { background:#E6F4EA; color:#1E7E34; border:1px solid #A8D5B5; }
-.badge-fail  { background:#FBE8E6; color:#C0392B; border:1px solid #F5B7B1; }
-.badge-query { background:#FFF8E1; color:#A06000; border:1px solid #F9D98A; }
-.badge-na    { background:#F3F4F6; color:#6B7280; border:1px solid #D1D5DB; }
-
-/* Document match chip */
-.match-chip { display:inline-block; font-size:10px; padding:2px 7px; border-radius:8px; cursor:pointer; font-weight:700; border:1px solid; margin:1px; }
-.match-chip.found   { background:#E6F4EA; color:#1E7E34; border-color:#A8D5B5; }
-.match-chip.missing { background:#FBE8E6; color:#C0392B; border-color:#F5B7B1; }
-.match-chip.partial { background:#FFF8E1; color:#A06000; border-color:#F9D98A; }
-
-/* Extracted text panel */
-.text-preview { background:#F8F9FB; border:1px solid #E0E6F0; border-radius:6px; padding:10px 14px; font-size:11.5px; color:#3A4560; max-height:120px; overflow-y:auto; margin-top:8px; white-space:pre-wrap; line-height:1.6; font-family:'Courier New',monospace; }
-
-/* Section header in table */
-.section-hdr td { background:#1A5CA8 !important; color:#fff !important; font-weight:700; font-size:12px; letter-spacing:.03em; }
-
-/* Summary table */
-.sum-table { width:100%; border-collapse:collapse; font-size:12px; }
-.sum-table th { background:#0B1F3A; color:#E8BB4A; padding:8px; border:1px solid #1A3A5C; text-align:center; }
-.sum-table td { border:1px solid #CBD3E1; padding:6px 8px; vertical-align:top; text-align:center; }
-.sum-table td.left { text-align:left; }
-.sum-table tr:hover td { background:#EEF4FC; }
-
-/* Flags panel */
-.flags-panel { background:#FFF9E8; border:1px solid #F9D98A; border-radius:6px; padding:12px 16px; margin-top:10px; }
-.flags-panel h4 { margin:0 0 8px; color:#A06000; font-size:13px; }
-.flag-item { font-size:12px; color:#7B4D00; padding:3px 0; display:flex; gap:6px; align-items:flex-start; }
-.flag-item::before { content:"⚠"; flex-shrink:0; }
-
-/* Corrigendum tracker */
-.corrig-item { background:#F5F7FA; border:1px solid #E0E6F0; border-radius:6px; padding:12px 14px; margin-bottom:10px; }
-.corrig-item-hdr { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
-.corrig-no { background:#1A5CA8; color:#fff; border-radius:4px; padding:2px 8px; font-size:11px; font-weight:700; }
-
-/* Bid doc panel */
-.bid-doc-panel { border:1px solid #E0E6F0; border-radius:8px; overflow:hidden; }
-.bid-doc-hdr { background:#EEF1F6; padding:10px 14px; display:flex; align-items:center; gap:12px; }
-.bid-doc-body { padding:12px 14px; }
-
-/* Page-by-page result grid */
-.pages-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:8px; margin-top:10px; }
-.page-card { border:1px solid #E0E6F0; border-radius:6px; padding:8px 10px; font-size:11px; }
-.page-card.relevant { border-color:#A8D5B5; background:#F0FAF4; }
-.page-card .pg-no { font-weight:700; color:#1A5CA8; font-size:10px; }
-.page-card .pg-snip { color:#3A4560; margin-top:3px; line-height:1.5; }
-
-/* Keyword match highlight in text */
-.kw-match { background:#FFE082; border-radius:2px; padding:0 2px; font-weight:700; }
-
-/* OCR status */
-.ocr-running { display:flex; align-items:center; gap:10px; padding:10px; background:#E8F0FB; border-radius:6px; font-size:12px; color:#1A5CA8; }
-.spinner { width:16px; height:16px; border:2px solid #CBD3E1; border-top-color:#1A5CA8; border-radius:50%; animation:spin .7s linear infinite; flex-shrink:0; }
-@keyframes spin { to { transform:rotate(360deg); } }
-
-/* Table scroll */
-.table-scroll { overflow-x:auto; }
-.divider { border:none; border-top:1px solid #E8EDF4; margin:16px 0; }
-.empty-note { color:#9AA5B8; font-size:13px; padding:30px; text-align:center; }
-.info-pill { display:inline-block; background:#F5F7FA; border:1px solid #E0E6F0; border-radius:6px; padding:4px 12px; font-size:12px; color:#1A1F2E; margin:2px; }
-.info-pill strong { color:#1A5CA8; }
-
-/* Step number circles */
-.step-num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:#E8BB4A; color:#0B1F3A; font-size:12px; font-weight:800; flex-shrink:0; }
+  :root{
+    --navy:#0B1F3A; --navyMid:#152E55; --blue:#1A5CA8; --blueL:#2574D4;
+    --gold:#C49A2D; --goldL:#E8BB4A; --smoke:#F4F5F7; --white:#FFFFFF;
+    --text:#1A1F2E; --muted:#5B6478; --border:#D4D8E2; --danger:#C0392B;
+    --success:#1A7A4A; --teal:#0E7490; --bg:#EEF1F6;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html{font-size:15px}
+  body{font-family:'Georgia','Times New Roman',serif;background:var(--bg);color:var(--text);min-height:100vh}
+  header{padding:18px 28px;background:linear-gradient(135deg, var(--navy) 0%, var(--navyMid) 100%);display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid var(--gold)}
+  header h1{font-size:19px;margin:0;font-weight:700;color:var(--white);letter-spacing:.02em}
+  header h1 span{color:var(--goldL)}
+  header .muted{color:#8FA8C8}
+  .layout{display:flex;min-height:calc(100vh - 68px)}
+  nav{width:240px;border-right:1px solid var(--border);padding:18px 10px;flex-shrink:0;background:var(--white)}
+  nav .step{padding:10px 12px;border-radius:6px;margin-bottom:4px;cursor:pointer;font-size:13px;color:var(--muted);display:flex;gap:10px;align-items:center;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+  nav .step .num{width:22px;height:22px;border-radius:50%;background:var(--smoke);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;font-weight:700;color:var(--navyMid)}
+  nav .step.active{background:var(--smoke);color:var(--navy);font-weight:700}
+  nav .step.active .num{background:var(--blue);color:#fff;border-color:var(--blue)}
+  nav .step.done .num{background:var(--success);color:#fff;border-color:var(--success)}
+  main{flex:1;padding:28px;max-width:1000px}
+  .card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:22px;margin-bottom:18px;box-shadow:0 1px 3px rgba(11,31,58,.06)}
+  .card h2{margin:0 0 4px;font-size:16px;color:var(--navy);font-weight:700}
+  .card .sub{color:var(--muted);font-size:12.5px;margin-bottom:16px;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+  .drop{border:2px dashed var(--border);border-radius:6px;padding:28px;text-align:center;color:var(--muted);cursor:pointer;font-size:13px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:var(--smoke)}
+  .drop:hover{border-color:var(--blue);color:var(--blue)}
+  input[type=file]{display:none}
+  button{background:var(--blue);color:#fff;border:none;padding:10px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:700;font-family:-apple-system,Segoe UI,Roboto,sans-serif;letter-spacing:.01em}
+  button:hover{background:var(--blueL)}
+  button.secondary{background:var(--white);border:1px solid var(--border);color:var(--navyMid)}
+  button.secondary:hover{background:var(--smoke)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  button.small{padding:6px 12px;font-size:12px}
+  textarea,input[type=text]{width:100%;background:var(--white);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:10px;font-size:13px;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+  textarea{min-height:110px;resize:vertical}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:10px;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+  th,td{border:1px solid var(--border);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--navyMid);color:var(--white);font-weight:700;font-size:11px;letter-spacing:.03em}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center}
+  .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+  .badge.ok{background:rgba(26,122,74,.12);color:var(--success)}
+  .badge.warn{background:rgba(196,154,45,.15);color:var(--gold)}
+  .badge.err{background:rgba(192,57,43,.12);color:var(--danger)}
+  .badge.info{background:rgba(26,92,168,.12);color:var(--blue)}
+  .muted{color:var(--muted);font-size:12px;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .bidder-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+  .bidder-tabs .tab{padding:6px 12px;border-radius:6px;background:var(--smoke);cursor:pointer;font-size:12.5px;border:1px solid var(--border);font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:var(--navyMid)}
+  .bidder-tabs .tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .flag{color:var(--danger);font-weight:700}
+  .fileitem{display:flex;justify-content:space-between;align-items:center;background:var(--smoke);padding:8px 12px;border-radius:6px;margin-top:8px;font-size:12.5px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;border:1px solid var(--border)}
+  .fileitem .x{color:var(--danger);cursor:pointer;font-weight:700}
+  .kv{display:grid;grid-template-columns:160px 1fr;gap:6px 14px;font-size:13px;margin-top:10px;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+  .kv div:nth-child(odd){color:var(--muted)}
+  footer.stepnav{display:flex;justify-content:space-between;margin-top:6px}
+  .log{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:var(--muted);background:var(--smoke);border:1px solid var(--border);border-radius:6px;padding:10px;max-height:160px;overflow:auto;white-space:pre-wrap}
+  #boot{position:fixed;inset:0;background:var(--navy);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:9999;transition:opacity .5s}
+  #boot.hide{opacity:0;pointer-events:none}
+  .boot-logo{font-size:44px;animation:pulse 1.2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+  .boot-title{color:var(--goldL);font-size:20px;font-weight:700;letter-spacing:.08em;text-align:center;font-family:Georgia,serif}
+  .boot-sub{color:#8FA8C8;font-size:12px;letter-spacing:.1em;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+  .boot-bar{width:200px;height:3px;background:rgba(255,255,255,.15);border-radius:2px;overflow:hidden}
+  .boot-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--goldL));border-radius:2px;animation:load 1.4s ease-in-out forwards}
+  @keyframes load{from{width:0}to{width:100%}}
 </style>
 </head>
 <body>
-<div class="wrap">
 
-<!-- ═══════════════════ HEADER ═══════════════════ -->
-<div class="tool-header">
-  <div class="tool-header-icon">📋</div>
-  <div>
-    <div class="tool-header-title">Bid Evaluation Tool</div>
-    <div class="tool-header-sub">GOVERNMENT / PSU PROCUREMENT · TECHNICAL BID EVALUATION</div>
-  </div>
-  <div class="tool-header-right">
-    <div class="header-badge">WORKS &amp; SERVICES</div>
-    <div style="color:#8FA8C8;font-size:10px;margin-top:4px">All analysis runs locally in your browser</div>
-  </div>
+<div id="boot">
+  <div class="boot-logo">📋</div>
+  <div class="boot-title">BID EVALUATOR</div>
+  <div class="boot-sub">MULTI-STAGE TENDER EVALUATION · THE TENDER GENIE</div>
+  <div class="boot-bar"><div class="boot-fill"></div></div>
 </div>
 
-<!-- ═══════════════════ STEP 1: TENDER DETAILS ═══════════════════ -->
-<div class="card" id="tenderCard">
-  <h2><span class="step-num">1</span> Tender Details</h2>
-  <p class="card-sub">Upload the tender document — key fields are extracted locally from the PDF text layer. Fill in any fields that weren't auto-detected.</p>
+<header>
+  <h1>The Tender <span>Genie</span> — Bid Evaluator</h1>
+  <div class="row" style="margin:0;gap:12px">
+    <button class="secondary small" onclick="chooseLocalFolder()" id="folderBtn">📁 Choose Local Folder</button>
+    <div class="muted" id="folderStatus" style="color:#8FA8C8">No local folder selected</div>
+    <div class="muted" id="apiStatus" style="color:#8FA8C8">API: /api/ai.js</div>
+  </div>
+</header>
 
-  <div class="upload-zone" id="tenderZone" onclick="document.getElementById('tenderFileIn').click()"
-    ondragover="event.preventDefault();this.classList.add('loading')"
-    ondragleave="this.classList.remove('loading')"
-    ondrop="event.preventDefault();this.classList.remove('loading');handleTenderPDF(event.dataTransfer.files[0])">
-    <div class="upload-icon">📄</div>
-    <div style="flex:1">
-      <div class="upload-title" id="tenderZoneTitle">Upload Tender / NIT Document (PDF)</div>
-      <div class="upload-hint" id="tenderZoneHint">Drop PDF here or click to browse — key fields extracted locally from text layer</div>
-      <div id="tenderProgress" style="display:none"><div class="progress-wrap"><div class="progress-bar" id="tenderProgressBar" style="width:0%"></div></div></div>
-    </div>
-    <input type="file" id="tenderFileIn" accept=".pdf" style="display:none" onchange="handleTenderPDF(this.files[0])"/>
-    <button class="secondary sm" onclick="event.stopPropagation();document.getElementById('tenderFileIn').click()">Browse</button>
-  </div>
-  <div id="tenderUploadStatus"></div>
-
-  <div class="row" style="margin-top:14px">
-    <div class="col">
-      <label>Tender / NIT Name</label>
-      <input type="text" id="tenderName" placeholder="e.g. Design, Build, Fund, Operate &amp; Transfer of Foot Over Bridges — Package 1"/>
-    </div>
-    <div class="col-sm">
-      <label>Organisation</label>
-      <input type="text" id="orgName" placeholder="e.g. GNIDA"/>
-    </div>
-    <div class="col-sm">
-      <label>Tender No.</label>
-      <input type="text" id="tenderNo" placeholder="e.g. GNIDA/2023/FOB/P1"/>
-    </div>
-  </div>
-  <div class="row" style="margin-top:12px">
-    <div class="col-sm">
-      <label>Tender Fee (₹)</label>
-      <input type="number" id="tenderFee" placeholder="e.g. 6770"/>
-    </div>
-    <div class="col-sm">
-      <label>EMD Amount (₹)</label>
-      <input type="number" id="emdAmount" placeholder="e.g. 100000"/>
-    </div>
-    <div class="col-sm">
-      <label>Type of Tender</label>
-      <select id="tenderType">
-        <option value="works">Works (BOQ-based)</option>
-        <option value="services">Services (SLA-based)</option>
-        <option value="botworks">BOT / PPP Works</option>
-        <option value="other">Other</option>
-      </select>
-    </div>
-    <div class="col-sm">
-      <label>Evaluation Method</label>
-      <select id="evalMethod">
-        <option value="l1">L1 (Lowest Price)</option>
-        <option value="h1">H1 (Highest Bid / Revenue Share)</option>
-        <option value="qcbs">QCBS (Quality+Cost)</option>
-        <option value="technical">Technical Only (Pre-Qual)</option>
-        <option value="other">Other</option>
-      </select>
-    </div>
-  </div>
+<div class="layout">
+  <nav id="stepNav"></nav>
+  <main id="mainArea"></main>
 </div>
-
-<!-- ═══════════════════ STEP 2: CORRIGENDUM / PRE-BID ═══════════════════ -->
-<div class="card" id="corrigCard">
-  <h2><span class="step-num">2</span> Corrigendum &amp; Pre-Bid Documents</h2>
-  <p class="card-sub">Upload any number of pre-bid query responses, corrigenda, or addenda. Each document is processed separately — amendments auto-extracted and listed below.</p>
-
-  <!-- Uploaded docs list -->
-  <div id="corrigDocList" style="margin-bottom:12px"></div>
-
-  <!-- Drop zone (always visible, adds to list) -->
-  <div class="upload-zone" id="corrigZone"
-    onclick="document.getElementById('corrigFileIn').click()"
-    ondragover="event.preventDefault();this.classList.add('loading')"
-    ondragleave="this.classList.remove('loading')"
-    ondrop="event.preventDefault();this.classList.remove('loading');handleCorrigFiles(event.dataTransfer.files)">
-    <div class="upload-icon">📎</div>
-    <div style="flex:1">
-      <div class="upload-title">Add Document (PDF)</div>
-      <div class="upload-hint">Drop PDFs here or click Browse — upload as many as needed</div>
-    </div>
-    <input type="file" id="corrigFileIn" accept=".pdf" multiple style="display:none"
-      onchange="handleCorrigFiles(this.files); this.value=''"/>
-    <button class="secondary sm" onclick="event.stopPropagation();document.getElementById('corrigFileIn').click()">Browse</button>
-  </div>
-  <div id="corrigUploadStatus"></div>
-
-  <hr class="divider"/>
-  <div style="font-weight:700;font-size:13px;color:#1A5CA8;margin-bottom:8px">Amendments Extracted</div>
-  <div id="corrigList"></div>
-  <div class="toolbar">
-    <button onclick="addCorrig()" class="ghost sm">+ Add Amendment Manually</button>
-  </div>
-</div>
-
-<!-- ═══════════════════ STEP 3: ELIGIBILITY CONDITIONS ═══════════════════ -->
-<div class="card" id="condCard">
-  <h2><span class="step-num">3</span> Eligibility Conditions</h2>
-  <p class="card-sub">Conditions from the RFP (incorporating any corrigendum changes). These appear as rows in every bidder's evaluation sheet.</p>
-  <div id="condAutoBanner" style="display:none"></div>
-  <div id="condList"></div>
-  <div class="toolbar">
-    <button onclick="addCondition()">+ Add Condition</button>
-    <button class="ghost sm" onclick="debugEligibility()">🔍 Debug Extraction</button>
-  </div>
-  <div id="condDebugPanel" style="display:none;margin-top:12px"></div>
-  <p style="font-size:11.5px;color:#9AA5B8;margin:8px 0 0">Tip: Copy conditions directly from the RFP. Financial criteria (net worth, turnover, solvency) are separate rows — add them only if required by this tender.</p>
-</div>
-
-<!-- ═══════════════════ STEP 4: BIDDERS ═══════════════════ -->
-<div class="card" id="biddersCard">
-  <h2><span class="step-num">4</span> Bidders</h2>
-  <p class="card-sub">Upload each bidder's technical bid PDF — name, GST, financials, experience and other eligibility evidence are extracted directly from the document text layer.</p>
-
-  <div id="bidderDropZone" class="dropzone"
-       ondragover="event.preventDefault(); this.classList.add('drag')"
-       ondragleave="this.classList.remove('drag')"
-       ondrop="event.preventDefault(); this.classList.remove('drag'); handleBidDropFiles(event.dataTransfer.files)">
-    <div style="font-size:28px">📂</div>
-    <div style="font-weight:600;margin-top:6px">Drag &amp; drop bid PDF(s) here, or click to browse</div>
-    <div style="font-size:11.5px;color:#9AA5B8;margin-top:4px">One PDF per bidder. Upload multiple at once to add several bidders together.</div>
-    <input type="file" id="bidderFileInput" accept="application/pdf" multiple style="display:none"
-           onchange="handleBidDropFiles(this.files); this.value=''"/>
-  </div>
-  <div class="toolbar" style="margin-top:8px">
-    <button onclick="document.getElementById('bidderFileInput').click()">+ Upload Bid PDF(s)</button>
-    <button class="ghost sm" onclick="toggleManualBidderEntry()">Add bidder manually instead</button>
-  </div>
-
-  <div id="manualBidderEntry" style="display:none;margin-top:12px">
-    <div class="row">
-      <div class="col">
-        <label>Bidder Name / Consortium Name</label>
-        <input type="text" id="newBidderName" placeholder="e.g. Ritesh Associates (51%) + Unik Outdoor Pvt. Ltd. (49%)"/>
-      </div>
-      <div class="col-sm">
-        <label>Portal Tender ID (optional)</label>
-        <input type="text" id="newBidderPortalId" placeholder="e.g. 3947743"/>
-      </div>
-    </div>
-    <div class="toolbar">
-      <button onclick="addBidder()">+ Add Bidder</button>
-    </div>
-  </div>
-
-  <div id="bidderUploadQueue" style="margin-top:12px"></div>
-</div>
-
-<!-- ═══════════════════ STEP 5: EVALUATION ═══════════════════ -->
-<div class="card" id="evalCard" style="display:none">
-  <h2><span class="step-num">5</span> Technical Bid Evaluation</h2>
-  <div id="bidderTabs" class="bidder-tabs"></div>
-  <div id="bidderPanels" style="padding-top:16px"></div>
-</div>
-
-<!-- ═══════════════════ STEP 6: SUMMARY ═══════════════════ -->
-<div class="card" id="summaryCard" style="display:none">
-  <h2><span class="step-num">6</span> Summary &amp; Export</h2>
-
-  <!-- ── Bid Document Upload & Evaluate ── -->
-  <div style="border:1px solid #D0E4F7;border-radius:8px;background:#F4F8FE;padding:16px 18px;margin-bottom:20px">
-    <div style="font-weight:700;font-size:14px;color:#1A5CA8;margin-bottom:4px">📂 Upload Bid Documents &amp; Evaluate</div>
-    <div style="font-size:12px;color:#5B6478;margin-bottom:14px">Upload each bidder's technical bid PDF below, then click <strong>Extract &amp; Evaluate All</strong> to parse responses and page references directly from the document text layer. No AI involved — all extraction is rule-based.</div>
-    <div id="summaryBidUploads"></div>
-    <div class="toolbar" style="margin-top:12px">
-      <button onclick="evaluateAllBidders()" id="evalAllBtn" style="background:#1A5CA8;color:#fff;font-weight:700;font-size:13px;padding:9px 22px;border:none;border-radius:6px;cursor:pointer">▶ Extract & Evaluate All Bidders</button>
-      <button class="secondary" onclick="renderSummaryUploads()">↻ Refresh List</button>
-    </div>
-    <div id="evalAllStatus" style="margin-top:8px"></div>
-  </div>
-
-  <div id="summaryContent"></div>
-  <div class="toolbar" style="margin-top:16px">
-    <button class="success" onclick="exportXLSX()">⬇ Export Evaluation Report (.xlsx)</button>
-    <button class="secondary" onclick="refreshSummary()">↻ Refresh Summary</button>
-  </div>
-</div>
-
-<div id="globalStatus" style="margin-top:8px"></div>
-
-</div><!-- /wrap -->
 
 <script>
-// ═══════════════════════════════════════════════════════════════════════
-//  PDF.js Setup
-// ═══════════════════════════════════════════════════════════════════════
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
-// ═══════════════════════════════════════════════════════════════════════
-//  State
-// ═══════════════════════════════════════════════════════════════════════
-let conditions = [];  // [{id, text, proof, corrigNote}]
-let bidders    = [];  // [{id, name, portalId, pdfText, pdfPages, responses, receivables, generalRemarks, recommendation}]
-let corrigenda = [];  // [{id, clauseRef, original, amended, source}]
-let activeBidder = null;
-let tenderText = '';
-let tenderPdfPages = []; // position-tagged page data from the tender PDF, used for table-aware extraction
-
-// ═══════════════════════════════════════════════════════════════════════
-//  PDF TEXT EXTRACTION (local, PDF.js)
-// ═══════════════════════════════════════════════════════════════════════
-async function extractPDFText(file, onProgress) {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  const totalPages = pdf.numPages;
-  const pages = [];
-  let fullText = '';
-
-  for (let i = 1; i <= totalPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-
-    // PDF.js gives us a flat list of text fragments with position info, but no line
-    // breaks. Reconstruct lines by watching for jumps in the vertical (y) position —
-    // this matters a lot for our numbered-clause matching (eligibility conditions,
-    // corrigenda) which anchors on "start of line".
-    let pageText = '';
-    let lastY = null;
-    // Lightweight position record per fragment — used by the table-aware eligibility
-    // extractor (extractEligibilityTableFromPages) to reconstruct multi-column tables
-    // by x/y position instead of guessing from flattened text.
-    const posItems = [];
-    for (const item of content.items) {
-      const y = item.transform ? item.transform[5] : null;
-      const x = item.transform ? item.transform[4] : null;
-      if (lastY !== null && y !== null && Math.abs(y - lastY) > 2) {
-        pageText += '\n';
-      } else if (pageText && !pageText.endsWith('\n')) {
-        pageText += ' ';
-      }
-      pageText += item.str;
-      if (y !== null) lastY = y;
-      if (item.str && item.str.trim() !== '') posItems.push({ str: item.str, x, y });
-    }
-
-    pages.push({ pageNo: i, text: pageText, items: posItems });
-    fullText += `\n\n--- PAGE ${i} ---\n${pageText}`;
-    if (onProgress) onProgress(Math.round((i / totalPages) * 100));
-  }
-
-  return { fullText, pages, totalPages };
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  TABLE-AWARE ELIGIBILITY EXTRACTION (position-based, no API)
-// ═══════════════════════════════════════════════════════════════════════
-// Indian govt/PSU tender eligibility tables are almost always laid out as a
-// 3-column table: [# | Eligibility Conditions | Documentary proof to be submitted].
-// PDF.js's flat text stream draws each row's "condition" cell fully, then that
-// same row's "proof" cell fully — but with NO marker showing where one ends and
-// the other begins once flattened to plain text. Regex guessing at that boundary
-// (the old approach) is inherently fragile.
-//
-// The fix: use each text fragment's actual x/y position on the page. The table's
-// column edges are fixed (we read them straight off the header row), so we can
-// bucket every fragment into "row number" / "condition" / "proof" by x position,
-// and bound each row's content by y position (between this row's number and the
-// next one). This is deterministic and works for any tender using this common
-// 3-column layout — entirely client-side. No AI, no API calls. All extraction is regex/pattern-based on the PDF text layer.
-const TBL_COND_HEADER_RE = /eligibility\s*conditions?/i;
-const TBL_PROOF_HEADER_RE = /documentary|proof\s*to\s*be\s*submitted|proof\s*required/i;
-const TBL_END_RE = /^note\s*:|^evaluation$|^\d\.\d\.?$|^financial\s+bid|^scope\s+of\s+work|^annexure|^instructions?\s+to\s+bidders|^general\s+terms|^special\s+conditions|^general\s+conditions/i;
-
-// Join a bucket of position-tagged fragments (one table cell) into clean text.
-function joinColumnItems(items) {
-  if (!items.length) return '';
-  const sorted = [...items].sort((a, b) => b.y - a.y || a.x - b.x);
-  let out = '';
-  let lastY = null;
-  for (const it of sorted) {
-    if (lastY !== null && Math.abs(it.y - lastY) > 2) {
-      out += (out && !out.endsWith(' ')) ? ' ' : '';
-      out += it.str;
-    } else if (out && !out.endsWith(' ')) {
-      out += (it.str.startsWith(' ') ? '' : ' ') + it.str;
-    } else {
-      out += it.str;
-    }
-    lastY = it.y;
-  }
-  return out.replace(/\s+/g, ' ').trim();
-}
-
-// Returns [{no, condition, proof}, ...] or [] if no recognizable table was found.
-function extractEligibilityTableFromPages(pages) {
-  let colBounds = null;
-  let expectedNext = 1;
-  let inTable = false;
-  const rows = [];
-
-  for (const page of (pages || [])) {
-    const items = page.items || [];
-    const proofHeaderItem = items.find(it => TBL_PROOF_HEADER_RE.test(it.str));
-    const condHeaderItem = proofHeaderItem
-      ? items.find(it => TBL_COND_HEADER_RE.test(it.str) && Math.abs(it.y - proofHeaderItem.y) <= 2)
-      : null;
-    const hashItem = proofHeaderItem
-      ? items.find(it => it.str.trim() === '#' && Math.abs(it.y - proofHeaderItem.y) <= 2)
-      : null;
-
-    if (condHeaderItem && proofHeaderItem) {
-      colBounds = {
-        anchorX: hashItem ? hashItem.x : condHeaderItem.x - 20,
-        col1End: condHeaderItem.x - 10,
-        col2End: proofHeaderItem.x - 10,
-      };
-      inTable = true;
-    }
-
-    if (!inTable || !colBounds) continue;
-
-    // Row anchors: bare integers tightly aligned to the '#' column, strictly sequential
-    // (this is what protects us from page-number footers and stray digits elsewhere).
-    const candidates = items
-      .filter(it => /^\d{1,2}$/.test(it.str.trim()) && Math.abs(it.x - colBounds.anchorX) < 8)
-      .sort((a, b) => b.y - a.y);
-
-    const anchors = [];
-    for (const c of candidates) {
-      if (parseInt(c.str.trim(), 10) === expectedNext) {
-        anchors.push(c);
-        expectedNext++;
-      }
-    }
-    if (!anchors.length) continue;
-
-    // Table-end marker: nearest ender-pattern fragment below the last anchor on this
-    // page (e.g. "Note: Only Eligible Bidders...", "4.2 Evaluation") — keeps trailing
-    // prose from being swept into the last row's cells.
-    const lastAnchorY = anchors[anchors.length - 1].y;
-    let enderY = -Infinity;
-    for (const it of items) {
-      if (it.y < lastAnchorY && TBL_END_RE.test(it.str.trim()) && it.y > enderY) enderY = it.y;
-    }
-
-    for (let i = 0; i < anchors.length; i++) {
-      const yStart = anchors[i].y;
-      const yEnd = i + 1 < anchors.length ? anchors[i + 1].y : enderY;
-      const condItems = items.filter(it =>
-        it.x >= colBounds.col1End && it.x < colBounds.col2End && it.y <= yStart && it.y > yEnd);
-      const proofItems = items.filter(it =>
-        it.x >= colBounds.col2End && it.y <= yStart && it.y > yEnd);
-      rows.push({
-        no: parseInt(anchors[i].str.trim(), 10),
-        condition: joinColumnItems(condItems),
-        proof: joinColumnItems(proofItems),
-      });
-    }
-  }
-  return rows;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  KEYWORD EXTRACTION ENGINE
-// ═══════════════════════════════════════════════════════════════════════
-const META_PATTERNS = {
-  tenderName: [
-    // "Design, Build, Fund, Operate & Transfer..." style BOT project names
-    /(design[,\s]+build[,\s]+fund[,\s]+operate[^\n]{10,200})/i,
-    // "Name of Work:" label
-    /name\s*of\s*work\s*[:\-]\s*(.{20,200})/i,
-    // "NIT / Tender / RFP for: <title>" — but only when "for" is followed by a capital letter
-    // (avoids grabbing mid-sentence like "tender for which the Bidder intends")
-    /(?:tender|nit|rfp|notice inviting tender)[^\n]{0,10}(?:for|:)\s*([A-Z].{20,180})/,
-  ],
-  orgName: [
-    /(?:greater\s*noida\s*industrial\s*development\s*authority|GNIDA)/i,
-    /(?:noida\s*metropolitan\s*region\s*development\s*authority|NMRDA)/i,
-    /(?:noida\s*authority|NOIDA)/i,
-    /([\w\s]+(?:development\s*authority|corporation|board|authority|limited))/i,
-  ],
-  tenderNo: [
-    /(?:tender\s*no|nit\s*no|ref\s*no)[.\s:\-]+([A-Z0-9\/\-\.]{5,40})/i,
-    /([A-Z]{2,8}\/\d{4}\/[A-Z\/\d\-]{3,30})/,
-  ],
-  tenderFee: [
-    // "Bid Processing Fee ... INR 6,770" (datasheet table format)
-    /bid\s*processing\s*fee[^\n]{0,80}?INR\s*([\d,]+)/i,
-    /(?:tender\s*fee|processing\s*fee|bid\s*fee)[^\n]{0,60}(?:rs\.?|₹|inr)[\s]*([\d,]+)/i,
-    /(?:rs\.?|₹|inr)\s*([\d,]+)[^\n]{0,30}(?:tender\s*fee|processing\s*fee|bid\s*fee)/i,
-  ],
-  emdAmount: [
-    // "Earnest Money Deposit (EMD) ... INR 1,00,000" (datasheet table format)
-    /earnest\s*money\s*deposit[^\n]{0,80}?INR\s*([\d,]+)/i,
-    /(?:emd|earnest\s*money)[^\n]{0,60}(?:rs\.?|₹|inr)[\s]*([\d,]+)/i,
-    /(?:rs\.?|₹|inr)\s*([\d,]+)[^\n]{0,30}(?:emd|earnest\s*money)/i,
-  ],
-};
-
-function extractMeta(text) {
-  const result = {};
-  for (const [field, patterns] of Object.entries(META_PATTERNS)) {
-    for (const pat of patterns) {
-      const m = text.match(pat);
-      if (m) {
-        result[field] = (m[1] || m[0]).trim().replace(/\s+/g,' ').substring(0,300);
-        break;
-      }
-    }
-  }
-  return result;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  ELIGIBILITY KEYWORD MATCHING
-//  For each condition, search the bid text for keyword evidence
-// ═══════════════════════════════════════════════════════════════════════
-const ELIGIBILITY_KEYWORDS = {
-  incorporation: ['certificate of incorporation','registration certificate','gst','gstin','pan','proprietorship','company','pvt ltd','private limited','partnership deed','firm registration'],
-  civil_works: ['civil work','construction work','experience certificate','work order','completion certificate','turnkey','drain','pavement','road','bridge','foo','fob','foot over'],
-  advertising: ['advertising','out-of-home','ooh','hoarding','display','media','licence','contract','nmrc','dmrc','metro'],
-  networth: ['net worth','networth','chartered accountant','ca certificate','balance sheet','audited','annual report'],
-  turnover: ['annual turnover','average turnover','revenue','ca certificate','audited','income tax','itr','form 26as'],
-  solvency: ['solvency','bank certificate','bank letterhead','letter of credit','financial soundness','credit limit'],
-  performance_security: ['performance security','performance guarantee','bank guarantee','bg'],
-  litigation: ['litigation','arbitration','blacklist','debarred','declaration','affidavit'],
-  emd: ['demand draft','dd','rtgs','neft','payment reference','earnest money'],
-  consortium: ['mou','consortium','joint venture','jv','memorandum of understanding','lead member','participant','equity'],
-  poa: ['power of attorney','poa','authorisation','authorized signatory','board resolution'],
-};
-
-function matchKeywordsInText(text, keywords) {
-  const lowerText = text.toLowerCase();
-  return keywords.filter(kw => lowerText.includes(kw.toLowerCase()));
-}
-
-function findRelevantPages(pages, keywords, maxPages=5, minScore=1) {
-  const scored = pages.map(p => {
-    const lowerText = p.text.toLowerCase();
-    const hits = keywords.filter(kw => lowerText.includes(kw.toLowerCase()));
-    return { pageNo: p.pageNo, hits, text: p.text, score: hits.length };
-  }).filter(p => p.score >= minScore);
-  scored.sort((a,b) => b.score - a.score);
-  return scored.slice(0, maxPages);
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  DEEP EXTRACTION HELPERS
-//  Each function searches the bid PDF text and pages for specific facts.
-// ═══════════════════════════════════════════════════════════════════════
-
-// Return up to `n` lines from `text` starting at position `pos`, cleaned up.
-function linesAround(text, pos, before=0, after=4) {
-  const start = Math.max(0, text.lastIndexOf('\n', pos - 1));
-  let end = pos;
-  let newlines = 0;
-  while (end < text.length && newlines <= after) {
-    if (text[end] === '\n') newlines++;
-    end++;
-  }
-  // also grab `before` lines
-  let realStart = start;
-  let nb = 0;
-  let scan = start - 1;
-  while (scan > 0 && nb <= before) {
-    if (text[scan] === '\n') nb++;
-    scan--;
-  }
-  realStart = Math.max(0, scan);
-  return text.slice(realStart, end).replace(/\s+/g, ' ').trim();
-}
-
-// Extract incorporation/entity type and registration details
-function extractIncorporation(pages, fullText) {
-  const hits = [];
-
-  // Firm/company name
-  const firmM = fullText.match(/name\s*of\s*(?:the\s*)?(?:firm|company|tenderer|bidder|contractor)\s*[-:]\s*([^\n\r]{3,80})/i) ||
-                fullText.match(/^[-\u2013]\s*([A-Z][A-Za-z0-9\s&.,()-]{3,60})$/m);
-  if (firmM) hits.push(firmM[1].trim().replace(/\s+/g,' '));
-
-  // Consortium: extract member names + equity
-  const isCons = /consortium|memorandum\s*of\s*understanding|mou\s*executed|lead\s*member/i.test(fullText);
-  if (isCons) {
-    const memberLines = [];
-    // "M/s. Ritesh Associates Lead Member 51%"
-    const memRe = /(?:1\.?|2\.?|lead\s*member|participant\s*member)[^\n]{0,20}([A-Z][A-Za-z0-9\s&.,()-]{3,60})(?:[^\n]{0,30}(\d{1,3})\s*%)?/gi;
-    const mems = [...fullText.matchAll(memRe)];
-    mems.slice(0,4).forEach(m => {
-      const pct = m[2] ? ` (${m[2]}%)` : '';
-      memberLines.push(m[1].trim().replace(/\s+/g,' ') + pct);
-    });
-    if (memberLines.length) hits.push('Consortium: ' + memberLines.join(' + '));
-    else hits.push('Consortium MOU submitted');
-  }
-
-  // Incorporation certificate date
-  const incM = fullText.match(/certificate\s*of\s*incorporation\s*(?:dated?|no\.?)?\s*[:\-]?\s*([^\n\r]{5,60})/i);
-  if (incM) hits.push('Incorp. Cert: ' + incM[1].trim().substring(0,60));
-
-  // Constitution of Business from GST cert
-  const constM = fullText.match(/constitution\s*of\s*(?:business|firm)\s*[:\|]?\s*([^\n\r]{3,50})/i);
-  if (constM) hits.push('Constitution: ' + constM[1].trim());
-
-  // Registration number (CIN / GST / firm reg)
-  const cinM = fullText.match(/\b(U\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6})\b/); // CIN
-  if (cinM) hits.push('CIN: ' + cinM[1]);
-
-  const keySet = ['certificate of incorporation','registration certificate','constitution','pvt ltd','private limited','proprietorship','partnership','memorandum of association','consortium'];
-  const relPages = findRelevantPages(pages, keySet, 4).filter(p => p.score >= 1);
-  const topPage = relPages.length ? relPages[0].pageNo : null;
-  const pgNos = relPages.map(p=>p.pageNo);
-
-  const response = [...new Set(hits)].slice(0,4).join('\n') || '';
-  return { response, topPage, pgNos, strength: response ? 'found' : 'missing' };
-}
-
-// Extract civil works / construction experience
-function extractCivilWorks(pages, fullText) {
-  const hits = [];
-
-  function parseAmt(str) { return parseFloat(str.replace(/,/g,'')); }
-  function fmtAmt(str) {
-    const v = parseAmt(str);
-    if (isNaN(v) || v < 10000) return null;
-    return `₹${str} (~${(v/1e7).toFixed(2)} Cr)`;
-  }
-
-  // Appendix 3A / eligible assignments section
-  const appendixM = fullText.match(/(?:appendix\s*3[aA]|eligible\s*assignments?|appendix\s*3\b)[^\n]{0,60}\n([\s\S]{50,1200}?)(?=appendix|\n\n\n|$)/i);
-  if (appendixM) {
-    const block = appendixM[1];
-    const projLines = block.match(/[^\n]{10,150}/g) || [];
-    projLines.slice(0,8).forEach(l => {
-      if (/inr|rs\.?|crore|lakh|duration|noida|gnida|nmrc|authority|months?/i.test(l)) {
-        hits.push(l.replace(/\s+/g,' ').trim());
-      }
-    });
-  }
-
-  // Work name patterns (English)
-  const woMatches = [...fullText.matchAll(/(?:name\s*of\s*work|assignment\s*name|work\s*of)\s*[:\-]?\s*([^\n\r]{10,150})/gi)];
-  woMatches.slice(0,4).forEach(m => {
-    const t = m[1].trim().replace(/\s+/g,' ');
-    if (t.length >= 10) hits.push(t);
-  });
-
-  // English experience certificate patterns (NOIDA / GNIDA letters)
-  const expCertM = [...fullText.matchAll(/(?:anubandh\s*(?:dhanaraashi|dhanrashi)?|contract\s*amount|awarded?\s*value|anubandh\s*sankhya|अनुबन्धित\s*धनराशि)[^\d\n]{0,20}(\d[\d,]{4,}(?:\.\d+)?)/gi)];
-  expCertM.slice(0,4).forEach(m => {
-    const fmt = fmtAmt(m[1]);
-    if (fmt) hits.push('Contract amount: ' + fmt);
-  });
-
-  // Hindi / Devanagari amount patterns: "रूपये 2,88,05,562" or "रूपये 2,87,51,039"
-  const hindiAmtM = [...fullText.matchAll(/(?:रूपये|रुपये|धनराशि)[\s\-]*(\d[\d,]{4,}(?:\.\d+)?)/g)];
-  hindiAmtM.slice(0,3).forEach(m => {
-    const fmt = fmtAmt(m[1]);
-    if (fmt) hits.push('Contract: ' + fmt);
-  });
-
-  // NOIDA letter pattern: "Senior Manager, Work Circle" + amount
-  const noidaLetterM = [...fullText.matchAll(/(?:senior\s*manager|work\s*circle|noida\s*authority)[^\n]{0,200}?(\d[\d,]{5,}(?:\.\d+)?)/gi)];
-  noidaLetterM.slice(0,3).forEach(m => {
-    const fmt = fmtAmt(m[1]);
-    if (fmt) hits.push('NOIDA WO: ' + fmt);
-  });
-
-  // Completion certificate indicators
-  if (/completion\s*certificate|satisfactorily\s*(?:completed|executed)|work\s*completed/i.test(fullText)) {
-    hits.push('Completion Certificate(s) submitted');
-  }
-
-  const keySet = ['work order','completion certificate','drain','road','bridge','infrastructure','civil','construction','noida','gnida','senior manager','work circle'];
-  const relPages = findRelevantPages(pages, keySet, 5).filter(p => p.score >= 2);
-  const topPage = relPages.length ? relPages[0].pageNo : null;
-  const pgNos = relPages.map(p=>p.pageNo);
-
-  const deduped = [...new Set(hits.map(h=>h.substring(0,120)))].slice(0,6);
-  const response = deduped.join('\n') || '';
-  return { response, topPage, pgNos, strength: response ? 'found' : 'missing' };
-}
-
-// Extract advertising / OOH experience
-function extractAdvertising(pages, fullText) {
-  const hits = [];
-
-  // License agreements: "License Agreement ... NMRC / DMRC / authority"
-  const licM = fullText.match(/license\s*agreement[^\n]{0,120}/gi) || [];
-  licM.slice(0,3).forEach(l => hits.push(l.trim()));
-
-  // Station/metro/hoarding contracts
-  const metroM = [...fullText.matchAll(/(?:advertising\s*rights?|co.branding|out.of.home|ooh|metro\s*station|hoarding)[^\n]{0,100}/gi)];
-  metroM.slice(0,3).forEach(m => hits.push(m[0].trim()));
-
-  // Work orders referencing advertising
-  const woM = [...fullText.matchAll(/(?:work\s*order|letter\s*of\s*award|notice\s*of\s*award)[^\n]{0,100}/gi)];
-  woM.slice(0,2).forEach(m => hits.push(m[0].trim()));
-
-  const keySet = ['advertising','out-of-home','ooh','hoarding','license','metro','station','nmrc','dmrc','media'];
-  const relPages = findRelevantPages(pages, keySet, 4);
-  const topPage = relPages.length ? relPages[0].pageNo : null;
-  const pgNos = relPages.map(p=>p.pageNo);
-
-  const deduped = [...new Set(hits.map(h=>h.replace(/\s+/g,' ').trim()))].slice(0,4);
-  const response = deduped.join('\n') || '';
-  return { response, topPage, pgNos, strength: response ? 'found' : 'partial' };
-}
-
-// Extract net worth and average turnover from CA certificate / balance sheet
-function extractNetWorthTurnover(pages, fullText) {
-  const hits = [];
-  const bidderNameM = fullText.match(/(?:name\s*of\s*(?:firm|bidder|company)|legal\s*name|trade\s*name)[^\S\r\n]*:?\s*([A-Z][A-Za-z0-9\s&.,()\-]{3,50})/);
-  const bidderLabel = bidderNameM ? bidderNameM[1].trim() : '';
-
-  // Minimum digit guard: rupee amounts must be >= 5 digits (at least 10,000)
-  function parseRupeeAmt(str) {
-    const v = str.replace(/,/g,'');
-    return parseFloat(v);
-  }
-  function fmtAmt(str) {
-    const v = parseRupeeAmt(str);
-    if (isNaN(v) || v < 10000) return null; // reject years, single digits
-    const cr = (v/1e7).toFixed(2);
-    return `INR ${str} (~${cr} Cr)`;
-  }
-
-  // Net worth — requires >=5 digit amount after keyword
-  const nwM = fullText.match(/net\s*worth[^\d\n]{0,40}((?:[\d,]{5,}(?:\.\d+)?))/i) ||
-              fullText.match(/capital\s*(?:account\s*)?balance[^\d\n]{0,40}((?:[\d,]{5,}(?:\.\d+)?))/i) ||
-              fullText.match(/(?:rs\.?|₹|inr)\s*([\d,]{5,}(?:\.\d+)?)(?:[^\n]{0,30}net\s*worth|[^\n]{0,30}capital)/i);
-  if (nwM) {
-    const fmt = fmtAmt(nwM[1]);
-    if (fmt) hits.push('Net Worth: ' + fmt);
-  }
-
-  // Turnover table: look for "YYYY-YY amount" where amount must be >= 5 digits
-  // Pattern: year group followed by whitespace/separator then digits (NOT immediately the year digits)
-  const fyRe = /(20\d\d[-–\/](?:20)?\d{2})\s*(?:[^\d\n]{0,20})?\b(\d[\d,]{4,}(?:\.\d+)?)\b/g;
-  const fyMatches = [...fullText.matchAll(fyRe)];
-  const seenYears = new Set();
-  const fyLines = [];
-  for (const m of fyMatches) {
-    const yr = m[1];
-    const amtRaw = m[2];
-    if (seenYears.has(yr)) continue;
-    const fmt = fmtAmt(amtRaw);
-    if (!fmt) continue;
-    seenYears.add(yr);
-    fyLines.push(`${yr}: ${fmt}`);
-    if (fyLines.length >= 5) break;
-  }
-  if (fyLines.length) hits.push('Turnover:\n' + fyLines.join('\n'));
-
-  // Average turnover calculation
-  if (fyLines.length >= 3) {
-    const amts = fyLines.map(l => {
-      const m = l.match(/INR ([\d,]+)/);
-      return m ? parseRupeeAmt(m[1]) : 0;
-    }).filter(v => v > 0);
-    if (amts.length >= 3) {
-      const avg = amts.slice(0,3).reduce((a,b)=>a+b,0)/3;
-      hits.push(`Avg Turnover (last 3 yrs): INR ~${(avg/1e7).toFixed(2)} Cr`);
-    }
-  }
-
-  // CA / auditor certificate reference
-  const caM = fullText.match(/(?:chartered\s*accountant|statutory\s*auditor|ca\s*firm)[^\n]{0,80}/i);
-  if (caM) hits.push(caM[0].trim().substring(0,100));
-
-  const keySet = ['net worth','turnover','chartered accountant','ca certificate','balance sheet','audited','financial year'];
-  const relPages = findRelevantPages(pages, keySet, 4).filter(p => p.score >= 2);
-  const topPage = relPages.length ? relPages[0].pageNo : null;
-  const pgNos = relPages.map(p=>p.pageNo);
-
-  const prefix = bidderLabel ? bidderLabel + '\n' : '';
-  const response = (prefix + hits.join('\n')).trim();
-  return { response, topPage, pgNos, strength: nwM ? 'found' : (hits.length ? 'partial' : 'missing') };
-}
-
-// Extract solvency certificate details
-function extractSolvency(pages, fullText) {
-  const hits = [];
-
-  function parseRupeeAmt(str) { return parseFloat(str.replace(/,/g,'')); }
-  function fmtAmt(str) {
-    const v = parseRupeeAmt(str);
-    if (isNaN(v) || v < 10000) return null;
-    return `₹${str} (~${(v/1e7).toFixed(2)} Cr)`;
-  }
-
-  // Solvency amount — require >= 5 digits
-  // Match Indian formats: 3,00,71,000 or 30071000
-  const solPatterns = [
-    /solvent\s*up\s*to\s*(?:a\s*limit\s*of\s*)?(?:inr|rs\.?|₹|rupees)?\s*(\d[\d,]{4,}(?:\.\d+)?)/i,
-    /solvency[^\d\n]{0,40}(?:inr|rs\.?|₹|rupees)?\s*(\d[\d,]{4,}(?:\.\d+)?)/i,
-    /(?:inr|rs\.?|₹)\s*(\d[\d,]{4,}(?:\.\d+)?)(?:[^\n]{0,40}solven)/i,
-    // Hindi: "हैसियत रू. 30071000" 
-    /(?:रू\.?|rupees)\s*(\d[\d,]{4,}(?:\.\d+)?)/,
-    // "credit limit of INR X"
-    /credit\s*limit\s*(?:of\s*)?(?:inr|rs\.?|₹)?\s*(\d[\d,]{4,}(?:\.\d+)?)/i,
-  ];
-  let solAmt = null;
-  for (const re of solPatterns) {
-    const m = fullText.match(re);
-    if (m && m[1]) { solAmt = m[1]; break; }
-  }
-  if (solAmt) {
-    const fmt = fmtAmt(solAmt);
-    if (fmt) hits.push('Solvency: ' + fmt);
-  }
-
-  // Bank name
-  const bankM = fullText.match(/(?:name\s*of\s*(?:the\s*)?bank|issued?\s*by)[^\n]{0,60}(?:bank|canara|sbi|icici|hdfc|pnb|ubi|axis)[^\n]{0,40}/i) ||
-                fullText.match(/(canara\s*bank|state\s*bank(?:\s*of\s*india)?|\bsbi\b|icici\s*bank|hdfc\s*bank|punjab\s*national\s*bank|union\s*bank|axis\s*bank|bank\s*of\s*baroda|bank\s*of\s*india)/i);
-  if (bankM) hits.push('Bank: ' + (bankM[1]||bankM[0]).trim().replace(/\s+/g,' '));
-
-  // Date
-  const dateM = fullText.match(/(?:dated?|issued\s*on)\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\d{1,2}\s+\w+\s+\d{4})/i);
-  if (dateM) hits.push('Dated: ' + dateM[1]);
-
-  // DM office / Haisiyat Pramaan Patra (UP solvency)
-  if (/dm\s*office|district\s*magistrate|haisiyat|हैसियत/i.test(fullText)) {
-    hits.push('DM Office Solvency Certificate (Haisiyat Pramaan Patra) submitted');
-  }
-
-  const keySet = ['solvency','bank certificate','solvent','credit limit','haisiyat','financial soundness'];
-  const relPages = findRelevantPages(pages, keySet, 3).filter(p => p.score >= 2);
-  const topPage = relPages.length ? relPages[0].pageNo : null;
-  const pgNos = relPages.map(p=>p.pageNo);
-
-  return { response: hits.join('\n'), topPage, pgNos, strength: hits.length ? 'found' : 'missing' };
-}
-
-// Extract GST registration
-function extractGST(pages, fullText) {
-  const hits = [];
-  const gstins = [...fullText.matchAll(/\b([0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1})\b/g)];
-  const uniqueGst = [...new Set(gstins.map(m=>m[1]))];
-  uniqueGst.forEach(g => hits.push(`GSTIN: ${g}`));
-
-  // Legal name from GST cert
-  const legalM = fullText.match(/legal\s*name\s*[:\|]\s*([A-Z][A-Za-z0-9\s&.]{3,50})/i);
-  if (legalM) hits.push('Legal Name: ' + legalM[1].trim());
-
-  const keySet = ['gstin','gst registration','registration number','registration certificate'];
-  const relPages = findRelevantPages(pages, keySet, 3);
-  const topPage = relPages.length ? relPages[0].pageNo : null;
-  const pgNos = relPages.map(p=>p.pageNo);
-
-  return { response: hits.join('\n'), topPage, pgNos, strength: uniqueGst.length ? 'found' : 'missing' };
-}
-
-// Extract litigation / blacklist declaration
-function extractLitigation(pages, fullText) {
-  const hits = [];
-
-  // Appendix 5 or 6 reference
-  if (/appendix\s*5|appendix\s*6|not\s*been\s*blacklisted|not\s*barred/i.test(fullText)) {
-    hits.push('Declaration submitted (Appendix 5/6)');
-  }
-  if (/no\s*pending\s*litigation|no\s*(?:court|legal)\s*case|no\s*arbitration/i.test(fullText)) {
-    hits.push('No pending litigation declared');
-  }
-  if (/not\s*been\s*expelled|no\s*agreement\s*terminated/i.test(fullText)) {
-    hits.push('No agreement terminated declaration submitted');
-  }
-
-  const keySet = ['blacklisted','barred','litigation','declaration','appendix 5','appendix 6','not been expelled'];
-  const relPages = findRelevantPages(pages, keySet, 3);
-  const topPage = relPages.length ? relPages[0].pageNo : null;
-  const pgNos = relPages.map(p=>p.pageNo);
-
-  return { response: hits.join('\n'), topPage, pgNos, strength: hits.length ? 'found' : 'missing' };
-}
-
-// Extract stamp paper / notarisation evidence
-function extractStampPaper(pages, fullText) {
-  const hits = [];
-
-  if (/india\s*non\s*judicial|non\s*judicial\s*stamp/i.test(fullText)) hits.push('Non-judicial stamp paper submitted');
-  if (/e[\s\-]?stamp/i.test(fullText)) hits.push('e-Stamp purchased');
-
-  // e-Stamp certificate numbers: IN-UP..., IN-DL..., etc. (allow alphanumeric + hyphen)
-  const certNos = [...fullText.matchAll(/(?:certificate\s*no\.?|cert\.?\s*no\.?)\s*[:\-]?\s*(IN-[A-Z0-9\-]{5,30})/gi)];
-  // Also match bare IN-XX pattern without "Certificate No." label
-  const bareNos = [...fullText.matchAll(/\b(IN-[A-Z]{2}[0-9A-Z]{8,25})/g)];
-  const allNos = [...new Set([...certNos.map(m=>m[1]), ...bareNos.map(m=>m[1])])];
-  allNos.slice(0,3).forEach(n => hits.push('Stamp Cert No: ' + n));
-
-  // Stamp duty amount
-  const dutyM = fullText.match(/stamp\s*duty\s*amount[^\d]{0,20}(\d[\d,]{1,})/i) ||
-                fullText.match(/stamp\s*duty[^\d]{0,10}(\d+)/i);
-  if (dutyM) hits.push('Stamp Duty: ₹' + dutyM[1]);
-
-  // Notary
-  if (/notary|notarised|notarized/i.test(fullText)) hits.push('Notarised');
-  if (/revenue\s*stamp/i.test(fullText)) hits.push('Revenue stamp affixed');
-
-  const keySet = ['non judicial','e-stamp','stamp paper','revenue stamp','notary','certificate no'];
-  const relPages = findRelevantPages(pages, keySet, 3);
-  const topPage = relPages.length ? relPages[0].pageNo : null;
-  const pgNos = relPages.map(p=>p.pageNo);
-
-  return { response: hits.join('\n'), topPage, pgNos, strength: hits.length ? 'found' : 'missing' };
-}
-
-// Extract consortium / MOU details
-function extractConsortium(pages, fullText) {
-  const hits = [];
-
-  // MOU parties
-  const mouM = fullText.match(/memorandum\s*of\s*understanding[^\n]{0,20}\n[\s\S]{0,400}/i);
-  if (mouM) {
-    // Extract party names
-    const parties = [...mouM[0].matchAll(/(?:first\s*party|second\s*party|lead\s*member|participant)[^\n]{0,80}/gi)];
-    parties.slice(0,4).forEach(p => hits.push(p[0].trim()));
-  }
-
-  // Shareholding table
-  const shareM = [...fullText.matchAll(/(\d{1,3})\s*%/g)];
-  if (shareM.length) {
-    const stakes = shareM.slice(0,4).map(m=>m[0]);
-    if (stakes.length >= 2) hits.push('Equity: ' + stakes.join(', '));
-  }
-
-  // Lead member
-  const leadM = fullText.match(/lead\s*member[^\n]{0,80}/i);
-  if (leadM) hits.push(leadM[0].trim());
-
-  const keySet = ['mou','consortium','lead member','equity','joint venture','memorandum of understanding'];
-  const relPages = findRelevantPages(pages, keySet, 3);
-  const topPage = relPages.length ? relPages[0].pageNo : null;
-  const pgNos = relPages.map(p=>p.pageNo);
-
-  return { response: hits.slice(0,4).join('\n'), topPage, pgNos, strength: hits.length ? 'found' : 'missing' };
-}
-
-// Extract Power of Attorney / Board Resolution
-function extractPOA(pages, fullText) {
-  const hits = [];
-  if (/power\s*of\s*attorney/i.test(fullText)) hits.push('Power of Attorney submitted');
-  if (/board\s*resolution/i.test(fullText)) hits.push('Board Resolution submitted');
-  const authM = fullText.match(/authoris[ei]d?\s*signatory[^\n]{0,80}/i);
-  if (authM) hits.push(authM[0].trim());
-  const nameM = fullText.match(/name\s*and\s*title\s*of\s*signatory\s*[-:]\s*([^\n\r]{3,60})/i);
-  if (nameM) hits.push('Authorised Person: ' + nameM[1].trim());
-
-  const keySet = ['power of attorney','board resolution','authorised signatory','authorized signatory'];
-  const relPages = findRelevantPages(pages, keySet, 3);
-  const topPage = relPages.length ? relPages[0].pageNo : null;
-  const pgNos = relPages.map(p=>p.pageNo);
-
-  return { response: hits.join('\n'), topPage, pgNos, strength: hits.length ? 'found' : 'missing' };
-}
-
-// Extract GNIDA-specific affidavit / declaration (Appendix E / 9)
-function extractDeclaration(pages, fullText) {
-  const hits = [];
-  if (/appendix\s*9|appendix\s*['"]?e['"]?|शपथ.पत्र|shpath/i.test(fullText)) hits.push('Appendix 9 / Declaration submitted');
-  if (/no\s*relative.*gnida|gnida.*no\s*relative/i.test(fullText)) hits.push('GNIDA relative declaration submitted');
-  if (/affidavit/i.test(fullText)) hits.push('Affidavit submitted');
-
-  const keySet = ['appendix 9','declaration','affidavit','gnida relative'];
-  const relPages = findRelevantPages(pages, keySet, 2);
-  const topPage = relPages.length ? relPages[0].pageNo : null;
-  const pgNos = relPages.map(p=>p.pageNo);
-
-  return { response: hits.join('\n'), topPage, pgNos, strength: hits.length ? 'found' : 'missing' };
-}
-
-// Master dispatcher: classify the condition and run the appropriate extractor
-function extractResponseForCondition(cond, pages, fullText) {
-  const t = cond.text.toLowerCase();
-  const p = (cond.proof||'').toLowerCase();
-
-  if (/\bgst\b|gstin|goods\s*and\s*services\s*tax/i.test(t)) return extractGST(pages, fullText);
-  if (/incorporat|constitution\s*of\s*business|proprietorship|partnership|private\s*limited|public\s*limited|company\s*registration/i.test(t)) return extractIncorporation(pages, fullText);
-  if (/civil\s*work|construction\s*work|foot\s*over\s*bridge|\bfob\b|bridge|drain|road|pedestrian|walkway|infrastructure|civil.*experience/i.test(t)) return extractCivilWorks(pages, fullText);
-  if (/advertis|out.of.home|\booh\b|hoarding|billboard|outdoor\s*media|media\s*compan/i.test(t)) return extractAdvertising(pages, fullText);
-  if (/net\s*worth/i.test(t)) return extractNetWorthTurnover(pages, fullText);
-  if (/average.*turnover|annual.*turnover|turnover.*three|turnover.*5\s*year/i.test(t)) return extractNetWorthTurnover(pages, fullText);
-  if (/solvency/i.test(t)) return extractSolvency(pages, fullText);
-  if (/litigation|blacklist|debarr|failed\s*to\s*perform|expelled|terminated/i.test(t)) return extractLitigation(pages, fullText);
-  if (/barred\s*by\s*government|government.*agency.*barred|supreme\s*court/i.test(t)) return extractLitigation(pages, fullText);
-  if (/stamp\s*paper|non\s*judicial|revenue\s*stamp/i.test(t)) return extractStampPaper(pages, fullText);
-  if (/declaration|appendix\s*9|appendix\s*e\b/i.test(t)) return extractDeclaration(pages, fullText);
-  if (/consortium|mou|joint\s*venture|memorandum\s*of\s*understanding/i.test(t)) return extractConsortium(pages, fullText);
-  if (/power\s*of\s*attorney|\bpoa\b|board\s*resolution|authoris/i.test(t)) return extractPOA(pages, fullText);
-
-  // Fallback: keyword-scored snippet
-  const keySet = (t.match(/\b\w{5,}\b/g) || []).slice(0, 10);
-  const relPages = findRelevantPages(pages, keySet, 3);
-  const topPage = relPages.length ? relPages[0].pageNo : null;
-  const pgNos = relPages.map(p=>p.pageNo);
-  const snippet = relPages.length ? relPages[0].text.replace(/\s+/g,' ').trim().substring(0,250) : '';
-  const matched = matchKeywordsInText(fullText, keySet);
-  const strength = matched.length >= 3 ? 'found' : matched.length >= 1 ? 'partial' : 'missing';
-  return { response: snippet, topPage, pgNos, strength };
-}
-
-function matchBidToConditions(bidder) {
-  if (!bidder.pdfText) return [];
-  const suggestions = [];
-  const pages = bidder.pdfPages || [];
-  const fullText = bidder.pdfText;
-
-  conditions.forEach(cond => {
-    const extracted = extractResponseForCondition(cond, pages, fullText);
-    suggestions.push({
-      condId: cond.id,
-      matched: [],           // legacy field — no longer used for strength
-      strength: extracted.strength,
-      topPage: extracted.topPage,
-      snippet: extracted.response,
-      relevantPages: extracted.pgNos || [],
-      extractedResponse: extracted.response,
-    });
-  });
-
-  return suggestions;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  ELIGIBILITY CONDITION AUTO-EXTRACTION (from tender text + corrigenda)
-// ═══════════════════════════════════════════════════════════════════════
-
-// Phrases that mark the start of an eligibility/qualification section.
-// More-specific patterns first so the numbered-section match takes priority over the generic one.
-const ELIGIBILITY_SECTION_MARKERS = [
-  /4[\.\s]+1[\.\s]+eligibility\s+(?:and\s+evaluation\s+)?criteria/i,
-  /4[\.\s]+1[\.\s]+eligibility\s+conditions?/i,
-  /eligibility\s+(?:and\s+evaluation\s+)?criteria/i,
-  /eligibility\s+conditions?/i,
-  /qualification\s+criteria/i,
-  /qualification\s+requirements?/i,
-  /pre[-\s]?qualification\s+criteria/i,
-  /technical\s+qualification/i,
-  /minimum\s+qualification\s+criteria/i,
-  /technical\s+(?:bid\s+)?eligibility/i,
-];
-
-// Headings that mark the END of the eligibility section
-const ELIGIBILITY_SECTION_ENDERS = [
-  /\b4[\.\s]+2\.?\s+(?=[A-Z])/,  // next numbered sub-section e.g. "4.2 Evaluation" — works even with fully collapsed whitespace
-  /financial\s+bid/i,
-  /scope\s+of\s+work/i,
-  /general\s+terms/i,
-  /instructions?\s+to\s+bidders/i,
-  /annexure/i,
-  /schedule\s+of\s+quantities/i,
-  /evaluation\s+(?:methodology|process)/i,
-  /submission\s+of\s+bids?/i,
-];
-
-// Proof/document hints keyed by keyword found in the condition text
-const PROOF_HINTS = [
-  { re: /sole\s*proprietor|registered\s*partnership|private\s*limited|public\s*limited|certificate\s*of\s*incorporation|company.*registr|pvt\.?\s*ltd/i,
-    proof: 'Company Incorporation Certificate / Registration Certificate / Partnership Deed / MoU (for consortium)' },
-  { re: /civil\s*work|construction|foot\s*over\s*bridge|\bfob\b|bridge|viaduct|flyover|pedestrian|walkway|infrastructure/i,
-    proof: 'Work Orders + Completion Certificates / Client Certificates' },
-  { re: /out.of.home|\booh\b|outdoor\s*advertis|media\s*compan|advertising\s*space|bus\s*shelter|hoarding|billboard/i,
-    proof: 'Work Orders + Completion Certificates / Client Certificates' },
-  { re: /net\s*worth|annual\s*turnover|average.*turnover/i,
-    proof: 'Form 2 and Audited Financial Statements from Chartered Accountant or Statutory Auditor' },
-  { re: /solvency/i, proof: 'Solvency Certificate from a Nationalized or Scheduled Bank' },
-  { re: /litigation|non.performing\s*contract/i, proof: 'Undertaking as per Appendix 5' },
-  { re: /barred|government.*agency|supreme\s*court/i, proof: 'Undertaking as per Appendix 6' },
-  { re: /stamp\s*paper|revenue\s*stamp/i, proof: 'Non-judicial stamp paper of Rs. 100 (U.P.) with Rs. 1 revenue stamp' },
-  { re: /\bdeclaration\b/i, proof: 'Appendix 9' },
-  { re: /earnest\s*money|\bemd\b/i, proof: 'EMD payment proof (DD / RTGS / NEFT / BG)' },
-  { re: /consortium|joint\s*venture|\bjv\b|\bmou\b/i, proof: 'MoU / JV Agreement defining roles & equity share' },
-  { re: /power\s*of\s*attorney|\bpoa\b|authoris[ei]d?\s*signatory/i, proof: 'Power of Attorney / Board Resolution' },
-  { re: /\bgst\b|gstin/i, proof: 'GST Registration Certificate' },
-  { re: /\bpan\b/i, proof: 'PAN Card' },
-];
-
-function guessProof(condText) {
-  for (const h of PROOF_HINTS) if (h.re.test(condText)) return h.proof;
-  return '';
-}
-
-// Find the eligibility section, skipping TOC entries (dot-leader lines).
-function findEligibilitySection(text) {
-  let startIdx = -1;
-
-  for (const marker of ELIGIBILITY_SECTION_MARKERS) {
-    let searchFrom = 0;
-    let m;
-    while ((m = text.slice(searchFrom).match(marker)) !== null) {
-      const absIdx = searchFrom + m.index;
-      // If followed mostly by dots/spaces/digits → TOC entry, skip
-      const after = text.slice(absIdx + m[0].length, absIdx + m[0].length + 150);
-      const dotRatio = (after.match(/[.\s\d]/g) || []).length / Math.max(after.length, 1);
-      if (dotRatio < 0.6) {
-        if (startIdx === -1 || absIdx < startIdx) startIdx = absIdx;
-        break;
-      }
-      searchFrom = absIdx + m[0].length + 1;
-      if (searchFrom >= text.length) break;
-    }
-  }
-
-  if (startIdx === -1) return text;
-
-  let endIdx = text.length;
-  const rest = text.slice(startIdx + 50);
-  for (const ender of ELIGIBILITY_SECTION_ENDERS) {
-    const m = rest.match(ender);
-    if (m) {
-      const absIdx = startIdx + 50 + m.index;
-      if (absIdx < endIdx) endIdx = absIdx;
-    }
-  }
-  return text.slice(startIdx, endIdx);
-}
-
-// Split section into numbered-clause candidates (handles "1." / "(a)" / "i)" style lists)
-function splitIntoConditionCandidates(section) {
-  const candidates = [];
-  const numberedRe = /(?:^|\n)\s*(?:\(?[a-z]\)|\(?[ivx]+\)|\d{1,2}\.\d{0,2}|\d{1,2}\))\s+/gi;
-  const matches = [...section.matchAll(numberedRe)];
-
-  if (matches.length >= 2) {
-    for (let i = 0; i < matches.length; i++) {
-      const start = matches[i].index + matches[i][0].length;
-      const end = i + 1 < matches.length ? matches[i+1].index : Math.min(section.length, start + 800);
-      const chunk = section.slice(start, end).replace(/\s+/g,' ').trim();
-      if (chunk.length >= 25 && chunk.length <= 900) candidates.push(chunk);
-    }
-  } else {
-    section.split(/\n+/).forEach(line => {
-      let t = line.replace(/\s+/g,' ').trim();
-      // Strip a leading bare table-row number (e.g. "9 Declaration" -> "Declaration")
-      // so output is consistent with the sequential-number splitter's candidates.
-      t = t.replace(/^(\d{1,2})\s+(?=[A-Za-z])/, '');
-      if (t.length >= 10 && t.length <= 900) candidates.push(t);
-    });
-  }
-  return candidates;
-}
-
-// Keywords that indicate a chunk is an eligibility requirement (not a submission instruction)
-const ELIGIBILITY_RELEVANCE_RE = /\b(shall\s+have|should\s+have|must\s+have|minimum|at\s+least|not\s+less\s+than|experience\s+in|experience\s+of|certificate|registered|incorporat|turnover|net\s*worth|solvency|earnest\s*money|\bemd\b|consortium|joint\s*venture|power\s*of\s*attorney|blacklist|litigation|non.performing|stamp\s*paper|\bdeclaration\b|\bgst\b|barred|debarred)\b/i;
-
-// Fallback splitter for bare-number table rows ("1 Sole...", "2 The...")
-function splitBySequentialNumbers(text) {
-  const re = /(?<![.\d])(\d{1,2})(?![.,)\d])\s+(?=[A-Z])/g;
-  let m;
-  const all = [];
-  while ((m = re.exec(text))) {
-    all.push({ num: parseInt(m[1], 10), index: m.index, len: m[0].length });
-  }
-
-  const dp = new Map();
-  for (const cand of all) {
-    const prev = dp.get(cand.num - 1);
-    const chain = prev ? [...prev.items, cand] : [cand];
-    const existing = dp.get(cand.num);
-    if (!existing || chain.length > existing.items.length ||
-        (chain.length === existing.items.length && chain[0].index < existing.items[0].index)) {
-      dp.set(cand.num, { items: chain });
-    }
-  }
-
-  let best = [];
-  for (const { items } of dp.values()) {
-    if (items.length > best.length && items[0].num <= 2) best = items;
-  }
-  if (best.length < 3) return [];
-
-  const candidates = [];
-  for (let i = 0; i < best.length; i++) {
-    const start = best[i].index + best[i].len;
-    const end = i + 1 < best.length ? best[i + 1].index : Math.min(text.length, start + 900);
-    const chunk = text.slice(start, end).replace(/\s+/g, ' ').trim();
-    if (chunk.length >= 15) candidates.push(chunk);
-  }
-  return candidates;
-}
-
-// Split proof column text from condition text.
-// In two-column PDF tables, PDF.js merges both columns into one string.
-// Known proof-boundary phrases signal where the condition text ends and the proof begins.
-const PROOF_BOUNDARY_RE = /\b(work\s*order|completion\s*certificate|client\s*certificate|certificate\s*of\s*incorporation|company\s*incorporation|form\s*2\b|audited\s*financial|chartered\s*accountant|statutory\s*auditor|solvency\s*certificate\s*from|nationaliz|scheduled\s*bank|undertaking\s*as\s*per|appendix\s*\d|to\s*be\s*submitted|non.judicial\s*stamp|stamp\s*paper)\b/i;
-
-function splitConditionFromProof(chunk) {
-  const re = new RegExp(PROOF_BOUNDARY_RE.source, 'gi');
-  const matches = [...chunk.matchAll(re)];
-  // Prefer the first boundary match well into the chunk (real proof column).
-  // For short rows (e.g. "Declaration", a one-line stamp-paper clause) the
-  // proof phrase can legitimately start early, so allow an early match too.
-  const chosen = matches.find(m => m.index > 40) || (chunk.length <= 60 ? matches[0] : null);
-  if (chosen) {
-    return {
-      text: (chunk.slice(0, chosen.index).replace(/\s+/g, ' ').trim()) || chunk.trim(),
-      proof: chunk.slice(chosen.index).replace(/\s+/g, ' ').trim(),
-    };
-  }
-  return { text: chunk, proof: guessProof(chunk) };
-}
-
-// Skip lines that are clearly table headers, not conditions
-const HEADER_ROW_RE = /^#?\s*(?:eligibility\s+conditions?|sl\.?\s*no|sr\.?\s*no|s\.?\s*no|documentary\s+proof|#\s+eligibility)/i;
-
-// Process/instruction sentences that happen to mention an eligibility keyword
-// (e.g. "EMD will be returned...") but are NOT themselves eligibility conditions.
-const NON_ELIGIBILITY_RE = /\b(will\s+be\s+returned|will\s+be\s+refunded|shall\s+be\s+returned|shall\s+be\s+refunded|released\s+after|after\s+opening\s+of\s+(?:the\s+)?(?:price|financial)\s*bid|unsuccessful\s+bidder|forfeit|encash|interest[\s-]free|as\s+possible)\b/i;
-
-function extractEligibilityConditions(text) {
-  const section = findEligibilitySection(text);
-  let rawCandidates = splitIntoConditionCandidates(section);
-  if (rawCandidates.length < 3) {
-    const fallback = splitBySequentialNumbers(section);
-    if (fallback.length >= 3) rawCandidates = fallback;
-  }
-
-  // Also search the full doc for a GST / registration number condition that
-  // sometimes lives outside the eligibility table in Indian govt tenders
-  const gstMatch = text.match(/gst(?:in)?\s*(?:registration|certificate|number|no\.?)[^\n]{10,100}/i);
-  if (gstMatch) rawCandidates.push(gstMatch[0]);
-
-  const seen = new Set();
-  const results = [];
-  for (const raw of rawCandidates) {
-    if (HEADER_ROW_RE.test(raw.trim())) continue;
-    if (NON_ELIGIBILITY_RE.test(raw)) continue;
-    if (!ELIGIBILITY_RELEVANCE_RE.test(raw)) continue;
-    const key = raw.replace(/\s+/g, ' ').trim().toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    const { text: condText, proof } = splitConditionFromProof(raw);
-    results.push({ text: condText, proof: proof || guessProof(condText) });
-    if (results.length >= 30) break;
-  }
-  return results;
-}
-
-// Preferred entry point: try the position-based table extractor first (accurate,
-// deterministic, no guessing at column boundaries). Only fall back to the regex/
-// keyword pipeline above if the document doesn't use the standard 3-column table
-// layout (e.g. eligibility given as a plain numbered list rather than a table).
-let lastExtractionMethod = 'none'; // exposed for the debug panel
-function extractEligibilityConditionsSmart(text, pages) {
-  const tableRows = extractEligibilityTableFromPages(pages);
-  if (tableRows.length >= 3) {
-    lastExtractionMethod = `table (position-based, ${tableRows.length} rows)`;
-    return tableRows
-      .sort((a, b) => a.no - b.no)
-      .map(r => ({ text: r.condition || `(Condition ${r.no} — see proof column)`, proof: r.proof }))
-      .filter(r => r.text && r.text.replace(/\(Condition.*\)/,'').trim().length > 0);
-  }
-  lastExtractionMethod = 'regex fallback (no table layout detected)';
-  return extractEligibilityConditions(text);
-}
-
-// Apply corrigendum amendments to an extracted condition list by clause-ref or fuzzy text match
-function applyCorrigendaToConditions(condList) {
-  if (!corrigenda.length) return condList;
-  return condList.map(c => {
-    for (const cg of corrigenda) {
-      const refMatch = cg.clauseRef && c.text.includes(cg.clauseRef);
-      const textMatch = cg.original && cg.original.length > 15 &&
-        c.text.toLowerCase().includes(cg.original.toLowerCase().substring(0, 30));
-      if (refMatch || textMatch) {
-        return {
-          ...c,
-          text: cg.amended ? cg.amended : c.text,
-          corrigNote: `Amended per Clause ${cg.clauseRef || '?'} (${cg.source || 'corrigendum'})`,
-        };
-      }
-    }
-    return c;
-  });
-}
-
-// Debug helper — shows exactly what the extractor sees from the uploaded tender
-function debugEligibility() {
-  const panel = document.getElementById('condDebugPanel');
-  if (!tenderText) {
-    panel.style.display = '';
-    panel.innerHTML = '<div class="status warn">No tender PDF uploaded yet — upload the tender in Step 1 first.</div>';
-    return;
-  }
-  const section = findEligibilitySection(tenderText);
-  const sectionFound = section.length < tenderText.length;
-  const stdCands = splitIntoConditionCandidates(section);
-  const seqCands = splitBySequentialNumbers(section);
-  const tableRows = extractEligibilityTableFromPages(tenderPdfPages);
-  const extracted = extractEligibilityConditionsSmart(tenderText, tenderPdfPages);
-
-  // Find which section marker matched
-  let matchedMarker = 'none — fell back to full document';
-  for (const marker of ELIGIBILITY_SECTION_MARKERS) {
-    if (tenderText.match(marker)) { matchedMarker = String(marker); break; }
-  }
-
-  panel.style.display = '';
-  panel.innerHTML = `
-    <div style="background:#F5F7FA;border:1px solid #CBD3E1;border-radius:8px;padding:14px;font-size:12px;font-family:monospace">
-      <div style="font-weight:700;font-size:13px;font-family:sans-serif;color:#1A5CA8;margin-bottom:10px">🔍 Extraction Diagnostics</div>
-      <div><strong>Extraction method used:</strong> ${escHtml(lastExtractionMethod)}</div>
-      <div><strong>Position-based table rows found:</strong> ${tableRows.length}</div>
-      <div><strong>Section heading matched:</strong> ${escHtml(matchedMarker)}</div>
-      <div><strong>Section length:</strong> ${section.length} chars (full doc: ${tenderText.length})</div>
-      <div><strong>Standard splitter candidates:</strong> ${stdCands.length}</div>
-      <div><strong>Sequential-number fallback candidates:</strong> ${seqCands.length}</div>
-      <div><strong>Final conditions after relevance filter:</strong> ${extracted.length}</div>
-      <hr style="margin:10px 0;border-color:#E0E6F0"/>
-      <div style="font-weight:700;margin-bottom:4px">Section text (first 1200 chars):</div>
-      <div style="background:#fff;border:1px solid #E0E6F0;border-radius:4px;padding:8px;max-height:180px;overflow-y:auto;white-space:pre-wrap;line-height:1.5">${escHtml(section.substring(0, 1200))}</div>
-      ${tableRows.length ? `
-      <hr style="margin:10px 0;border-color:#E0E6F0"/>
-      <div style="font-weight:700;margin-bottom:4px">Table rows found (${tableRows.length}) — condition / proof:</div>
-      <ol style="margin:0;padding-left:18px">${tableRows.map(r => `<li style="margin-bottom:6px"><strong>${escHtml((r.condition||'').substring(0,140))}</strong><br/><span style="color:#5B6478">${escHtml((r.proof||'').substring(0,100))}</span></li>`).join('')}</ol>` : ''}
-      ${!tableRows.length && seqCands.length ? `
-      <hr style="margin:10px 0;border-color:#E0E6F0"/>
-      <div style="font-weight:700;margin-bottom:4px">Sequential candidates found (${seqCands.length}):</div>
-      <ol style="margin:0;padding-left:18px">${seqCands.map(c => `<li style="margin-bottom:3px">${escHtml(c.substring(0,120))}</li>`).join('')}</ol>` : ''}
-    </div>`;
-}
-
-// Auto-populate Step 3 from tenderText + corrigenda. Shows a confirm banner if the
-// user already has manually-entered conditions, instead of silently overwriting them.
-function tryAutoPopulateConditions() {
-  if (!tenderText) return;
-  const section = findEligibilitySection(tenderText);
-  const sectionFound = section.length < tenderText.length; // false means we fell back to whole doc
-
-  // Diagnostic output — visible in browser console (F12 → Console)
-  console.log('[BidEval] Section found:', sectionFound, '| length:', section.length);
-  console.log('[BidEval] Section preview:', section.substring(0, 800));
-  console.log('[BidEval] Standard splitter candidates:', splitIntoConditionCandidates(section).length);
-  console.log('[BidEval] Sequential fallback candidates:', splitBySequentialNumbers(section).length);
-
-  const extracted = extractEligibilityConditionsSmart(tenderText, tenderPdfPages);
-  console.log('[BidEval] Extraction method used:', lastExtractionMethod);
-
-  if (!extracted.length) {
-    showZoneStatus('globalStatus',
-      sectionFound
-        ? `⚠ Found an eligibility/qualification heading but couldn't split it into individual conditions — the numbering format may be unusual. Please add conditions manually, or share the tender PDF so the parser can be tuned.`
-        : `⚠ Couldn't locate an "Eligibility Criteria" / "Qualification Criteria" heading in the extracted text — conditions need to be added manually for this tender.`,
-      'warn');
-    return;
-  }
-
-  const amended = applyCorrigendaToConditions(extracted);
-  const asConditions = amended.map((c, i) => ({ id: i+1, text: c.text, proof: c.proof, corrigNote: c.corrigNote || '' }));
-
-  conditions = asConditions;
-  renderConditions();
-  refreshAllBidderPanels();
-  showZoneStatus('globalStatus', `✓ Auto-populated ${asConditions.length} eligibility condition(s) from the tender (${lastExtractionMethod})${corrigenda.length ? ' (corrigendum amendments applied)' : ''}.`, 'ok');
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  CORRIGENDUM AUTO-EXTRACTION
-// ═══════════════════════════════════════════════════════════════════════
-const CORRIG_PATTERNS = [
-  { re: /clause\s*([\d\.]+)[^\n]{0,60}\n([^\n]{20,200})\n[^\n]{0,30}(?:amended|replaced|substituted|read as)[^\n]{0,10}\n([^\n]{20,200})/gi, groups:{clause:1,original:2,amended:3}},
-  { re: /(?:sr\.?\s*no\.?\s*|s\.?\s*no\.?\s*)(\d+)[^\n]{0,20}\n([^\n]{10,120})\n([^\n]{10,120})/gi, groups:{clause:1,original:2,amended:3}},
-];
-
-function extractCorrigenda(text) {
-  const found = [];
-  // Simple heuristic: look for "Clause X.Y" + changed text
-  const lines = text.split('\n');
-  for (let i = 0; i < lines.length - 2; i++) {
-    const l = lines[i];
-    const clauseM = l.match(/clause\s+([\d\.]+)/i) || l.match(/condition\s+([\d\.]+)/i);
-    if (clauseM) {
-      const ref = clauseM[1];
-      // Look for "read as" or "amended to" or "substituted by" in nearby lines
-      const context = lines.slice(i, i+6).join('\n');
-      const amendM = context.match(/(?:amended(?:\s+to)?|read\s+as|substituted(?:\s+by)?|replaced(?:\s+with)?)[:\s]+(.{20,200})/i);
-      const origM  = context.match(/existing[:\s]+(.{20,200})/i) || context.match(/(?:before|original)[:\s]+(.{20,200})/i);
-      if (amendM) {
-        found.push({
-          id: Date.now() + found.length,
-          clauseRef: ref,
-          original: origM ? origM[1].trim() : '(see original tender)',
-          amended: amendM[1].trim(),
-          source: 'Auto-extracted from PDF',
-        });
-      }
-    }
-  }
-  return found;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  TENDER PDF HANDLER
-// ═══════════════════════════════════════════════════════════════════════
-async function handleTenderPDF(file) {
-  if (!file) return;
-  if (file.type !== 'application/pdf') { showZoneStatus('tenderUploadStatus','Only PDF files are supported.','err'); return; }
-
-  const zone = document.getElementById('tenderZone');
-  zone.classList.add('loading');
-  document.getElementById('tenderProgress').style.display = '';
-  showZoneStatus('tenderUploadStatus', 'Reading PDF locally…', 'info');
-
-  try {
-    const { fullText, pages, totalPages } = await extractPDFText(file, pct => {
-      document.getElementById('tenderProgressBar').style.width = pct + '%';
-    });
-    tenderText = fullText;
-    tenderPdfPages = pages;
-
-    // Extract meta fields
-    const meta = extractMeta(fullText);
-    if (meta.tenderName) setField('tenderName', meta.tenderName);
-    if (meta.orgName) {
-      // Clean up org name
-      const gn = fullText.match(/GNIDA/i) ? 'GNIDA' :
-                 fullText.match(/noida\s*authority/i) ? 'NOIDA Authority' :
-                 fullText.match(/NMRC/i) ? 'NMRC' : meta.orgName;
-      setField('orgName', gn);
-    }
-    if (meta.tenderNo) setField('tenderNo', meta.tenderNo);
-    if (meta.tenderFee) setField('tenderFee', meta.tenderFee.replace(/,/g,''));
-    if (meta.emdAmount) setField('emdAmount', meta.emdAmount.replace(/,/g,''));
-
-    // Auto-detect evaluation method from text
-    const evalSel = document.getElementById('evalMethod');
-    if (evalSel) {
-      if (/highest\s*(license\s*fee|bid|quote|revenue|premium|offer)|h\s*-?\s*1\b|h1\b|highest\s*bidder|maximum\s*(license|revenue|bid)/i.test(fullText)) {
-        evalSel.value = 'h1';
-      } else if (/lowest\s*(bid|price|quote|offer)|l\s*-?\s*1\b|l1\b|lowest\s*bidder/i.test(fullText)) {
-        evalSel.value = 'l1';
-      } else if (/qcbs|quality.*cost.*based|technical.*financial.*weight/i.test(fullText)) {
-        evalSel.value = 'qcbs';
-      } else if (/pre\s*qualification|technical\s*(?:bid\s*)?evaluation\s*only/i.test(fullText)) {
-        evalSel.value = 'technical';
-      }
-    }
-
-    // Auto-detect tender type
-    const typeSel = document.getElementById('tenderType');
-    if (typeSel) {
-      if (/\bbot\b|build\s*operate\s*transfer|ppp|concession|license\s*fee|revenue\s*share/i.test(fullText)) {
-        typeSel.value = 'botworks';
-      } else if (/bill\s*of\s*quantities|boq|schedule\s*of\s*rates|sor/i.test(fullText)) {
-        typeSel.value = 'works';
-      } else if (/service\s*level|sla|manpower|deliverable/i.test(fullText)) {
-        typeSel.value = 'services';
-      }
-    }
-
-    zone.classList.remove('loading');
-    zone.classList.add('active');
-    document.getElementById('tenderZoneTitle').textContent = '✓ ' + file.name;
-    document.getElementById('tenderZoneHint').textContent = `${totalPages} pages extracted locally. Fields auto-filled below — edit as needed.`;
-    document.getElementById('tenderProgress').style.display = 'none';
-    showZoneStatus('tenderUploadStatus', `✓ Extracted ${totalPages} pages. Auto-filled available fields from text layer.`, 'ok');
-
-    tryAutoPopulateConditions();
-
-  } catch(e) {
-    zone.classList.remove('loading');
-    document.getElementById('tenderProgress').style.display = 'none';
-    showZoneStatus('tenderUploadStatus', 'Error reading PDF: ' + e.message + '. Fill fields manually.', 'err');
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  CORRIGENDUM / PRE-BID — MULTI-DOCUMENT UPLOAD
-// ═══════════════════════════════════════════════════════════════════════
-let corrigDocs = []; // [{id, name, type, totalPages, status, amendCount}]
-
-const DOC_TYPE_LABELS = {
-  corrigendum: 'Corrigendum',
-  prebid: 'Pre-Bid Query Response',
-  addendum: 'Addendum',
-  other: 'Other',
-};
-
-function inferDocType(filename) {
-  const f = filename.toLowerCase();
-  if (/corrig|amendment|addend/.test(f)) return 'corrigendum';
-  if (/pre.?bid|query|queries|response/.test(f)) return 'prebid';
-  if (/addend/.test(f)) return 'addendum';
-  return 'other';
-}
-
-async function handleCorrigFiles(fileList) {
-  if (!fileList || !fileList.length) return;
-  const files = Array.from(fileList).filter(f => f.type === 'application/pdf');
-  if (!files.length) { showZoneStatus('corrigUploadStatus','Only PDF files are supported.','err'); return; }
-
-  for (const file of files) {
-    const docId = Date.now() + Math.random();
-    const docType = inferDocType(file.name);
-    const doc = { id: docId, name: file.name, type: docType, totalPages: 0, status: 'loading', amendCount: 0 };
-    corrigDocs.push(doc);
-    renderCorrigDocList();
-
-    try {
-      const { fullText, totalPages } = await extractPDFText(file);
-      doc.totalPages = totalPages;
-      const found = extractCorrigenda(fullText);
-      found.forEach(c => {
-        c.sourceDoc = file.name;
-        c.source = `Auto-extracted from "${file.name}"`;
-        corrigenda.push(c);
-      });
-      doc.amendCount = found.length;
-      doc.status = 'done';
-    } catch(e) {
-      doc.status = 'error';
-      doc.error = e.message;
-    }
-    renderCorrigDocList();
-    renderCorrigenda();
-  }
-
-  const doneCount = corrigDocs.filter(d => d.status === 'done').length;
-  const totalAmends = corrigDocs.reduce((s,d) => s + (d.amendCount||0), 0);
-  showZoneStatus('corrigUploadStatus',
-    `✓ ${doneCount} document(s) processed. ${totalAmends} amendment(s) auto-identified — review and edit below, or add more manually.`,
-    totalAmends ? 'ok' : 'warn');
-
-  tryAutoPopulateConditions();
-}
-
-function removeCorrigDoc(id) {
-  const doc = corrigDocs.find(d => d.id === id);
-  if (doc) {
-    // Remove amendments that came from this doc
-    corrigenda = corrigenda.filter(c => c.sourceDoc !== doc.name);
-    renderCorrigenda();
-  }
-  corrigDocs = corrigDocs.filter(d => d.id !== id);
-  renderCorrigDocList();
-}
-
-function renderCorrigDocList() {
-  const div = document.getElementById('corrigDocList');
-  if (!corrigDocs.length) { div.innerHTML = ''; return; }
-  div.innerHTML = corrigDocs.map(doc => {
-    const icon = doc.status === 'loading' ? '<span class="spinner" style="display:inline-block"></span>'
-               : doc.status === 'error'   ? '❌'
-               : '✓';
-    const statusColor = doc.status === 'done' ? '#1E7E34' : doc.status === 'error' ? '#C0392B' : '#1A5CA8';
-    const typeOptions = Object.entries(DOC_TYPE_LABELS).map(([v,l]) =>
-      `<option value="${v}" ${doc.type===v?'selected':''}>${l}</option>`).join('');
-    return `
-      <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#F5F7FA;border:1px solid #E0E6F0;border-radius:6px;margin-bottom:6px">
-        <span style="color:${statusColor};font-weight:700;width:18px;text-align:center">${icon}</span>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:600;color:#1A1F2E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(doc.name)}</div>
-          <div style="font-size:11px;color:#9AA5B8;margin-top:1px">
-            ${doc.status==='loading' ? 'Processing…'
-            : doc.status==='error'  ? `Error: ${escHtml(doc.error||'')}`
-            : `${doc.totalPages} pages · ${doc.amendCount} amendment(s) extracted`}
-          </div>
-        </div>
-        <select style="width:180px;font-size:12px;padding:4px 6px" onchange="corrigDocs.find(d=>d.id===${doc.id}).type=this.value">${typeOptions}</select>
-        <button class="danger sm" onclick="removeCorrigDoc(${doc.id})">✕</button>
-      </div>`;
-  }).join('');
-}
-
-// Legacy single-file shim (keeps ondrop on zone working)
-function handleCorrigPDF(file) { if (file) handleCorrigFiles([file]); }
-
-// ═══════════════════════════════════════════════════════════════════════
-//  CORRIGENDUM RENDERING
-// ═══════════════════════════════════════════════════════════════════════
-function addCorrig() {
-  corrigenda.push({ id: Date.now(), clauseRef:'', original:'', amended:'', source:'Manual' });
-  renderCorrigenda();
-}
-
-function removeCorrig(id) {
-  corrigenda = corrigenda.filter(c => c.id !== id);
-  renderCorrigenda();
-}
-
-function renderCorrigenda() {
-  const div = document.getElementById('corrigList');
-  if (!corrigenda.length) {
-    div.innerHTML = '<p class="empty-note" style="padding:12px">No amendments recorded yet.</p>';
-    return;
-  }
-  div.innerHTML = corrigenda.map((c, i) => `
-    <div class="corrig-item" id="corrig_${c.id}">
-      <div class="corrig-item-hdr">
-        <span class="corrig-no">Amend. ${i+1}</span>
-        <div style="flex:1;display:flex;gap:10px">
-          <div style="flex:0 0 160px">
-            <label style="margin-bottom:2px">Clause / Condition Ref.</label>
-            <input type="text" value="${escHtml(c.clauseRef)}" placeholder="e.g. 4.1.2" onchange="corrigenda[${i}].clauseRef=this.value"/>
-          </div>
-          <div style="flex:1;font-size:11px;color:#5B6478;align-self:flex-end;padding-bottom:4px">${escHtml(c.source)}</div>
-        </div>
-        <button class="danger sm" onclick="removeCorrig(${c.id})">✕</button>
-      </div>
-      <div class="row">
-        <div class="col">
-          <label style="margin-bottom:2px">Original Clause Text</label>
-          <textarea rows="2" onchange="corrigenda[${i}].original=this.value" placeholder="Original wording from tender...">${escHtml(c.original)}</textarea>
-        </div>
-        <div class="col">
-          <label style="margin-bottom:2px">Amended / Revised Text</label>
-          <textarea rows="2" onchange="corrigenda[${i}].amended=this.value" placeholder="New wording per corrigendum...">${escHtml(c.amended)}</textarea>
-        </div>
-      </div>
-    </div>
-  `).join('');
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  ELIGIBILITY CONDITIONS
-// ═══════════════════════════════════════════════════════════════════════
-function addCondition() {
-  const id = conditions.length ? Math.max(...conditions.map(c=>c.id))+1 : 1;
-  conditions.push({ id, text:'', proof:'', corrigNote:'' });
-  renderConditions();
-}
-
-function removeCondition(id) {
-  conditions = conditions.filter(c => c.id !== id);
-  renderConditions();
-  refreshAllBidderPanels();
-}
-
-function renderConditions() {
-  const div = document.getElementById('condList');
-  if (!conditions.length) {
-    div.innerHTML = '<p class="empty-note">No conditions yet. Click "+ Add Condition" to copy eligibility conditions from the RFP.</p>';
-    return;
-  }
-  div.innerHTML = conditions.map((c,i) => `
-    <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start">
-      <div style="font-weight:700;color:#1A5CA8;min-width:24px;margin-top:10px">${i+1}.</div>
-      <div style="flex:1">
-        <label>Condition Text (from RFP / corrigendum)</label>
-        <textarea rows="2" onchange="conditions[${i}].text=this.value" placeholder="Paste the eligibility condition text here...">${escHtml(c.text)}</textarea>
-      </div>
-      <div style="flex:0 0 220px">
-        <label>Documentary Proof Required</label>
-        <textarea rows="2" onchange="conditions[${i}].proof=this.value" placeholder="e.g. Certificate of Incorporation / Partnership Deed">${escHtml(c.proof)}</textarea>
-      </div>
-      <div style="margin-top:24px">
-        <button class="danger sm" onclick="removeCondition(${c.id})">✕</button>
-      </div>
-    </div>
-  `).join('');
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  BIDDER MANAGEMENT
-// ═══════════════════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════════════════
-//  STEP 4: UPLOAD-FIRST BIDDER CREATION (extract name + data from PDF)
-// ═══════════════════════════════════════════════════════════════════════
-function toggleManualBidderEntry() {
-  const el = document.getElementById('manualBidderEntry');
-  el.style.display = el.style.display === 'none' ? '' : 'none';
-}
-
-// Try to find the bidder/company name inside the extracted PDF text.
-// Falls back to the filename (cleaned up) if nothing matches.
-function guessBidderNameFromText(text, filename) {
-  const head = text.slice(0, 8000);
-  const patterns = [
-    // Appendix 1 form fields (GNIDA / standard GOI tender forms)
-    /name\s*of\s*(?:the\s*)?(?:firm|company|tenderer|bidder|contractor|agency|applicant)\s*[-:\u2013]\s*([^\n]{3,90})/i,
-    /(?:firm|company|tenderer|bidder)\s*name\s*[-:]\s*([^\n]{3,90})/i,
-    // "- Ritesh Associates" style (value on same line after dash)
-    /^[-\u2013]\s*((?:[A-Z][a-zA-Z0-9&.,()\s]{3,70}))$/m,
-    // M/s prefix
-    /\b(M\/s\.?\s+[A-Z][A-Za-z0-9&.,'\- ]{3,80})/,
-    // GST Legal Name
-    /(?:legal\s*name|trade\s*name)[^:\n]{0,5}[:\|]\s*([A-Z][A-Za-z0-9\s&.,()-]{3,60})/i,
-    // Board Resolution / POA "For <Name>"
-    /^(?:for|for\s+and\s+on\s+behalf\s+of)\s+([A-Z][A-Za-z0-9\s&.,()-]{4,70})$/im,
-  ];
-  for (const re of patterns) {
-    const m = head.match(re);
-    if (m && m[1]) {
-      let name = m[1].trim().replace(/\s{2,}/g,' ').replace(/[-:]+$/, '').trim();
-      name = name.split(/\n/)[0].trim();
-      // Reject clearly bad matches: all-caps abbreviations, too short, junk words
-      if (name.length < 3 || name.length > 100) continue;
-      if (/^(yes|no|submitted|nil|na|n\/a|india|delhi|noida|uttar)$/i.test(name)) continue;
-      return name;
-    }
-  }
-  // Fallback: clean filename
-  let base = filename.replace(/\.pdf$/i, '').replace(/[_\-]+/g,' ').trim();
-  base = base.replace(/\b(technical|bid|tender|document|rfp|proposal|final|scan(ned)?|package|tech)\b/gi,'').replace(/\s{2,}/g,' ').trim();
-  return base || filename;
-}
-
-function renderBidderUploadQueueRow(rowId, filename) {
-  const q = document.getElementById('bidderUploadQueue');
-  const row = document.createElement('div');
-  row.className = 'upload-row';
-  row.id = rowId;
-  row.innerHTML = `<span>⏳</span><span class="name">${filename}</span><span class="meta" id="${rowId}_meta">Extracting text…</span>`;
-  q.prepend(row);
-}
-
-async function handleBidDropFiles(fileList) {
-  const files = Array.from(fileList || []).filter(f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
-  if (!files.length) { showStatus('globalStatus', 'Please upload PDF file(s).', 'err'); return; }
-
-  for (const file of files) {
-    const rowId = 'biq_' + Math.random().toString(36).slice(2,9);
-    renderBidderUploadQueueRow(rowId, file.name);
-    try {
-      const { fullText, pages, totalPages } = await extractPDFText(file, pct => {
-        const meta = document.getElementById(rowId + '_meta');
-        if (meta) meta.textContent = `Extracting… ${pct}%`;
-      });
-
-      const name = guessBidderNameFromText(fullText, file.name);
-      const id = bidders.length ? Math.max(...bidders.map(b=>b.id))+1 : 1;
-      const b = {
-        id, name, portalId: '',
-        pdfText: fullText, pdfPages: pages, pdfLoaded: true,
-        pdfFileName: file.name, pdfTotalPages: totalPages,
-        docMatches: [],
-        receivables: { fee:'', emd:'' },
-        responses: [],
-        generalRemarks: '',
-        recommendation: '',
-      };
-
-      // Auto-detect receivables straight away
-      const feeM = fullText.match(/tender\s*(?:processing\s*)?fee[^\d]{0,20}([\d,]+)/i);
-      const emdM = fullText.match(/emd[^\d]{0,20}([\d,]+)/i) || fullText.match(/earnest\s*money[^\d]{0,20}([\d,]+)/i);
-      if (feeM) b.receivables.fee = feeM[1].replace(/,/g,'');
-      if (emdM) b.receivables.emd = emdM[1].replace(/,/g,'');
-
-      // Run local keyword matching against eligibility conditions immediately
-      b.docMatches = matchBidToConditions(b);
-
-      bidders.push(b);
-
-      const row = document.getElementById(rowId);
-      if (row) row.innerHTML = `<span class="badge-ok">✓</span><span class="name">${name}</span><span class="meta">${totalPages} pages · matched against ${conditions.length} condition(s)</span>`;
-    } catch (e) {
-      const row = document.getElementById(rowId);
-      if (row) row.innerHTML = `<span class="badge-err">✕</span><span class="name">${file.name}</span><span class="meta">Failed to read PDF: ${e.message}</span>`;
-    }
-  }
-
-  document.getElementById('evalCard').style.display = '';
-  document.getElementById('summaryCard').style.display = '';
-  activeBidder = bidders.length ? bidders[bidders.length-1].id : null;
-  renderTabs();
-  renderAllPanels();
-  refreshSummary();
-  renderSummaryUploads();
-  showStatus('globalStatus', `${files.length} bidder(s) added from uploaded PDF(s). Review extracted data in Step 5.`, 'ok');
-}
-
-function addBidder() {
-  const name = document.getElementById('newBidderName').value.trim();
-  if (!name) { showStatus('globalStatus','Enter a bidder name first.','err'); return; }
-  const pid = document.getElementById('newBidderPortalId').value.trim();
-  const id  = bidders.length ? Math.max(...bidders.map(b=>b.id))+1 : 1;
-  bidders.push({
-    id, name, portalId: pid,
-    pdfText: '', pdfPages: [], pdfLoaded: false,
-    docMatches: [],
-    receivables: { fee:'', emd:'' },
-    responses: [],
-    generalRemarks: '',
-    recommendation: '',
-  });
-  document.getElementById('newBidderName').value = '';
-  document.getElementById('newBidderPortalId').value = '';
-  document.getElementById('evalCard').style.display = '';
-  document.getElementById('summaryCard').style.display = '';
-  activeBidder = id;
-  renderTabs();
-  renderAllPanels();
-  refreshSummary();
-  renderSummaryUploads();
-  showStatus('globalStatus', `Bidder "${name}" added.`, 'ok');
-}
-
-function removeBidder(id) {
-  if (!confirm('Remove this bidder and all evaluation data?')) return;
-  bidders = bidders.filter(b => b.id !== id);
-  if (activeBidder === id) activeBidder = bidders.length ? bidders[0].id : null;
-  renderTabs(); renderAllPanels(); refreshSummary(); renderSummaryUploads();
-}
-
-function switchTab(id) {
-  activeBidder = id;
-  renderTabs(); renderAllPanels();
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  BID PDF UPLOAD & LOCAL ANALYSIS
-// ═══════════════════════════════════════════════════════════════════════
-async function handleBidPDF(bidderId, file) {
-  if (!file) return;
-  const b = getBidder(bidderId);
-  if (!b) return;
-
-  const statusId = `bidStatus_${bidderId}`;
-  const progressId = `bidProgress_${bidderId}`;
-  const progressBarId = `bidProgressBar_${bidderId}`;
-
-  showBidUploadStatus(statusId, '⏳ Extracting text from bid PDF locally…', 'info');
-  const progressEl = document.getElementById(progressId);
-  if (progressEl) progressEl.style.display = '';
-
-  try {
-    const { fullText, pages, totalPages } = await extractPDFText(file, pct => {
-      const bar = document.getElementById(progressBarId);
-      if (bar) bar.style.width = pct + '%';
-    });
-
-    b.pdfText  = fullText;
-    b.pdfPages = pages;
-    b.pdfLoaded = true;
-    b.pdfFileName = file.name;
-    b.pdfTotalPages = totalPages;
-
-    // Auto-detect receivables
-    const feeM = fullText.match(/tender\s*(?:processing\s*)?fee[^\d]{0,20}([\d,]+)/i);
-    const emdM = fullText.match(/emd[^\d]{0,20}([\d,]+)/i) || fullText.match(/earnest\s*money[^\d]{0,20}([\d,]+)/i);
-    if (feeM && !b.receivables.fee) b.receivables.fee = feeM[1].replace(/,/g,'');
-    if (emdM && !b.receivables.emd) b.receivables.emd = emdM[1].replace(/,/g,'');
-
-    // Run keyword matching against conditions
-    b.docMatches = matchBidToConditions(b);
-
-    if (progressEl) progressEl.style.display = 'none';
-    showBidUploadStatus(statusId, `✓ ${totalPages} pages extracted. Evidence matched against ${conditions.length} eligibility condition(s) — review and adjust below.`, 'ok');
-
-    // Re-render only this bidder's panel
-    const panelDiv = document.getElementById(`panel_${bidderId}`);
-    if (panelDiv) panelDiv.innerHTML = buildPanel(b);
-
-  } catch(e) {
-    if (progressEl) progressEl.style.display = 'none';
-    showBidUploadStatus(statusId, 'Error extracting PDF: ' + e.message, 'err');
-  }
-}
-
-function showBidUploadStatus(id, msg, type) {
-  const el = document.getElementById(id);
-  if (el) el.innerHTML = `<div class="status ${type}" style="margin:8px 0">${msg}</div>`;
-}
-
-function applyMatch(bId, cId) {
-  const b = getBidder(bId);
-  if (!b) return;
-  const r = b.responses.find(r => r.condId === cId);
-  if (!r) return;
-  const sug = b.docMatches.find(s => s.condId === cId);
-  if (!sug) return;
-
-  const extracted = sug.extractedResponse || sug.snippet || '';
-  if (extracted) r.response = extracted.trim().substring(0, 500);
-
-  if (sug.relevantPages && sug.relevantPages.length) {
-    r.pg = sug.relevantPages.slice(0, 5).join(',\n');
-  } else if (sug.topPage) {
-    r.pg = String(sug.topPage);
-  }
-
-  if (!r.status || r.status === '') {
-    if (sug.strength === 'found')        r.status = 'pass';
-    else if (sug.strength === 'partial') r.status = 'query';
-    else                                 r.status = 'fail';
-  }
-  const panelDiv = document.getElementById(`panel_${bId}`);
-  if (panelDiv) panelDiv.innerHTML = buildPanel(b);
-  renderTabs();
-  refreshSummary();
-}
-
-
-// ═══════════════════════════════════════════════════════════════════════
-//  PANEL RENDERING
-// ═══════════════════════════════════════════════════════════════════════
-function renderTabs() {
-  const div = document.getElementById('bidderTabs');
-  if (bidders.length <= 1) { div.innerHTML = ''; return; }
-  div.innerHTML = bidders.map(b => {
-    const flags = getFlags(b);
-    let cls = 'bidder-tab';
-    if (b.id === activeBidder) cls += ' active';
-    if (flags.some(f=>f.type==='fail')) cls += ' flagged';
-    else if (flags.length) cls += ' has-issues';
-    const label = b.portalId ? `${b.name} (${b.portalId})` : b.name;
-    return `<button class="${cls}" onclick="switchTab(${b.id})">${escHtml(label)}</button>`;
-  }).join('');
-}
-
-function renderAllPanels() {
-  const div = document.getElementById('bidderPanels');
-  div.innerHTML = bidders.map(b => {
-    const visible = b.id === activeBidder ? '' : 'display:none';
-    return `<div id="panel_${b.id}" style="${visible}">${buildPanel(b)}</div>`;
-  }).join('');
-}
-
-function refreshAllBidderPanels() {
-  if (!bidders.length) return;
-  renderAllPanels();
-}
-
-function buildPanel(b) {
-  // Ensure responses array has an entry per condition
-  conditions.forEach(c => {
-    if (!b.responses.find(r => r.condId === c.id)) {
-      b.responses.push({ condId: c.id, response:'', pg:'', status:'', remarks:'' });
-    }
-  });
-  const flags = getFlags(b);
-
-  let html = `
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:16px;flex-wrap:wrap">
-      <div>
-        <strong style="font-size:15px">${escHtml(b.name)}</strong>
-        ${b.portalId ? `<span class="info-pill" style="margin-left:8px">Portal ID: ${escHtml(b.portalId)}</span>` : ''}
-      </div>
-      <button class="danger sm" onclick="removeBidder(${b.id})">Remove Bidder</button>
-    </div>`;
-
-  // ── Bid Document Upload ──
-  html += `
-    <div class="bid-doc-panel" style="margin-bottom:16px">
-      <div class="bid-doc-hdr">
-        <div style="font-weight:700;font-size:13px;color:#1A5CA8">📂 Technical Bid Document</div>
-        <div style="font-size:11.5px;color:#5B6478;margin-left:auto">Upload ZIP or PDF — text extracted locally, keywords matched to conditions</div>
-      </div>
-      <div class="bid-doc-body">
-        ${b.pdfLoaded ? `
-          <div class="status ok" style="margin-bottom:8px">✓ ${escHtml(b.pdfFileName||'Bid document')} — ${b.pdfTotalPages} pages extracted</div>
-        ` : ''}
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <label style="cursor:pointer;flex:1">
-            <div style="border:1px dashed #CBD3E1;border-radius:6px;padding:10px 14px;background:#FAFBFC;font-size:12.5px;color:#5B6478;text-align:center">
-              ${b.pdfLoaded ? '↻ Replace bid PDF' : '📎 Upload bid PDF (scanned or text PDF)'}
-            </div>
-            <input type="file" accept=".pdf" style="display:none" onchange="handleBidPDF(${b.id},this.files[0])"/>
-          </label>
-        </div>
-        <div id="bidProgress_${b.id}" style="display:none;margin-top:6px"><div class="progress-wrap"><div class="progress-bar" id="bidProgressBar_${b.id}" style="width:0%"></div></div></div>
-        <div id="bidStatus_${b.id}"></div>
-      </div>
-    </div>`;
-
-  // ── Receivables ──
-  html += `
-    <div class="row" style="margin-bottom:14px">
-      <div class="col-sm">
-        <label>Tender Fee Paid (₹)</label>
-        <input type="text" value="${escHtml(b.receivables.fee)}" onchange="getBidder(${b.id}).receivables.fee=this.value" placeholder="Amount / Ref. no."/>
-      </div>
-      <div class="col-sm">
-        <label>EMD Paid (₹)</label>
-        <input type="text" value="${escHtml(b.receivables.emd)}" onchange="getBidder(${b.id}).receivables.emd=this.value" placeholder="Amount / DD No. / RTGS Ref."/>
-      </div>
-    </div>`;
-
-  // ── Flags panel ──
-  if (flags.length) {
-    html += `<div class="flags-panel"><h4>⚠ Issues / Queries (${flags.length})</h4>`;
-    flags.forEach(f => html += `<div class="flag-item">${escHtml(f.msg)}</div>`);
-    html += `</div>`;
-  }
-
-  // ── Evaluation Table ──
-  html += `<div class="table-scroll"><table class="eval-table"><thead><tr>
-    <th class="col-no">No.</th>
-    <th class="col-cond">Eligibility Condition</th>
-    <th class="col-proof">Documentary Proof Required</th>
-    <th class="col-resp">Response / Documents Submitted</th>
-    <th class="col-pg">Pg. No.</th>
-    <th class="col-status">Status</th>
-    <th class="col-match">Match</th>
-  </tr></thead><tbody>`;
-
-  conditions.forEach((c, i) => {
-    const resp = b.responses.find(r => r.condId === c.id) || {};
-    const statusCls = resp.status || 'na';
-    const sug = b.docMatches.find(s => s.condId === c.id);
-
-    const corrigNote = c.corrigNote ? `<div style="font-size:10px;color:#A06000;margin-top:3px">📝 ${escHtml(c.corrigNote)}</div>` : '';
-
-    let aiCell = '<span style="color:#CBD3E1;font-size:11px">—</span>';
-    if (sug) {
-      const chipCls = sug.strength === 'found' ? 'found' : sug.strength === 'partial' ? 'partial' : 'missing';
-      const chipLabel = sug.strength === 'found' ? '✓ Found' : sug.strength === 'partial' ? '? Partial' : '✗ Missing';
-      const pagesLabel = sug.relevantPages.length ? `p.${sug.relevantPages.join(',')}` : '';
-      const previewText = (sug.extractedResponse || sug.snippet || '').replace(/\n/g,' ').substring(0,120);
-      aiCell = `
-        <div>
-          <span class="match-chip ${chipCls}" title="${escHtml(previewText)}" onclick="applyMatch(${b.id},${c.id})">${chipLabel}</span>
-          ${pagesLabel ? `<div style="font-size:10px;color:#9AA5B8;margin-top:2px">${pagesLabel}</div>` : ''}
-          <div style="font-size:10px;color:#B0B8C8;margin-top:2px">click to fill</div>
-        </div>`;
-    }
-
-    html += `<tr>
-      <td class="col-no">${i+1}</td>
-      <td class="col-cond" style="font-size:12px">${escHtml(c.text)}${corrigNote}</td>
-      <td class="col-proof" style="font-size:11.5px;color:#5B6478">${escHtml(c.proof)}</td>
-      <td class="col-resp">
-        <textarea rows="3" style="width:100%;border:none;background:transparent;font-family:inherit;font-size:12px;resize:vertical"
-          onchange="setResp(${b.id},${c.id},'response',this.value)">${escHtml(resp.response||'')}</textarea>
-        <input type="text" placeholder="Remarks / flags…" style="font-size:11px;color:#A06000;border:none;border-top:1px dashed #E8BB4A;background:#FFFFF8;padding:3px 4px;width:100%"
-          onchange="setResp(${b.id},${c.id},'remarks',this.value)" value="${escHtml(resp.remarks||'')}"/>
-      </td>
-      <td class="col-pg">
-        <input type="text" value="${escHtml(resp.pg||'')}" onchange="setResp(${b.id},${c.id},'pg',this.value)"
-          style="width:100%;border:none;background:transparent;font-size:12px;font-family:inherit;text-align:center"/>
-      </td>
-      <td class="col-status">
-        <select class="status-select ${statusCls}" onchange="setStatus(${b.id},${c.id},this)">
-          <option value=""  ${!resp.status?'selected':''}>— —</option>
-          <option value="pass"  ${resp.status==='pass' ?'selected':''}>✓ Pass</option>
-          <option value="fail"  ${resp.status==='fail' ?'selected':''}>✗ Fail</option>
-          <option value="query" ${resp.status==='query'?'selected':''}>? Query</option>
-          <option value="na"    ${resp.status==='na'   ?'selected':''}>N/A</option>
-        </select>
-      </td>
-      <td class="col-match">${aiCell}</td>
-    </tr>`;
-  });
-
-  html += `</tbody></table></div>`;
-
-  // ── Remarks & Recommendation ──
-  html += `
-    <div class="row" style="margin-top:16px">
-      <div class="col">
-        <label>General Remarks on Bid</label>
-        <textarea rows="3" onchange="getBidder(${b.id}).generalRemarks=this.value"
-          placeholder="Overall observations, discrepancies noted, documents missing…">${escHtml(b.generalRemarks||'')}</textarea>
-      </div>
-      <div class="col-sm">
-        <label>Recommendation</label>
-        <select onchange="getBidder(${b.id}).recommendation=this.value" style="margin-bottom:8px">
-          <option value="" ${!b.recommendation?'selected':''}>— Select —</option>
-          <option value="Technically Qualified" ${b.recommendation==='Technically Qualified'?'selected':''}>✓ Technically Qualified</option>
-          <option value="Technically Disqualified" ${b.recommendation==='Technically Disqualified'?'selected':''}>✗ Disqualified</option>
-          <option value="Conditionally Qualified" ${b.recommendation==='Conditionally Qualified'?'selected':''}>⚠ Conditionally Qualified</option>
-        </select>
-      </div>
-    </div>
-    <div class="toolbar">
-      <button class="secondary" onclick="autoSave(${b.id})">💾 Save &amp; Refresh Summary</button>
-    </div>`;
-
-  return html;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  STATE SETTERS
-// ═══════════════════════════════════════════════════════════════════════
-function setResp(bId, cId, field, val) {
-  const b = getBidder(bId);
-  const r = b && b.responses.find(r => r.condId === cId);
-  if (r) r[field] = val;
-}
-
-function setStatus(bId, cId, sel) {
-  const val = sel.value;
-  sel.className = 'status-select ' + (val || 'na');
-  setResp(bId, cId, 'status', val);
-  renderTabs();
-  refreshSummary();
-}
-
-function autoSave(bId) {
-  refreshSummary();
-  showStatus('globalStatus','Progress saved. Summary refreshed.','ok');
-}
-
-function getBidder(id) { return bidders.find(b => b.id === id); }
-
-// ═══════════════════════════════════════════════════════════════════════
-//  FLAGS
-// ═══════════════════════════════════════════════════════════════════════
-function getFlags(b) {
-  const flags = [];
-  b.responses.forEach(r => {
-    if (r.status === 'fail') {
-      const c = conditions.find(c => c.id === r.condId);
-      const no = c ? conditions.indexOf(c)+1 : '?';
-      flags.push({ type:'fail', msg:`Condition ${no} — FAILED${r.remarks ? ': '+r.remarks : ''}` });
-    }
-    if (r.status === 'query') {
-      const c = conditions.find(c => c.id === r.condId);
-      const no = c ? conditions.indexOf(c)+1 : '?';
-      flags.push({ type:'query', msg:`Condition ${no} — Needs clarification${r.remarks ? ': '+r.remarks : ''}` });
-    }
-  });
-  return flags;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  SUMMARY
-// ═══════════════════════════════════════════════════════════════════════
-function refreshSummary() {
-  const div = document.getElementById('summaryContent');
-  if (!bidders.length) { div.innerHTML = '<p class="empty-note">Add bidders to see the summary.</p>'; return; }
-
-  let html = `<div class="table-scroll"><table class="sum-table"><thead><tr>
-    <th style="text-align:left;width:30px">Sr.</th>
-    <th style="text-align:left;min-width:200px">Bidder</th>
-    <th>Tender Fee</th><th>EMD</th>
-    ${conditions.map((_,i)=>`<th>Cl.${i+1}</th>`).join('')}
-    <th>Recommendation</th>
-  </tr></thead><tbody>`;
-
-  bidders.forEach((b, bi) => {
-    const recBadge = b.recommendation === 'Technically Qualified' ? 'badge-pass'
-                   : b.recommendation === 'Technically Disqualified' ? 'badge-fail'
-                   : b.recommendation === 'Conditionally Qualified' ? 'badge-query' : 'badge-na';
-    html += `<tr>
-      <td>${bi+1}</td>
-      <td class="left"><strong>${escHtml(b.name)}</strong>${b.portalId?`<br><span style="font-size:10px;color:#9AA5B8">${escHtml(b.portalId)}</span>`:''}</td>
-      <td>${escHtml(b.receivables.fee||'—')}</td>
-      <td>${escHtml(b.receivables.emd||'—')}</td>
-      ${conditions.map(c => {
-        const r = b.responses.find(r => r.condId === c.id);
-        const s = r ? r.status : '';
-        const icon = s==='pass' ? '<span style="color:#1E7E34;font-weight:700">✓</span>'
-                   : s==='fail' ? '<span style="color:#C0392B;font-weight:700">✗</span>'
-                   : s==='query'? '<span style="color:#A06000;font-weight:700">?</span>'
-                   : '<span style="color:#CBD3E1">—</span>';
-        return `<td>${icon}</td>`;
-      }).join('')}
-      <td><span class="badge ${recBadge}">${escHtml(b.recommendation||'Pending')}</span></td>
-    </tr>`;
-  });
-
-  html += `</tbody></table></div>`;
-
-  // Corrigendum summary
-  if (corrigenda.length) {
-    html += `<div style="margin-top:16px"><strong style="font-size:13px;color:#1A5CA8">Amendments Applied (${corrigenda.length})</strong>`;
-    corrigenda.forEach((c,i) => {
-      html += `<div style="font-size:12px;margin-top:6px;color:#5B6478">
-        <strong style="color:#1A1F2E">Amend. ${i+1} — Cl. ${escHtml(c.clauseRef)}</strong>:
-        Amended to: "${escHtml(c.amended.substring(0,120))}${c.amended.length>120?'…':''}"
-      </div>`;
-    });
-    html += `</div>`;
-  }
-
-  div.innerHTML = html;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  XLSX EXPORT
-// ═══════════════════════════════════════════════════════════════════════
-function exportXLSX() {
-  if (!bidders.length) { showStatus('globalStatus','No bidders to export.','err'); return; }
-  if (!conditions.length) { showStatus('globalStatus','No conditions defined.','err'); return; }
-
-  const wb = XLSX.utils.book_new();
-  const tName = v('tenderName') || 'Tender';
-  const org   = v('orgName') || '';
-  const tNo   = v('tenderNo') || '';
-  const tFee  = v('tenderFee') || '';
-  const emd   = v('emdAmount') || '';
-
-  // Helper: cell address
-  function enc(r, c) { return XLSX.utils.encode_cell({r, c}); }
-
-  // Helper: detect if a bidder has any FAIL responses
-  function isFlagged(b) {
-    return conditions.some(c => {
-      const r = b.responses.find(r => r.condId === c.id);
-      return r && r.status === 'fail';
-    });
-  }
-
-  // Helper: get response text for a condition by domain keyword
-  function getDomainResponse(b, ...kwds) {
-    for (const kw of kwds) {
-      const cond = conditions.find(c => c.text.toLowerCase().includes(kw));
-      if (!cond) continue;
-      const r = b.responses.find(r => r.condId === cond.id);
-      if (r && r.response) return r.response;
-    }
-    return '';
-  }
-
-  // ── SUMMARY SHEET ──
-  // Structure: blank rows 1-2, title merged A3:H3, blank row 4,
-  // headers row 5, bidder rows 6+
-  const sumWs = {};
-  const RED_FILL = { patternType: 'solid', fgColor: { rgb: 'FFFF0000' } };
-  const HDR_FILL = { patternType: 'solid', fgColor: { rgb: 'FF1F3864' } };
-  const HDR_FONT = { bold: true, color: { rgb: 'FFFFFFFF' }, sz: 11 };
-  const BOLD    = { bold: true };
-
-  // Row 3 (index 2): title
-  sumWs[enc(2,0)] = { v: tName, t:'s', s:{ font:{ bold:true, sz:12 }, alignment:{ horizontal:'center', wrapText:true } } };
-
-  // Row 5 (index 4): headers
-  const sumHdrs = ['Sr. No.','Name of Bidder','Firm Incorporation','Civil works','Advertising works','Net worth','Average Annual Turnover','Solvency'];
-  sumHdrs.forEach((h, ci) => {
-    sumWs[enc(4,ci)] = { v:h, t:'s', s:{ font:HDR_FONT, fill:HDR_FILL, alignment:{horizontal:'center',wrapText:true} } };
-  });
-
-  // Bidder rows starting row 6 (index 5)
-  bidders.forEach((b, i) => {
-    const rowIdx = 5 + i;
-    const flagged = isFlagged(b);
-    const cellStyle = flagged ? { fill:RED_FILL } : {};
-
-    const firmIncorp  = getDomainResponse(b,'incorporat','proprietorship','partnership','private limited','public limited','constitution');
-    const civilWorks  = getDomainResponse(b,'civil work','construction','foot over bridge','fob','drain','road','pedestrian','walkway','infrastructure');
-    const advWorks    = getDomainResponse(b,'advertis','out-of-home','ooh','hoarding','billboard','media','licensing');
-    const netWorth    = getDomainResponse(b,'net worth','networth','capital');
-    const avgTurnover = getDomainResponse(b,'turnover','annual turnover','average');
-    const solvency    = getDomainResponse(b,'solvency');
-
-    const rowVals = [i+1, b.name||'', firmIncorp, civilWorks, advWorks, netWorth, avgTurnover, solvency];
-    rowVals.forEach((val, ci) => {
-      const cell = { v: val===null||val===undefined?'':val, t: typeof val==='number'?'n':'s' };
-      if (flagged) cell.s = { fill:RED_FILL };
-      sumWs[enc(rowIdx, ci)] = cell;
-    });
-  });
-
-  sumWs['!ref']    = XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:5+bidders.length, c:7}});
-  sumWs['!merges'] = [{s:{r:2,c:0}, e:{r:2,c:7}}];
-  sumWs['!cols']   = [7,24,21,42,40,14,15,24].map(w=>({wch:w}));
-  XLSX.utils.book_append_sheet(wb, sumWs, 'SUMMARY');
-
-  // ── PER-BIDDER SHEETS ──
-  // Benchmark layout:
-  //   Row 1:  blank
-  //   Row 2:  B=Eligibility Conditions | C=Documentary proof | D=Response | E=pg. no.
-  //   Row 3:  B=bidder label | E=total pages
-  //   Row 4:  B=Receivables
-  //   Row 5:  B=Tender fee | C=amount | D=Yes/No | E=page
-  //   Row 6:  B=EMD        | C=amount | D=Yes/No | E=page
-  //   Row 7:  blank
-  //   Row 8+: conditions (A=no, B=condition, C=proof, D=response, E=pg.nos)
-  //   Last row: GST (condition 10)
-  // NO Status column, NO Remarks column.
-
-  bidders.forEach(b => {
-    const ws = {};
-
-    // Row 2 (index 1): headers
-    ws[enc(1,1)] = { v:'Eligibility Conditions', t:'s', s:{ font:BOLD } };
-    ws[enc(1,2)] = { v:'Documentary proof',      t:'s', s:{ font:BOLD } };
-    ws[enc(1,3)] = { v:'Response',               t:'s', s:{ font:BOLD } };
-    ws[enc(1,4)] = { v:'pg. no.',                t:'s', s:{ font:BOLD } };
-
-    // Row 3 (index 2): bidder name in B3
-    const bidderLabel = b.portalId ? `${b.name} (${b.portalId})` : b.name;
-    ws[enc(2,1)] = { v: bidderLabel, t:'s' };
-    if (b.pdfTotalPages) ws[enc(2,4)] = { v: String(b.pdfTotalPages), t:'s' };
-
-    // Row 4 (index 3): Receivables label
-    ws[enc(3,1)] = { v:'Receivables', t:'s', s:{ font:BOLD } };
-
-    // Row 5 (index 4): Tender fee
-    ws[enc(4,1)] = { v:'Tender fee', t:'s' };
-    if (tFee) ws[enc(4,2)] = { v: tFee, t:'s' };
-    ws[enc(4,3)] = { v: (b.receivables && b.receivables.fee) ? 'Yes' : '', t:'s' };
-    if (b.receivables && b.receivables.feePg) ws[enc(4,4)] = { v: String(b.receivables.feePg), t:'s' };
-
-    // Row 6 (index 5): EMD
-    ws[enc(5,1)] = { v:'EMD', t:'s' };
-    if (emd) ws[enc(5,2)] = { v: emd, t:'s' };
-    ws[enc(5,3)] = { v: (b.receivables && b.receivables.emd) ? 'Yes' : '', t:'s' };
-    if (b.receivables && b.receivables.emdPg) ws[enc(5,4)] = { v: String(b.receivables.emdPg), t:'s' };
-
-    // Row 7 (index 6): blank
-
-    // Rows 8+ (index 7+): eligibility conditions
-    let condRow = 7;
-    conditions.forEach((c, i) => {
-      const r = b.responses.find(r => r.condId === c.id) || {};
-      const condText = c.text + (c.corrigNote ? ` [Corr: ${c.corrigNote}]` : '');
-      ws[enc(condRow, 0)] = { v: String(i+1), t:'s' };
-      ws[enc(condRow, 1)] = { v: condText,    t:'s' };
-      ws[enc(condRow, 2)] = { v: c.proof||'', t:'s' };
-      ws[enc(condRow, 3)] = { v: r.response||'', t:'s' };
-      ws[enc(condRow, 4)] = { v: r.pg||'',    t:'s' };
-      condRow++;
-    });
-
-    // Condition 10: GST — always append unless already in conditions
-    const hasGSTCond = conditions.some(c => /\bgst\b|gstin/i.test(c.text));
-    if (!hasGSTCond) {
-      // Find GST response from docMatches
-      const gstMatch = b.docMatches && b.docMatches.find(s => {
-        const c = conditions.find(cc => cc.id === s.condId);
-        return c && /\bgst\b|gstin/i.test(c.text);
-      });
-      // Extract GSTINs directly from pdfText
-      let gstResponse = '';
-      if (b.pdfText) {
-        const gstins = [...b.pdfText.matchAll(/\b([0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z])\b/g)];
-        const uniq = [...new Set(gstins.map(m=>m[1]))];
-        gstResponse = uniq.join('\n');
-      }
-      ws[enc(condRow, 0)] = { v: String(conditions.length + 1), t:'s' };
-      ws[enc(condRow, 1)] = { v: 'GST', t:'s' };
-      ws[enc(condRow, 2)] = { v: 'GST Registration Certificate', t:'s' };
-      ws[enc(condRow, 3)] = { v: gstResponse, t:'s' };
-      ws[enc(condRow, 4)] = { v: '', t:'s' };
-      condRow++;
-    }
-
-    ws['!ref']  = XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:condRow, c:4}});
-    ws['!cols'] = [6, 48, 27, 39, 35].map(w=>({wch:w}));
-
-    // Sheet name: "Bidder Name (PortalID)" max 31 chars
-    let sheetName = b.portalId ? `${b.name} (${b.portalId})` : b.name;
-    sheetName = sheetName.replace(/[\/\\*?\[\]:]/g,'').substring(0,31).trim();
-    if (!sheetName) sheetName = `Bidder_${b.id}`;
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-  });
-
-  // ── CORRIGENDUM SHEET (only if corrigenda exist) ──
-  if (corrigenda.length) {
-    const cRows = [['No.','Clause Ref.','Original Text','Amended Text','Source']];
-    corrigenda.forEach((c,i) => cRows.push([i+1, c.clauseRef, c.original, c.amended, c.source]));
-    const cWs = XLSX.utils.aoa_to_sheet(cRows);
-    cWs['!cols'] = [6,14,44,44,20].map(w=>({wch:w}));
-    XLSX.utils.book_append_sheet(wb, cWs, 'Corrigendum');
-  }
-
-  const fname = `BidEval_${(org||tName||'Tender').replace(/[\s\/\\:*?[\]]/g,'_').substring(0,30)}_${new Date().toISOString().slice(0,10)}.xlsx`;
-  XLSX.writeFile(wb, fname);
-  showStatus('globalStatus', `✓ Exported: ${fname}`, 'ok');
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  HELPERS
-// ═══════════════════════════════════════════════════════════════════════
-function v(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
-
-function setField(id, val) {
-  const el = document.getElementById(id);
-  if (el && val !== null && val !== undefined && String(val).trim()) el.value = String(val).trim();
-}
-
-function showStatus(targetId, msg, type) {
-  const el = document.getElementById(targetId);
-  if (!el) return;
-  el.innerHTML = `<div class="status ${type}">${msg}</div>`;
-  setTimeout(() => { if(el) el.innerHTML=''; }, 6000);
-}
-
-function showZoneStatus(id, msg, type) {
-  const el = document.getElementById(id);
-  if (el) el.innerHTML = `<div class="status ${type}" style="margin-bottom:8px">${msg}</div>`;
-}
-
-function escHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;');
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  INIT
-// ═══════════════════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════════════════
-//  STEP 6 — BID DOCUMENT UPLOAD & EVALUATE
-// ═══════════════════════════════════════════════════════════════════════
-
-function renderSummaryUploads() {
-  const div = document.getElementById('summaryBidUploads');
-  if (!div) return;
-  if (!bidders.length) {
-    div.innerHTML = '<div style="font-size:12px;color:#9AA5B8;padding:6px 0">No bidders added yet — add bidders in Step 4 first.</div>';
-    return;
-  }
-  div.innerHTML = bidders.map(b => `
-    <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #E0E6F0;flex-wrap:wrap">
-      <div style="min-width:220px;font-size:13px;font-weight:600;color:#1A1F2E">${escHtml(b.name)}</div>
-      <label style="cursor:pointer;flex:1;min-width:180px">
-        <div style="border:1px dashed #CBD3E1;border-radius:6px;padding:7px 12px;background:#fff;font-size:12px;color:#5B6478;text-align:center;white-space:nowrap">
-          ${b.pdfLoaded ? `✓ ${escHtml(b.pdfFileName||'PDF loaded')} (${b.pdfTotalPages}p) — click to replace` : '📎 Upload bid PDF'}
-        </div>
-        <input type="file" accept=".pdf" style="display:none" onchange="handleSummaryBidPDF(${b.id}, this.files[0])"/>
-      </label>
-      <div id="sumBidStatus_${b.id}" style="font-size:11.5px;min-width:120px"></div>
-    </div>
-  `).join('');
-}
-
-async function handleSummaryBidPDF(bidderId, file) {
-  if (!file) return;
-  const b = getBidder(bidderId);
-  if (!b) return;
-  const statusEl = document.getElementById(`sumBidStatus_${bidderId}`);
-  if (statusEl) statusEl.innerHTML = '<span style="color:#1A5CA8">⏳ Extracting…</span>';
-  try {
-    const { fullText, pages, totalPages } = await extractPDFText(file, () => {});
-    b.pdfText        = fullText;
-    b.pdfPages       = pages;
-    b.pdfLoaded      = true;
-    b.pdfFileName    = file.name;
-    b.pdfTotalPages  = totalPages;
-    b.docMatches  = matchBidToConditions(b);
-    if (statusEl) statusEl.innerHTML = `<span style="color:#1E7E34">✓ ${totalPages} pages</span>`;
-    renderSummaryUploads(); // refresh labels
-  } catch(e) {
-    if (statusEl) statusEl.innerHTML = `<span style="color:#C0392B">Error: ${escHtml(e.message)}</span>`;
-  }
-}
-
-function evaluateAllBidders() {
-  const loaded = bidders.filter(b => b.pdfLoaded);
-  if (!loaded.length) {
-    document.getElementById('evalAllStatus').innerHTML =
-      '<div class="status err">No bid PDFs uploaded yet. Upload at least one PDF above first.</div>';
-    return;
-  }
-  if (!conditions.length) {
-    document.getElementById('evalAllStatus').innerHTML =
-      '<div class="status err">No eligibility conditions defined. Complete Steps 1–3 first.</div>';
-    return;
-  }
-
-  let filled = 0;
-  loaded.forEach(b => {
-    // Re-run keyword matching
-    b.docMatches = matchBidToConditions(b);
-
-    // Ensure response array exists
-    conditions.forEach(c => {
-      if (!b.responses.find(r => r.condId === c.id)) {
-        b.responses.push({ condId: c.id, response:'', pg:'', status:'', remarks:'' });
-      }
-    });
-
-    // Auto-detect receivables
-    const feeM = b.pdfText.match(/tender\s*(?:processing\s*)?fee[^\d]{0,20}([\d,]+)/i);
-    const emdM = b.pdfText.match(/emd[^\d]{0,20}([\d,]+)/i) ||
-                 b.pdfText.match(/earnest\s*money[^\d]{0,20}([\d,]+)/i);
-    if (feeM && !b.receivables.fee) b.receivables.fee = feeM[1].replace(/,/g,'');
-    if (emdM && !b.receivables.emd) b.receivables.emd = emdM[1].replace(/,/g,'');
-
-    // Apply suggestions to response rows
-    b.docMatches.forEach(sug => {
-      const r = b.responses.find(r => r.condId === sug.condId);
-      if (!r) return;
-      // Only fill if currently empty — don't overwrite manual entries
-      const extracted = sug.extractedResponse || sug.snippet || '';
-      if (!r.response && extracted) r.response = extracted.trim().substring(0, 500);
-      if (!r.pg && sug.relevantPages && sug.relevantPages.length) {
-        r.pg = sug.relevantPages.slice(0,5).join(',\n');
-      } else if (!r.pg && sug.topPage) {
-        r.pg = String(sug.topPage);
-      }
-      if (!r.status) {
-        if (sug.strength === 'found')    r.status = 'pass';
-        else if (sug.strength === 'partial') r.status = 'query';
-        else                             r.status = 'fail';
-      }
-      filled++;
-    });
-
-    // Auto-set recommendation based on any fails
-    if (!b.recommendation) {
-      const hasFail  = b.responses.some(r => r.status === 'fail');
-      const hasQuery = b.responses.some(r => r.status === 'query');
-      if (hasFail)       b.recommendation = 'Technically Disqualified';
-      else if (hasQuery) b.recommendation = 'Conditionally Qualified';
-      else               b.recommendation = 'Technically Qualified';
-    }
-  });
-
-  // Refresh UI
-  refreshSummary();
-  renderTabs();
-  // Re-render all evaluation panels so manual edits in Step 5 also show updated state
-  bidders.forEach(b => {
-    const panelDiv = document.getElementById(`panel_${b.id}`);
-    if (panelDiv) panelDiv.innerHTML = buildPanel(b);
-  });
-
-  document.getElementById('evalAllStatus').innerHTML =
-    `<div class="status ok">✓ Evaluated ${loaded.length} bidder(s) — ${filled} condition responses filled. Review in Step 5, then export below.</div>`;
+window.addEventListener('load', () => {
   setTimeout(() => {
-    const el = document.getElementById('evalAllStatus');
-    if (el) el.innerHTML = '';
-  }, 8000);
+    const b = document.getElementById('boot');
+    if (b) { b.classList.add('hide'); setTimeout(() => b.remove(), 600); }
+  }, 900);
+});
+</script>
+
+<script>
+/* ============================================================
+   STATE
+   ============================================================ */
+const state = {
+  step: 1,
+  api: { base: '' /* same-origin /api/ai.js by default */ },
+  tender: { nitNo:'', publishDate:'', closeDate:'', openDate:'', emd:'', department:'', extractedText:'' },
+  rfpFiles: [],
+  etenderFiles: [],
+  prebidFiles: [],
+  corrigendumFiles: [],
+  corrigendumDelta: '',
+  eligibility: [], // {id, description, type, threshold, weight}
+  bidsPageFiles: [],
+  bidders: [], // {id, name, files:[], technicalText:'', financialText:''}
+  evaluation: {}, // bidderId -> [{criterionId, score, reasoning, citation, flags}]
+  consensus: {}, // bidderId -> {avgScore, variance, needsReview}
+  report: { executiveSummary: '', recommendation: '' },
+  log: [],
+  localDir: null,       // FileSystemDirectoryHandle for the tender root folder
+  localDirName: '',
+};
+
+const STEPS = [
+  'Upload RFP',
+  'eTender Details',
+  'Pre-Bid Queries',
+  'Corrigendum Compare',
+  'Eligibility (LLM)',
+  'Bids Upload',
+  'Evaluate Bids (LLM)',
+  'Generate Report',
+];
+
+function log(msg){
+  state.log.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
+  const el = document.getElementById('logBox');
+  if(el){ el.textContent = state.log.slice(-40).join('\n'); el.scrollTop = el.scrollHeight; }
 }
 
-renderConditions();
-renderCorrigenda();
-renderCorrigDocList();
+/* ============================================================
+   LOCAL FOLDER STORAGE
+   - Uses the File System Access API (Chrome/Edge) to write real
+     files into a folder the user picks once, organized as:
+       <TenderFolder>/RFP/, /eTender/, /PreBid/, /Corrigendum/,
+       /BidsPage/, /Bidders/<name>/Technical|Financial/
+   - Falls back to triggering a browser download if the API
+     isn't supported (e.g. Firefox, Safari).
+   ============================================================ */
+const supportsFSAccess = 'showDirectoryPicker' in window;
+
+async function chooseLocalFolder(){
+  if(!supportsFSAccess){
+    alert('Your browser doesn\'t support folder access (File System Access API). Files will be saved to your Downloads folder instead.');
+    state.localDir = 'fallback';
+    document.getElementById('folderStatus').textContent = 'Using Downloads (fallback mode)';
+    return;
+  }
+  try{
+    const handle = await window.showDirectoryPicker();
+    state.localDir = handle;
+    state.localDirName = handle.name;
+    document.getElementById('folderStatus').textContent = 'Saving to: ' + handle.name;
+    log('Local folder selected: ' + handle.name);
+  } catch(err){
+    log('Folder selection cancelled or failed: ' + err.message);
+  }
+}
+
+// Get (or create) a nested directory handle from a path array, e.g. ['Bidders','ABC Ltd','Technical']
+async function getOrCreateDir(pathParts){
+  let dir = state.localDir;
+  for(const part of pathParts){
+    dir = await dir.getDirectoryHandle(sanitizeName(part), { create: true });
+  }
+  return dir;
+}
+
+function sanitizeName(name){
+  return String(name || 'untitled').replace(/[\/\\:*?"<>|]/g, '_').trim().slice(0,80) || 'untitled';
+}
+
+// Save a File object into pathParts (array of folder names) under the chosen root.
+// If no folder has been chosen yet, prompts the user for one first (first-upload prompt),
+// then reuses that same folder for every subsequent file in this session.
+async function saveFileLocally(file, pathParts){
+  if(!file) return;
+
+  if(!state.localDir){
+    if(!supportsFSAccess){
+      // No folder API available at all — fall back to downloads immediately, no prompt needed.
+      state.localDir = 'fallback';
+      document.getElementById('folderStatus') && (document.getElementById('folderStatus').textContent = 'Using Downloads (fallback mode)');
+      triggerDownload(file);
+      return;
+    }
+    try{
+      const handle = await window.showDirectoryPicker();
+      state.localDir = handle;
+      state.localDirName = handle.name;
+      const statusEl = document.getElementById('folderStatus');
+      if(statusEl) statusEl.textContent = 'Saving to: ' + handle.name;
+      log('Local folder selected: ' + handle.name);
+    } catch(err){
+      log('Folder selection cancelled — file not saved locally: ' + file.name);
+      return; // user declined the picker; skip saving this file, don't block the rest of the app
+    }
+  }
+
+  if(state.localDir === 'fallback'){
+    triggerDownload(file);
+    return;
+  }
+
+  try{
+    const dir = await getOrCreateDir(pathParts);
+    const fileHandle = await dir.getFileHandle(sanitizeName(file.name), { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(file);
+    await writable.close();
+    log('Saved locally: ' + pathParts.join('/') + '/' + file.name);
+  } catch(err){
+    log('Local save failed for ' + file.name + ': ' + err.message);
+  }
+}
+
+function triggerDownload(file){
+  const url = URL.createObjectURL(file);
+  const a = document.createElement('a');
+  a.href = url; a.download = file.name;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  log('Downloaded (fallback): ' + file.name);
+}
+
+/* ============================================================
+   API CALL — talks to /api/ai.js (your existing key-rotation proxy)
+   ============================================================ */
+async function callAI(task, messages, opts={}){
+  const res = await fetch((state.api.base || '') + '/api/ai.js', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      task, messages,
+      temperature: opts.temperature,
+      max_tokens: opts.max_tokens,
+    }),
+  });
+  const data = await res.json();
+  if(!res.ok || !data.success){
+    throw new Error(data.error || 'AI call failed');
+  }
+  log(`AI(${task}) via ${data.provider}/${data.model} key#${data.key_used}`);
+  return data.content;
+}
+
+/* ============================================================
+   FILE HELPERS — extract text from PDF/image client-side
+   ============================================================ */
+if (window['pdfjsLib']) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+async function extractTextFromFile(file){
+  if(file.type === 'application/pdf'){
+    return extractTextFromPDF(file);
+  } else if(file.type.startsWith('image/')){
+    return extractTextFromImage(file);
+  } else {
+    return await file.text().catch(()=> '[Unsupported file type: ' + file.type + ']');
+  }
+}
+
+async function extractTextFromPDF(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  let text = '';
+  for(let p=1; p<=pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    text += content.items.map(i=>i.str).join(' ') + '\n\n';
+  }
+  if(text.trim().length < 20){
+    // likely scanned — fall back to OCR on rendered pages
+    log('PDF text layer empty — falling back to OCR (may be slow)');
+    text = await ocrPDF(pdf);
+  }
+  return text;
+}
+
+async function ocrPDF(pdf){
+  let text = '';
+  const maxPages = Math.min(pdf.numPages, 8); // cap for demo performance
+  for(let p=1; p<=maxPages; p++){
+    const page = await pdf.getPage(p);
+    const viewport = page.getViewport({scale: 1.5});
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width; canvas.height = viewport.height;
+    await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+    const { data: { text: t } } = await Tesseract.recognize(canvas, 'eng');
+    text += t + '\n\n';
+  }
+  return text;
+}
+
+async function extractTextFromImage(file){
+  const { data: { text } } = await Tesseract.recognize(file, 'eng');
+  return text;
+}
+
+/* ============================================================
+   RENDER: NAV
+   ============================================================ */
+function renderNav(){
+  const nav = document.getElementById('stepNav');
+  nav.innerHTML = STEPS.map((s,i)=>{
+    const n = i+1;
+    const cls = ['step'];
+    if(n === state.step) cls.push('active');
+    if(n < state.step) cls.push('done');
+    return `<div class="${cls.join(' ')}" onclick="goToStep(${n})">
+      <div class="num">${n < state.step ? '✓' : n}</div>
+      <div>${s}</div>
+    </div>`;
+  }).join('');
+}
+
+function goToStep(n){
+  state.step = n;
+  render();
+}
+
+/* ============================================================
+   RENDER: MAIN — dispatches to stage renderers
+   ============================================================ */
+function render(){
+  renderNav();
+  const main = document.getElementById('mainArea');
+  const renderers = [
+    renderStage1, renderStage2, renderStage3, renderStage4,
+    renderStage5, renderStage6, renderStage7, renderStage8,
+  ];
+  main.innerHTML = renderers[state.step-1]();
+  main.insertAdjacentHTML('beforeend', `
+    <div class="card">
+      <div class="log" id="logBox">${state.log.slice(-40).join('\n')}</div>
+    </div>
+    <footer class="stepnav">
+      <button class="secondary" onclick="goToStep(${Math.max(1,state.step-1)})" ${state.step===1?'disabled':''}>← Back</button>
+      <button onclick="goToStep(${Math.min(8,state.step+1)})" ${state.step===8?'disabled':''}>Next →</button>
+    </footer>
+  `);
+}
+
+/* ============================================================
+   STAGE 1 — Upload RFP
+   ============================================================ */
+function renderStage1(){
+  return `
+  <div class="card">
+    <h2>Stage 1 · Upload Tender RFP</h2>
+    <div class="sub">Ingest the original tender document (PDF / Word / Image). Parsed client-side — no LLM.</div>
+    <div class="drop" onclick="document.getElementById('rfpInput').click()">Click to upload RFP (PDF/Image)</div>
+    <input type="file" id="rfpInput" accept=".pdf,image/*" onchange="handleRFPUpload(event)">
+    ${state.rfpFiles.map((f,i)=>`
+      <div class="fileitem"><span>${f.name}</span><span class="x" onclick="removeRFP(${i})">✕</span></div>
+    `).join('')}
+    ${state.tender.extractedText ? `
+      <div class="sub" style="margin-top:16px">Extracted text preview</div>
+      <textarea readonly>${escapeHtml(state.tender.extractedText.slice(0,3000))}</textarea>
+      <span class="badge ok">Parsed ${state.tender.extractedText.length.toLocaleString()} chars</span>
+    ` : ''}
+  </div>`;
+}
+
+async function handleRFPUpload(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  state.rfpFiles.push(file);
+  render();
+  saveFileLocally(file, ['RFP']);
+  log('Parsing RFP: ' + file.name);
+  try{
+    const text = await extractTextFromFile(file);
+    state.tender.extractedText = text;
+    log('RFP parsed OK');
+  } catch(err){ log('RFP parse error: ' + err.message); }
+  render();
+}
+function removeRFP(i){ state.rfpFiles.splice(i,1); render(); }
+
+/* ============================================================
+   STAGE 2 — eTender Details
+   ============================================================ */
+function renderStage2(){
+  const t = state.tender;
+  return `
+  <div class="card">
+    <h2>Stage 2 · Upload eTender Details</h2>
+    <div class="sub">Screenshot or PDF of the eTender portal listing page. Auto-extracts metadata via OCR + regex.</div>
+    <div class="drop" onclick="document.getElementById('etInput').click()">Click to upload eTender screenshot/PDF</div>
+    <input type="file" id="etInput" accept=".pdf,image/*" onchange="handleETenderUpload(event)">
+    ${state.etenderFiles.map(f=>`<div class="fileitem"><span>${f.name}</span></div>`).join('')}
+    <div class="kv">
+      <div>Tender ID / NIT No</div><div><input type="text" value="${t.nitNo}" oninput="t2set('nitNo',this.value)"></div>
+      <div>Publish Date</div><div><input type="text" value="${t.publishDate}" oninput="t2set('publishDate',this.value)"></div>
+      <div>Closing Date</div><div><input type="text" value="${t.closeDate}" oninput="t2set('closeDate',this.value)"></div>
+      <div>Opening Date</div><div><input type="text" value="${t.openDate}" oninput="t2set('openDate',this.value)"></div>
+      <div>EMD Amount</div><div><input type="text" value="${t.emd}" oninput="t2set('emd',this.value)"></div>
+      <div>Department</div><div><input type="text" value="${t.department}" oninput="t2set('department',this.value)"></div>
+    </div>
+  </div>`;
+}
+function t2set(k,v){ state.tender[k] = v; }
+
+async function handleETenderUpload(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  state.etenderFiles.push(file);
+  render();
+  saveFileLocally(file, ['eTender']);
+  log('OCR on eTender page: ' + file.name);
+  try{
+    const text = await extractTextFromFile(file);
+    autoFillTenderMeta(text);
+    log('eTender metadata extracted');
+  } catch(err){ log('eTender parse error: ' + err.message); }
+  render();
+}
+
+// Basic regex extraction — refine against real portal formats later
+function autoFillTenderMeta(text){
+  const patterns = {
+    nitNo: /(?:NIT\s*No\.?|Tender\s*ID)\s*[:\-]?\s*([A-Za-z0-9\/\-]+)/i,
+    publishDate: /Publish(?:ed)?\s*Date\s*[:\-]?\s*([0-9\-\/]{6,12})/i,
+    closeDate: /Closing\s*Date\s*[:\-]?\s*([0-9\-\/]{6,12})/i,
+    openDate: /Opening\s*Date\s*[:\-]?\s*([0-9\-\/]{6,12})/i,
+    emd: /EMD\s*(?:Amount)?\s*[:\-]?\s*(?:Rs\.?|₹)?\s*([0-9,]+)/i,
+    department: /Department\s*[:\-]?\s*([A-Za-z0-9 &,.\-]+)/i,
+  };
+  for(const [k, re] of Object.entries(patterns)){
+    const m = text.match(re);
+    if(m && !state.tender[k]) state.tender[k] = m[1].trim();
+  }
+}
+
+/* ============================================================
+   STAGE 3 — Pre-Bid Queries & Corrigendum
+   ============================================================ */
+function renderStage3(){
+  return `
+  <div class="card">
+    <h2>Stage 3 · Upload Pre-Bid Queries & Corrigendum</h2>
+    <div class="sub">Query-response document and/or corrigendum PDF issued before submission deadline.</div>
+    <div class="drop" onclick="document.getElementById('prebidInput').click()">Click to upload pre-bid query / corrigendum doc</div>
+    <input type="file" id="prebidInput" accept=".pdf,image/*" multiple onchange="handlePrebidUpload(event)">
+    ${state.prebidFiles.map((f,i)=>`
+      <div class="fileitem"><span>${f.name} ${f._text ? `<span class="badge ok" style="margin-left:8px">parsed</span>`:''}</span><span class="x" onclick="removePrebid(${i})">✕</span></div>
+    `).join('')}
+  </div>`;
+}
+async function handlePrebidUpload(e){
+  for(const file of e.target.files){
+    state.prebidFiles.push(file);
+    render();
+    saveFileLocally(file, ['PreBid']);
+    try{ file._text = await extractTextFromFile(file); log('Parsed pre-bid doc: ' + file.name); }
+    catch(err){ log('Parse error: ' + err.message); }
+  }
+  render();
+}
+function removePrebid(i){ state.prebidFiles.splice(i,1); render(); }
+
+/* ============================================================
+   STAGE 4 — Corrigendum vs Original: Delta report
+   ============================================================ */
+function renderStage4(){
+  return `
+  <div class="card">
+    <h2>Stage 4 · Corrigendum eTender Page — Compare</h2>
+    <div class="sub">Diffs corrigendum text against Stage 1 (RFP) and Stage 2 (original dates/EMD). No LLM.</div>
+    <div class="drop" onclick="document.getElementById('corrInput').click()">Click to upload corrigendum eTender page</div>
+    <input type="file" id="corrInput" accept=".pdf,image/*" onchange="handleCorrigendumUpload(event)">
+    ${state.corrigendumFiles.map(f=>`<div class="fileitem"><span>${f.name}</span></div>`).join('')}
+    <div class="row">
+      <button ${state.corrigendumFiles.length===0?'disabled':''} onclick="runDeltaCompare()">Run Delta Compare</button>
+    </div>
+    ${state.corrigendumDelta ? `
+      <div class="sub" style="margin-top:16px">Delta Report</div>
+      <textarea readonly style="min-height:180px">${escapeHtml(state.corrigendumDelta)}</textarea>
+    ` : ''}
+  </div>`;
+}
+async function handleCorrigendumUpload(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  state.corrigendumFiles.push(file);
+  render();
+  saveFileLocally(file, ['Corrigendum']);
+  try{ file._text = await extractTextFromFile(file); log('Parsed corrigendum: ' + file.name); }
+  catch(err){ log('Parse error: ' + err.message); }
+  render();
+}
+
+function runDeltaCompare(){
+  const corrText = (state.corrigendumFiles[0] && state.corrigendumFiles[0]._text) || '';
+  const original = { ...state.tender };
+  // Simple heuristic diff: re-run the same regex extraction on corrigendum text
+  // and flag anything that differs from Stage 2 values.
+  const patterns = {
+    closeDate: /Closing\s*Date\s*[:\-]?\s*([0-9\-\/]{6,12})/i,
+    openDate: /Opening\s*Date\s*[:\-]?\s*([0-9\-\/]{6,12})/i,
+    emd: /EMD\s*(?:Amount)?\s*[:\-]?\s*(?:Rs\.?|₹)?\s*([0-9,]+)/i,
+  };
+  let deltas = [];
+  for(const [k, re] of Object.entries(patterns)){
+    const m = corrText.match(re);
+    if(m && original[k] && m[1].trim() !== original[k]){
+      deltas.push(`${k}: "${original[k]}" → "${m[1].trim()}"`);
+    }
+  }
+  // naive scope-change flag: look for keywords
+  if(/scope|BOQ|quantity|specification/i.test(corrText)){
+    deltas.push('Possible scope/BOQ/specification change mentioned — review manually.');
+  }
+  state.corrigendumDelta = deltas.length
+    ? deltas.join('\n')
+    : 'No date/EMD deltas detected by pattern match. Review corrigendum text manually for clause-level changes.';
+  log('Delta compare complete: ' + deltas.length + ' item(s) flagged');
+  render();
+}
+
+/* ============================================================
+   STAGE 5 — Eligibility (LLM)
+   ============================================================ */
+function renderStage5(){
+  return `
+  <div class="card">
+    <h2>Stage 5 · Check Eligibility <span class="badge info">LLM</span></h2>
+    <div class="sub">Extracts mandatory/qualifying eligibility criteria with thresholds from the RFP text.</div>
+    <div class="row">
+      <button ${!state.tender.extractedText ? 'disabled':''} onclick="runEligibilityExtraction()" id="eligBtn">
+        Extract Eligibility Criteria
+      </button>
+    </div>
+    ${state.eligibility.length ? `
+      <table>
+        <tr><th>Description</th><th>Type</th><th>Threshold</th><th>Weight</th></tr>
+        ${state.eligibility.map(c=>`
+          <tr>
+            <td>${escapeHtml(c.description)}</td>
+            <td><span class="badge ${c.type==='mandatory'?'err':'info'}">${c.type}</span></td>
+            <td>${escapeHtml(c.threshold||'—')}</td>
+            <td>${escapeHtml(String(c.weight||'—'))}</td>
+          </tr>
+        `).join('')}
+      </table>
+    ` : `<div class="muted" style="margin-top:12px">No eligibility criteria extracted yet.</div>`}
+  </div>`;
+}
+
+/* ============================================================
+   CHUNKING & RELEVANCE RETRIEVAL
+   For 100+ page documents, blind truncation ("just send the
+   first N characters") silently drops whatever is past that
+   point — which for a real tender is often exactly the clause
+   a criterion depends on. Instead: split into overlapping
+   chunks, score each chunk by keyword overlap against a query,
+   and send only the top-scoring chunks to the LLM.
+   ============================================================ */
+const STOPWORDS = new Set(['the','a','an','and','or','of','to','in','on','for','with','is','are','be','this','that','shall','must','any','as','by','at','from','it','its','will','should','may']);
+
+function chunkText(text, chunkSize=3500, overlap=400){
+  const chunks = [];
+  if(!text) return chunks;
+  let start = 0;
+  while(start < text.length){
+    const end = Math.min(start + chunkSize, text.length);
+    chunks.push(text.slice(start, end));
+    if(end >= text.length) break;
+    start = end - overlap;
+  }
+  return chunks;
+}
+
+function tokenize(str){
+  return (str.toLowerCase().match(/[a-z0-9]+/g) || []).filter(w => w.length > 2 && !STOPWORDS.has(w));
+}
+
+function scoreChunk(chunkTokenSet, queryTokens){
+  let score = 0;
+  for(const t of queryTokens) if(chunkTokenSet.has(t)) score++;
+  return score;
+}
+
+// Returns the top-K most relevant chunks (joined) from `text` for the given `query` string.
+// Always includes the first chunk too (covers intro/definitions sections), deduped.
+function getRelevantExcerpt(text, query, {chunkSize=3500, overlap=400, topK=4, maxChars=14000} = {}){
+  const chunks = chunkText(text, chunkSize, overlap);
+  if(chunks.length === 0) return '';
+  if(chunks.length <= topK) return chunks.join('\n\n---\n\n').slice(0, maxChars);
+
+  const queryTokens = tokenize(query);
+  const scored = chunks.map((c, i) => ({
+    i, text: c,
+    score: scoreChunk(new Set(tokenize(c)), queryTokens),
+  }));
+  scored.sort((a,b) => b.score - a.score);
+
+  const picked = scored.slice(0, topK);
+  if(!picked.some(p => p.i === 0)) picked.push(scored.find(s => s.i === 0));
+  picked.sort((a,b) => a.i - b.i); // restore document order for readability
+
+  return picked.map(p => p.text).join('\n\n[...]\n\n').slice(0, maxChars);
+}
+
+/* ============================================================
+   ELIGIBILITY EXTRACTION LOGIC
+   ============================================================ */
+  const btn = document.getElementById('eligBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Extracting…';
+  try{
+    const fullText = state.tender.extractedText || '';
+    const chunks = chunkText(fullText, 6000, 500);
+    log(`RFP split into ${chunks.length} chunk(s) for eligibility scan`);
+
+    // Scan every chunk (eligibility clauses can appear anywhere in a 100+ page RFP),
+    // merge results, then dedupe near-identical criteria.
+    let merged = [];
+    for(let i=0; i<chunks.length; i++){
+      const prompt = `Extract all mandatory and qualifying eligibility criteria from this tender text excerpt with thresholds. This is chunk ${i+1} of ${chunks.length} — only extract what's actually present here, don't guess at missing chunks.
+Return ONLY valid JSON: an array of objects like
+{"description": "...", "type": "mandatory|qualifying", "threshold": "...", "weight": number|null}
+If no eligibility criteria appear in this excerpt, return [].
+
+Excerpt:
+"""${chunks[i]}"""`;
+      try{
+        const raw = await callAI('eligibility', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:2000});
+        const parsed = safeParseJsonArray(raw);
+        merged = merged.concat(parsed);
+        log(`Chunk ${i+1}/${chunks.length}: ${parsed.length} criteria found`);
+      } catch(err){
+        log(`Chunk ${i+1}/${chunks.length} extraction failed: ${err.message}`);
+      }
+    }
+
+    // Dedupe: drop criteria whose description is near-identical to one already kept
+    const deduped = [];
+    for(const c of merged){
+      const desc = (c.description || '').toLowerCase().trim();
+      if(!desc) continue;
+      const isDupe = deduped.some(d => {
+        const a = new Set(tokenize(desc)), b = new Set(tokenize(d.description || ''));
+        const overlap = [...a].filter(t => b.has(t)).length;
+        return overlap / Math.max(a.size, b.size, 1) > 0.7;
+      });
+      if(!isDupe) deduped.push(c);
+    }
+
+    state.eligibility = deduped.map((c,i)=>({ id: 'crit_'+(i+1), ...c }));
+    log('Extracted ' + state.eligibility.length + ' unique eligibility criteria (from ' + merged.length + ' raw matches)');
+  } catch(err){
+    log('Eligibility extraction failed: ' + err.message);
+    alert('Eligibility extraction failed: ' + err.message);
+  }
+  render();
+}
+
+/* ============================================================
+   STAGE 6 — Bids Received & Submissions
+   ============================================================ */
+function renderStage6(){
+  return `
+  <div class="card">
+    <h2>Stage 6 · Upload Bids-Received Page & Bid Submissions</h2>
+    <div class="sub">Extract bidder list, then attach technical/financial bid files per bidder.</div>
+    <div class="drop" onclick="document.getElementById('bidsPageInput').click()">Click to upload bids-received page (screenshot/PDF)</div>
+    <input type="file" id="bidsPageInput" accept=".pdf,image/*" onchange="handleBidsPageUpload(event)">
+    <div class="row">
+      <button class="secondary" onclick="addBidderManually()">+ Add Bidder Manually</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Bidders</h2>
+    ${state.bidders.length === 0 ? `<div class="muted">No bidders yet.</div>` : state.bidders.map((b,bi)=>`
+      <div class="card" style="background:var(--panel2);margin-bottom:10px">
+        <div class="row" style="justify-content:space-between;align-items:center;margin-top:0">
+          <input type="text" value="${b.name}" oninput="renameBidder(${bi},this.value)" style="max-width:260px">
+          <button class="secondary small" onclick="removeBidder(${bi})">Remove</button>
+        </div>
+        <div class="row">
+          <div>
+            <div class="muted" style="margin-bottom:4px">Technical Bid</div>
+            <button class="secondary small" onclick="document.getElementById('techInput${bi}').click()">Upload</button>
+            <input type="file" id="techInput${bi}" style="display:none" accept=".pdf,image/*" onchange="handleBidFile(event,${bi},'technicalText')">
+            ${b.technicalText ? '<span class="badge ok" style="margin-left:8px">parsed</span>' : ''}
+          </div>
+          <div>
+            <div class="muted" style="margin-bottom:4px">Financial Bid</div>
+            <button class="secondary small" onclick="document.getElementById('finInput${bi}').click()">Upload</button>
+            <input type="file" id="finInput${bi}" style="display:none" accept=".pdf,image/*" onchange="handleBidFile(event,${bi},'financialText')">
+            ${b.financialText ? '<span class="badge ok" style="margin-left:8px">parsed</span>' : ''}
+          </div>
+        </div>
+      </div>
+    `).join('')}
+  </div>`;
+}
+
+async function handleBidsPageUpload(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  state.bidsPageFiles.push(file);
+  render();
+  saveFileLocally(file, ['BidsPage']);
+  log('OCR on bids-received page: ' + file.name);
+  try{
+    const text = await extractTextFromFile(file);
+    // naive bidder-name extraction: lines that look like "1. XYZ Pvt Ltd" or similar
+    const names = Array.from(new Set(
+      (text.match(/^[ \t]*\d+[\.\)]\s*([A-Za-z][A-Za-z0-9 &.,'\-]{3,60})/gm) || [])
+        .map(l => l.replace(/^[ \t]*\d+[\.\)]\s*/, '').trim())
+    ));
+    names.forEach(n => addBidder(n));
+    log('Detected ' + names.length + ' bidder name(s) — verify and edit as needed');
+  } catch(err){ log('Bids page parse error: ' + err.message); }
+  render();
+}
+
+function addBidder(name){
+  state.bidders.push({ id: 'bidder_' + (state.bidders.length+1), name: name || ('Bidder ' + (state.bidders.length+1)), technicalText:'', financialText:'' });
+}
+function addBidderManually(){ addBidder(''); render(); }
+function renameBidder(i, name){ state.bidders[i].name = name; }
+function removeBidder(i){ state.bidders.splice(i,1); render(); }
+
+async function handleBidFile(e, bidderIdx, field){
+  const file = e.target.files[0];
+  if(!file) return;
+  render();
+  const bidder = state.bidders[bidderIdx];
+  const subfolder = field === 'technicalText' ? 'Technical' : 'Financial';
+  saveFileLocally(file, ['Bidders', bidder.name || ('Bidder ' + (bidderIdx+1)), subfolder]);
+  log(`Parsing ${field} for ${bidder.name}: ${file.name}`);
+  try{
+    const text = await extractTextFromFile(file);
+    state.bidders[bidderIdx][field] = text;
+    log('Parsed OK');
+  } catch(err){ log('Parse error: ' + err.message); }
+  render();
+}
+
+/* ============================================================
+   STAGE 7 — Evaluate Bids (LLM, heavy, per bidder x criterion)
+   ============================================================ */
+function renderStage7(){
+  const ready = state.eligibility.length > 0 && state.bidders.length > 0;
+  return `
+  <div class="card">
+    <h2>Stage 7 · Evaluate Bids <span class="badge info">LLM · Heavy</span></h2>
+    <div class="sub">Scores each bidder against every eligibility criterion, with reasoning. (Single-model scoring in this basic build — swap in multi-model consensus later.)</div>
+    <div class="row">
+      <button ${!ready?'disabled':''} onclick="runEvaluation()" id="evalBtn">Run Evaluation</button>
+      ${!ready ? '<span class="muted">Need eligibility criteria (Stage 5) and at least one bidder with bid text (Stage 6)</span>' : ''}
+    </div>
+  </div>
+  ${state.bidders.length ? `
+  <div class="card">
+    <div class="bidder-tabs">
+      ${state.bidders.map((b,i)=>`<div class="tab ${state._evalTab===i?'active':''}" onclick="setEvalTab(${i})">${escapeHtml(b.name)}</div>`).join('')}
+    </div>
+    ${renderEvalTable(state._evalTab || 0)}
+  </div>` : ''}
+  `;
+}
+
+function setEvalTab(i){ state._evalTab = i; render(); }
+
+function renderEvalTable(idx){
+  const b = state.bidders[idx];
+  if(!b) return '';
+  const rows = state.evaluation[b.id] || [];
+  const consensus = state.consensus[b.id];
+  return `
+    ${consensus ? `
+      <div class="kv" style="margin-bottom:10px">
+        <div>Average Score</div><div>${consensus.avgScore.toFixed(1)}</div>
+        <div>Needs Review</div><div>${consensus.needsReview ? '<span class="flag">YES — low scores / flags present</span>' : 'No'}</div>
+      </div>
+    ` : ''}
+    <table>
+      <tr><th>Criterion</th><th>Score</th><th>Reasoning</th><th>Flags</th></tr>
+      ${rows.length ? rows.map(r=>`
+        <tr>
+          <td>${escapeHtml(r.criterionDesc)}</td>
+          <td>${r.score}</td>
+          <td>${escapeHtml(r.reasoning)}</td>
+          <td>${(r.flags||[]).map(f=>`<span class="badge warn">${escapeHtml(f)}</span>`).join(' ') || '—'}</td>
+        </tr>
+      `).join('') : `<tr><td colspan="4" class="muted">Not evaluated yet.</td></tr>`}
+    </table>
+  `;
+}
+
+async function runEvaluation(){
+  const btn = document.getElementById('evalBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Evaluating…';
+  try{
+    for(const bidder of state.bidders){
+      const bidText = (bidder.technicalText || '') + '\n\n' + (bidder.financialText || '');
+      log(`${bidder.name}: bid text is ${bidText.length.toLocaleString()} chars — selecting relevant excerpts per criterion`);
+      const scores = [];
+      for(const crit of state.eligibility){
+        // Instead of blindly sending the first N characters (which drops anything
+        // past that point on a 100+ page bid), pick the chunks most relevant to
+        // this specific criterion's wording.
+        const excerpt = getRelevantExcerpt(bidText, crit.description, { topK: 4, maxChars: 14000 });
+        const prompt = `Evaluate this bidder's bid against the following criterion. Score 0-100 with reasoning, and note the page/paragraph if identifiable.
+Criterion: ${crit.description} (type: ${crit.type}, threshold: ${crit.threshold || 'n/a'})
+
+Note: the bid text below is the most relevant excerpts selected from a longer document, not the full text. [...] marks a gap between excerpts.
+
+Bid excerpts:
+"""${excerpt}"""
+
+Return ONLY valid JSON: {"score": number, "reasoning": "...", "citation": "...", "flags": ["..."]}`;
+        try{
+          const raw = await callAI('evaluate', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:600});
+          const parsed = safeParseJsonObject(raw);
+          scores.push({
+            criterionId: crit.id,
+            criterionDesc: crit.description,
+            score: Number(parsed.score) || 0,
+            reasoning: parsed.reasoning || '',
+            citation: parsed.citation || '',
+            flags: parsed.flags || [],
+          });
+        } catch(err){
+          scores.push({ criterionId: crit.id, criterionDesc: crit.description, score: 0, reasoning: 'Evaluation error: ' + err.message, flags:['error'] });
+        }
+      }
+      state.evaluation[bidder.id] = scores;
+      const avg = scores.reduce((s,r)=>s+r.score,0) / (scores.length || 1);
+      const anyFlags = scores.some(r => (r.flags||[]).length);
+      state.consensus[bidder.id] = { avgScore: avg, variance: 0, needsReview: anyFlags || avg < 50 };
+      log(`Evaluated ${bidder.name}: avg ${avg.toFixed(1)}`);
+      render();
+    }
+  } catch(err){
+    log('Evaluation run failed: ' + err.message);
+  }
+  render();
+}
+
+/* ============================================================
+   STAGE 8 — Generate Report (LLM light + Excel export)
+   ============================================================ */
+function renderStage8(){
+  const hasEval = Object.keys(state.evaluation).length > 0;
+  return `
+  <div class="card">
+    <h2>Stage 8 · Generate Bid Evaluation Report <span class="badge info">LLM · Light</span></h2>
+    <div class="sub">Compiles rankings, compliance matrix, and an AI-drafted executive summary + recommendation.</div>
+    <div class="row">
+      <button ${!hasEval?'disabled':''} onclick="runReportGeneration()" id="reportBtn">Draft Executive Summary</button>
+      <button ${!hasEval?'disabled':''} class="secondary" onclick="exportExcel()">Export Excel</button>
+    </div>
+  </div>
+  ${hasEval ? `
+  <div class="card">
+    <h2>Ranking</h2>
+    <table>
+      <tr><th>Rank</th><th>Bidder</th><th>Avg Score</th><th>Needs Review</th></tr>
+      ${rankedBidders().map((b,i)=>`
+        <tr><td>${i+1}</td><td>${escapeHtml(b.name)}</td><td>${b.avgScore.toFixed(1)}</td>
+        <td>${b.needsReview ? '<span class="flag">Yes</span>' : 'No'}</td></tr>
+      `).join('')}
+    </table>
+  </div>` : ''}
+  ${state.report.executiveSummary ? `
+  <div class="card">
+    <h2>Executive Summary</h2>
+    <textarea readonly style="min-height:200px">${escapeHtml(state.report.executiveSummary)}</textarea>
+  </div>` : ''}
+  `;
+}
+
+function rankedBidders(){
+  return state.bidders
+    .map(b => ({ name: b.name, ...state.consensus[b.id] }))
+    .filter(b => b.avgScore !== undefined)
+    .sort((a,b) => b.avgScore - a.avgScore);
+}
+
+async function runReportGeneration(){
+  const btn = document.getElementById('reportBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Drafting…';
+  try{
+    const ranked = rankedBidders();
+    const prompt = `Draft an executive summary and award recommendation from these evaluation scores.
+Tender: ${state.tender.nitNo || '(no NIT number captured)'}, Department: ${state.tender.department || 'n/a'}
+Ranked bidders (name, avg score, needs-review flag):
+${ranked.map(r=>`- ${r.name}: ${r.avgScore.toFixed(1)} (needs review: ${r.needsReview})`).join('\n')}
+
+Write 3-4 short paragraphs: overview of the evaluation, key differentiators between top bidders, any compliance concerns, and a final award recommendation naming the top bidder if scores are clear.`;
+    const summary = await callAI('report', [{role:'user', content: prompt}], {temperature:0.4, max_tokens:1200});
+    state.report.executiveSummary = summary;
+    log('Executive summary drafted');
+  } catch(err){
+    log('Report generation failed: ' + err.message);
+    alert('Report generation failed: ' + err.message);
+  }
+  render();
+}
+
+function exportExcel(){
+  const wb = XLSX.utils.book_new();
+
+  const summarySheet = XLSX.utils.aoa_to_sheet([
+    ['Tender Evaluation Report'],
+    ['NIT No', state.tender.nitNo],
+    ['Department', state.tender.department],
+    ['Closing Date', state.tender.closeDate],
+    [],
+    ['Rank','Bidder','Avg Score','Needs Review'],
+    ...rankedBidders().map((b,i)=>[i+1, b.name, b.avgScore.toFixed(1), b.needsReview ? 'YES' : 'No']),
+  ]);
+  XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
+
+  state.bidders.forEach(b=>{
+    const rows = state.evaluation[b.id] || [];
+    const sheet = XLSX.utils.aoa_to_sheet([
+      ['Criterion','Type','Score','Reasoning','Citation','Flags'],
+      ...rows.map(r=>{
+        const crit = state.eligibility.find(c=>c.id===r.criterionId) || {};
+        return [r.criterionDesc, crit.type||'', r.score, r.reasoning, r.citation||'', (r.flags||[]).join('; ')];
+      }),
+    ]);
+    XLSX.utils.book_append_sheet(wb, sheet, (b.name || 'Bidder').slice(0,28));
+  });
+
+  const eligSheet = XLSX.utils.aoa_to_sheet([
+    ['Description','Type','Threshold','Weight'],
+    ...state.eligibility.map(c=>[c.description, c.type, c.threshold||'', c.weight||'']),
+  ]);
+  XLSX.utils.book_append_sheet(wb, eligSheet, 'Eligibility Criteria');
+
+  XLSX.writeFile(wb, 'Bid_Evaluation_Report.xlsx');
+  log('Excel report exported');
+}
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+function escapeHtml(str){
+  return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function safeParseJsonArray(raw){
+  const cleaned = raw.replace(/```json|```/g, '').trim();
+  try{
+    const parsed = JSON.parse(cleaned);
+    return Array.isArray(parsed) ? parsed : (parsed.criteria || parsed.items || []);
+  } catch(e){
+    // try to find a JSON array substring
+    const m = cleaned.match(/\[[\s\S]*\]/);
+    if(m){ try{ return JSON.parse(m[0]); } catch(e2){} }
+    throw new Error('Could not parse LLM JSON response');
+  }
+}
+
+function safeParseJsonObject(raw){
+  const cleaned = raw.replace(/```json|```/g, '').trim();
+  try{ return JSON.parse(cleaned); }
+  catch(e){
+    const m = cleaned.match(/\{[\s\S]*\}/);
+    if(m){ try{ return JSON.parse(m[0]); } catch(e2){} }
+    throw new Error('Could not parse LLM JSON response');
+  }
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+render();
 </script>
 </body>
 </html>
