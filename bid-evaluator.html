@@ -628,6 +628,7 @@ function getRelevantExcerpt(text, query, {chunkSize=3500, overlap=400, topK=4, m
 /* ============================================================
    ELIGIBILITY EXTRACTION LOGIC
    ============================================================ */
+async function runEligibilityExtraction(){
   const btn = document.getElementById('eligBtn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Extracting…';
   try{
