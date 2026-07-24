@@ -1015,12 +1015,64 @@ function extractSelectionMethodFromDataSheet(fullText){
   return { method, qualifyingThresholdPct: pct };
 }
 
-// Locates the "Eligibility Criteria" section (heading like "4.1 Eligibility
-// Criteria") in the source text and slices out just that section (up to the
-// next sibling heading, e.g. "4.1.1" or "4.2"). This lets us send ONE small
-// slice to the AI instead of chunking and scanning the entire 100+ page RFP.
-// Returns null if no confident anchor is found, so the caller can fall back
-// to the old full-document chunk scan.
+// Generic section-anchoring: given a full document and a set of heading /
+// end-boundary / signal-term patterns, locates a named section and slices
+// it out — so callers can send ONE small slice to the AI instead of
+// chunking and scanning the entire 100+ page document. Returns null if no
+// confident anchor is found, so the caller can fall back to a full scan.
+// `label` is just for log messages (e.g. "Eligibility section", "Scoring
+// criteria section").
+function findNamedSection(fullText, { label, headingPatterns, endPatterns, signalTerms, maxLen = 8000, minLen = 200 }){
+  const { stripped, map } = stripPageMarkersWithMap(fullText);
+  const toOriginal = (strippedIdx) => {
+    if(strippedIdx <= 0) return 0;
+    if(strippedIdx >= map.length) return fullText.length;
+    return map[strippedIdx];
+  };
+
+  let startIdxStripped = -1;
+  for(const re of headingPatterns){
+    const m = stripped.match(re);
+    if(m){ startIdxStripped = m.index; break; }
+  }
+  if(startIdxStripped === -1){
+    log(`${label} anchor: no heading pattern matched — falling back to full scan`);
+    return null;
+  }
+  const startIdx = toOriginal(startIdxStripped);
+
+  const afterStripped = stripped.slice(startIdxStripped + 50); // skip past the heading itself
+  let endIdxStripped = stripped.length;
+  for(const re of endPatterns){
+    const m = afterStripped.match(re);
+    if(m){
+      const candidate = startIdxStripped + 50 + m.index;
+      if(candidate < endIdxStripped) endIdxStripped = candidate;
+    }
+  }
+  let endIdx = toOriginal(endIdxStripped);
+  // Cap section length generously; if no end heading matched at all, don't
+  // send the whole rest of the document.
+  if(endIdx - startIdx > maxLen) endIdx = startIdx + maxLen;
+
+  const slice = fullText.slice(startIdx, endIdx).trim();
+  // Sanity check: a real section should contain at least ONE recognizable
+  // term; if not, this was probably a false-positive heading match (e.g. a
+  // table of contents entry, not the actual section).
+  if(!signalTerms.test(slice)){
+    log(`${label} anchor: matched a heading but slice (${slice.length} chars) had no recognizable terms — likely a false positive (e.g. table of contents), falling back to full scan`);
+    return null;
+  }
+  // Guard against having anchored to a table-of-contents listing rather than
+  // the real section — TOC entries are short (just the heading + page number).
+  if(slice.length < minLen){
+    log(`${label} anchor: matched slice too short (${slice.length} chars) — likely a table-of-contents entry, falling back to full scan`);
+    return null;
+  }
+
+  return slice;
+}
+
 // PDF extraction inserts [PAGE N] / [CORR PAGE N] markers between text spans.
 // If a page break happens to fall mid-heading (e.g. between "4.1" and
 // "Eligibility Criteria"), a plain regex match on the raw text fails even
@@ -1044,75 +1096,62 @@ function stripPageMarkersWithMap(text){
 }
 
 function findEligibilitySection(fullText){
-  const { stripped, map } = stripPageMarkersWithMap(fullText);
-  const toOriginal = (strippedIdx) => {
-    if(strippedIdx <= 0) return 0;
-    if(strippedIdx >= map.length) return fullText.length;
-    return map[strippedIdx];
-  };
+  return findNamedSection(fullText, {
+    label: 'Eligibility section',
+    headingPatterns: [
+      /\b\d{1,2}\.\d{1,2}\s*\.?\s*Eligibility\s*Criteria\b/i,
+      /\bEligibility\s+Conditions\b/i,
+      /\bEligibility\s+and\s+Evaluation\s+criteria\b/i,
+      /\bClause\s*\d{1,2}\.\d{1,2}\s*[:\-]?\s*Eligibility\b/i,
+      /\bELIGIBILITY\s*CRITERIA\b/,                    // all-caps heading, no numbering
+      /\bEligibility\s+Criteria\s+for\s+Bidders?\b/i,
+      /\bMinimum\s+Eligibility\s+Criteria\b/i,
+      /\bQualification\s+Criteria\b/i,
+      /\bPre[\s-]?Qualification\s+Criteria\b/i,
+      /\bBidder\s+Eligibility\b/i,
+    ],
+    endPatterns: [
+      /\b\d{1,2}\.\d{1,2}\.\d{1,2}\s+[A-Z]/,     // e.g. "4.1.1 Conditions"
+      /\b\d{1,2}\.\d{1,2}\s+Evaluation\b/i,       // e.g. "4.2 Evaluation..."
+      /\b\d{1,2}\.\d{1,2}\s+[A-Z][a-z]+\s+[A-Z]/, // generic next numbered heading
+    ],
+    signalTerms: /turnover|EMD|earnest\s*money|GST|blacklist|debarr|ITR|net\s*worth|similar\s*project|documentary\s*proof|registration|incorporat|experience|financial\s*capacity|technical\s*capacity/i,
+    maxLen: 8000,
+    minLen: 200,
+  });
+}
 
-  const headingPatterns = [
-    /\b\d{1,2}\.\d{1,2}\s*\.?\s*Eligibility\s*Criteria\b/i,
-    /\bEligibility\s+Conditions\b/i,
-    /\bEligibility\s+and\s+Evaluation\s+criteria\b/i,
-    /\bClause\s*\d{1,2}\.\d{1,2}\s*[:\-]?\s*Eligibility\b/i,
-    /\bELIGIBILITY\s*CRITERIA\b/,                    // all-caps heading, no numbering
-    /\bEligibility\s+Criteria\s+for\s+Bidders?\b/i,
-    /\bMinimum\s+Eligibility\s+Criteria\b/i,
-    /\bQualification\s+Criteria\b/i,
-    /\bPre[\s-]?Qualification\s+Criteria\b/i,
-    /\bBidder\s+Eligibility\b/i,
-  ];
-  let startIdxStripped = -1;
-  for(const re of headingPatterns){
-    const m = stripped.match(re);
-    if(m){ startIdxStripped = m.index; break; }
-  }
-  if(startIdxStripped === -1){
-    log('Eligibility section anchor: no heading pattern matched — falling back to full scan');
-    return null;
-  }
-  const startIdx = toOriginal(startIdxStripped);
-
-  // Find the next section-level heading after the start to use as the end
-  // boundary (e.g. "4.1.1 Conditions for Consortium", "4.2 Evaluation...").
-  const endPatterns = [
-    /\b\d{1,2}\.\d{1,2}\.\d{1,2}\s+[A-Z]/,     // e.g. "4.1.1 Conditions"
-    /\b\d{1,2}\.\d{1,2}\s+Evaluation\b/i,       // e.g. "4.2 Evaluation..."
-    /\b\d{1,2}\.\d{1,2}\s+[A-Z][a-z]+\s+[A-Z]/, // generic next numbered heading
-  ];
-  const afterStripped = stripped.slice(startIdxStripped + 50); // skip past the heading itself
-  let endIdxStripped = stripped.length;
-  for(const re of endPatterns){
-    const m = afterStripped.match(re);
-    if(m){
-      const candidate = startIdxStripped + 50 + m.index;
-      if(candidate < endIdxStripped) endIdxStripped = candidate;
-    }
-  }
-  let endIdx = toOriginal(endIdxStripped);
-  // Cap section length generously (eligibility tables are rarely >8000 chars);
-  // if no end heading matched at all, don't send the whole rest of the document.
-  const MAX_SECTION_LEN = 8000;
-  if(endIdx - startIdx > MAX_SECTION_LEN) endIdx = startIdx + MAX_SECTION_LEN;
-
-  const slice = fullText.slice(startIdx, endIdx).trim();
-  // Sanity check: a real eligibility section should contain at least ONE of
-  // these recognizable terms; if not, this was probably a false-positive
-  // heading match (e.g. a table of contents entry, not the actual section).
-  const signalTerms = /turnover|EMD|earnest\s*money|GST|blacklist|debarr|ITR|net\s*worth|similar\s*project|documentary\s*proof|registration|incorporat|experience|financial\s*capacity|technical\s*capacity/i;
-  if(!signalTerms.test(slice)){
-    log(`Eligibility section anchor: matched a heading but slice (${slice.length} chars) had no recognizable eligibility terms — likely a false positive (e.g. table of contents), falling back to full scan`);
-    return null;
-  }
-  // Guard against having anchored to a table-of-contents listing rather than
-  // the real section — TOC entries are short (just the heading + page number).
-  if(slice.length < 200){
-    log(`Eligibility section anchor: matched slice too short (${slice.length} chars) — likely a table-of-contents entry, falling back to full scan`);
-    return null;
-  }
-
-  return slice;
+// Locates the marks-based "Technical Evaluation Criteria" table (as distinct
+// from the pass/fail Eligibility Criteria table above) — e.g. "4.1.2
+// Evaluation criteria of e-bids", "Technical Evaluation Criteria", "Marking
+// Scheme". Mirrors findEligibilitySection exactly, just with different
+// heading/end/signal patterns tuned for the marks-table's own vocabulary
+// (Maximum Marks, sub-weightages, presentation, etc.) instead of eligibility's
+// (turnover, EMD, GST, etc.).
+function findScoringCriteriaSection(fullText){
+  return findNamedSection(fullText, {
+    label: 'Scoring criteria section',
+    headingPatterns: [
+      /\b\d{1,2}\.\d{1,2}\.\d{1,2}\s*Evaluation\s*criteria\s*of\s*e-?bids\b/i,
+      /\bTechnical\s+Evaluation\s+Criteria\b/i,
+      /\bEvaluation\s*[-–—]\s*Method\s*of\s*selection\b/i,
+      /\bMarking\s+Scheme\b/i,
+      /\bTechnical\s+Scoring\s+(?:Criteria|Rubric)\b/i,
+      /\bMarks?[\s-]?based\s+Evaluation\b/i,
+      /\b\d{1,2}\.\d{1,2}\s*Evaluation\s*Criteria\b/i,
+      /\bCriteria\s+for\s+Technical\s+Evaluation\b/i,
+    ],
+    endPatterns: [
+      /\b\d{1,2}\.\d{1,2}\s+Evaluation\s*[-–—]\s*Method\b/i, // e.g. "4.2 Evaluation - Method..."
+      /\b\d{1,2}\s+Instructions\s+to\s+Bidders\b/i,
+      /\bAnnexure\s+[A-Z]\b/i,
+      /\b\d{1,2}\.\d{1,2}\.\d{1,2}\s+[A-Z]/,     // next numbered sub-heading
+      /\b\d{1,2}\.\d{1,2}\s+[A-Z][a-z]+\s+[A-Z]/, // generic next numbered heading
+    ],
+    signalTerms: /maximum\s*marks|max\s*marks|marks|weightage|sub-?criteria|technical\s*presentation|documents?\s*to\s*be\s*submitted|CV\s*format|grand\s*total/i,
+    maxLen: 8000,
+    minLen: 200,
+  });
 }
 
 async function runEligibilityExtraction(){
@@ -1280,16 +1319,12 @@ Excerpt:
    fixed max marks per criterion, tiered scoring, sub-weights,
    qualifying threshold, and selection method like L1/QCBS.)
    ============================================================ */
-async function runScoringCriteriaExtraction(){
-  setProcessing(5);
-  try{
-    const fullText = combinedEligibilitySourceText();
-    const chunks = chunkText(fullText, 6000, 500);
-    log(`Scanning ${chunks.length} chunk(s) for the marks-based evaluation/scoring rubric`);
-
-    let merged = [];
-    for(let i=0; i<chunks.length; i++){
-      const prompt = `You are extracting rows from a tender document's TECHNICAL EVALUATION CRITERIA TABLE — the marks-based scoring table used to rank qualified bidders (often titled "Evaluation Criteria", "Technical Evaluation", "Marking Scheme"), NOT the pass/fail eligibility table. This is chunk ${i+1} of ${chunks.length} of a tender document (which may include both the original RFP and a later corrigendum that can amend/override RFP scoring rules — e.g. a revised max-marks value, changed tier thresholds, or an added/removed criterion). Only extract what's actually present here.
+// Builds the extraction prompt for one chunk/slice of text when scanning for
+// the technical evaluation / scoring criteria table. Factored out so both the
+// anchored single-slice path and the full-document fallback path share
+// identical prompt wording.
+function buildScoringCriteriaPrompt(chunkText, i, totalChunks){
+  return `You are extracting rows from a tender document's TECHNICAL EVALUATION CRITERIA TABLE — the marks-based scoring table used to rank qualified bidders (often titled "Evaluation Criteria", "Technical Evaluation", "Marking Scheme"), NOT the pass/fail eligibility table. This is chunk ${i+1} of ${totalChunks} of a tender document (which may include both the original RFP and a later corrigendum that can amend/override RFP scoring rules — e.g. a revised max-marks value, changed tier thresholds, or an added/removed criterion). Only extract what's actually present here.
 
 MOST IMPORTANT RULE: mirror the table exactly as printed. Each row typically has: a serial number, a "Criteria" cell (which itself contains the criterion name PLUS its full scoring rule — tiered marks, sub-weighted components, definitions like "Similar Projects shall mean...", all as one block of text, exactly like the source), a "Maximum Marks" cell, and a "Documents to be Submitted" cell. Reproduce the Criteria cell's full text faithfully — do not split tiers/sub-weights out into separate structured fields; keep them inline as the source presents them, since that is how this will be compared against a real filled-in evaluation report.
 
@@ -1311,7 +1346,30 @@ Also, if this chunk states the overall qualifying/minimum technical score (e.g. 
 Return ONLY valid JSON: an array of objects as described. If neither a genuine technical-evaluation-criteria table nor a plausible continuation of one appears in this excerpt, return [].
 
 Excerpt:
-"""${chunks[i]}"""`;
+"""${chunkText}"""`;
+}
+
+async function runScoringCriteriaExtraction(){
+  setProcessing(5);
+  try{
+    const fullText = combinedEligibilitySourceText();
+
+    // Try to anchor directly to the Technical Evaluation Criteria section
+    // first — this needs just ONE AI call instead of one per chunk of the
+    // whole document, mirroring the eligibility extraction's approach.
+    const anchoredSection = findScoringCriteriaSection(fullText);
+    let chunks;
+    if(anchoredSection){
+      chunks = [anchoredSection];
+      log(`Found "Technical Evaluation Criteria" section directly (${anchoredSection.length} chars) — using 1 AI call instead of scanning the full document`);
+    } else {
+      chunks = chunkText(fullText, 6000, 500);
+      log(`Could not confidently locate the Technical Evaluation Criteria section — falling back to full-document scan: split into ${chunks.length} chunk(s)`);
+    }
+
+    let merged = [];
+    for(let i=0; i<chunks.length; i++){
+      const prompt = buildScoringCriteriaPrompt(chunks[i], i, chunks.length);
       try{
         const raw = await callAI('eligibility', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:4000});
         const parsed = safeParseJsonArray(raw);
@@ -1319,6 +1377,26 @@ Excerpt:
         log(`Chunk ${i+1}/${chunks.length}: ${parsed.length} scoring item(s) found`);
       } catch(err){
         log(`Chunk ${i+1}/${chunks.length} scoring extraction failed: ${err.message}`);
+      }
+    }
+
+    // If the anchored single-chunk attempt came back completely empty (e.g.
+    // the section text didn't parse as expected, or this RFP's scoring table
+    // never got picked up by the heading patterns), fall back once to the
+    // full-document chunk scan rather than silently returning zero criteria.
+    if(anchoredSection && merged.length === 0){
+      log('Anchored scoring section returned 0 criteria — falling back to full-document scan');
+      const fallbackChunks = chunkText(fullText, 6000, 500);
+      for(let i=0; i<fallbackChunks.length; i++){
+        const prompt = buildScoringCriteriaPrompt(fallbackChunks[i], i, fallbackChunks.length);
+        try{
+          const raw = await callAI('eligibility', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:4000});
+          const parsed = safeParseJsonArray(raw);
+          merged = merged.concat(parsed);
+          log(`Fallback chunk ${i+1}/${fallbackChunks.length}: ${parsed.length} scoring item(s) found`);
+        } catch(err){
+          log(`Fallback chunk ${i+1}/${fallbackChunks.length} scoring extraction failed: ${err.message}`);
+        }
       }
     }
 
