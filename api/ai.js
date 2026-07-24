@@ -1,6 +1,7 @@
 // /api/ai.js
 // AI API for The Tender Genie
 // Handles Groq, Gemini, Cerebras, OpenRouter with 5 keys each
+// NOW WITH CROSS-PROVIDER FALLBACKS
 
 export const config = {
   runtime: 'edge',
@@ -38,15 +39,50 @@ const KEYS = {
   ],
 };
 
-// ====== WHICH PROVIDER TO USE FOR EACH TASK ======
+// ====== TASK CONFIGURATION WITH FALLBACKS ======
+// Each task has a primary provider and an optional list of fallback providers.
+// If the primary fails (all 5 keys exhausted), it tries fallbacks in order.
 const TASKS = {
-  ocr:           { provider: 'gemini',   model: 'gemini-2.0-flash' },
-  extract:       { provider: 'gemini',   model: 'gemini-2.0-flash' },
-  chat:          { provider: 'groq',     model: 'llama-3.3-70b-versatile' },
-  eligibility:   { provider: 'groq',     model: 'llama-3.3-70b-versatile' },
-  compare:       { provider: 'gemini',   model: 'gemini-2.0-flash' },
-  evaluate:      { provider: 'gemini',   model: 'gemini-2.0-flash' },
-  report:        { provider: 'groq',     model: 'llama-3.3-70b-versatile' },
+  ocr: {
+    primary:   { provider: 'gemini',   model: 'gemini-2.0-flash' },
+    fallbacks: [],
+  },
+  extract: {
+    primary:   { provider: 'gemini',   model: 'gemini-2.0-flash' },
+    fallbacks: [],
+  },
+  chat: {
+    primary:   { provider: 'groq',     model: 'llama-3.3-70b-versatile' },
+    fallbacks: [
+      { provider: 'cerebras',   model: 'llama-3.3-70b' },
+      { provider: 'openrouter', model: 'deepseek/deepseek-r1:free' },
+      { provider: 'gemini',     model: 'gemini-2.0-flash' },
+    ],
+  },
+  eligibility: {
+    primary:   { provider: 'groq',     model: 'llama-3.3-70b-versatile' },
+    fallbacks: [
+      { provider: 'cerebras',   model: 'llama-3.3-70b' },
+      { provider: 'openrouter', model: 'deepseek/deepseek-r1:free' },
+      { provider: 'gemini',     model: 'gemini-2.0-flash' },
+    ],
+  },
+  compare: {
+    primary:   { provider: 'gemini',   model: 'gemini-2.0-flash' },
+    fallbacks: [],
+  },
+  evaluate: {
+    primary:   { provider: 'gemini',   model: 'gemini-2.0-flash' },
+    fallbacks: [],
+  },
+  report: {
+    primary:   { provider: 'groq',     model: 'llama-3.3-70b-versatile' },
+    fallbacks: [
+      { provider: 'cerebras',   model: 'llama-3.3-70b' },
+      { provider: 'openrouter', model: 'deepseek/deepseek-r1:free' },
+      { provider: 'gemini',     model: 'gemini-2.0-flash' },
+    ],
+  },
 };
 
 // Track which key to use next (round-robin)
@@ -80,26 +116,31 @@ export default async function handler(req) {
       return json({ error: 'Please send messages array' }, 400);
     }
 
-    // Get provider settings for this task
+    // Get task configuration
     const taskConfig = TASKS[task];
-    const provider = taskConfig.provider;
-    const model = taskConfig.model;
+    
+    // Build list of providers to try: primary + fallbacks
+    const providersToTry = [taskConfig.primary, ...(taskConfig.fallbacks || [])];
 
-    // Try each key until one works
-    const result = await tryWithFallback(provider, model, messages, body.temperature, body.max_tokens);
+    // Try each provider until one works
+    const result = await tryProviders(providersToTry, messages, body.temperature, body.max_tokens);
 
     if (!result.success) {
-      return json({ error: 'All keys failed for ' + provider, details: result.error }, 503);
+      return json({ 
+        error: 'All providers failed for task: ' + task, 
+        details: result.error 
+      }, 503);
     }
 
     // Return success
     return json({
       success: true,
       task: task,
-      provider: provider,
-      model: model,
+      provider: result.provider,
+      model: result.model,
       content: result.content,
       key_used: result.keyNumber,
+      fallback_used: result.fallbackUsed,
       time: new Date().toISOString(),
     });
 
@@ -108,9 +149,47 @@ export default async function handler(req) {
   }
 }
 
-// ====== TRY KEYS ONE BY ONE ======
+// ====== TRY PROVIDERS ONE BY ONE ======
+async function tryProviders(providers, messages, temperature, maxTokens) {
+  for (let i = 0; i < providers.length; i++) {
+    const config = providers[i];
+    const isFallback = i > 0;
+    
+    try {
+      const result = await tryWithFallback(
+        config.provider, 
+        config.model, 
+        messages, 
+        temperature, 
+        maxTokens
+      );
+      
+      if (result.success) {
+        return {
+          success: true,
+          content: result.content,
+          provider: config.provider,
+          model: config.model,
+          keyNumber: result.keyNumber,
+          fallbackUsed: isFallback,
+        };
+      }
+    } catch (err) {
+      console.log((isFallback ? 'Fallback' : 'Primary') + ' provider ' + config.provider + ' failed: ' + err.message);
+      // Continue to next provider
+    }
+  }
+  
+  return { success: false, error: 'All providers and keys exhausted' };
+}
+
+// ====== TRY KEYS ONE BY ONE (for a single provider) ======
 async function tryWithFallback(provider, model, messages, temperature, maxTokens) {
   const keyList = KEYS[provider];
+  
+  if (!keyList || keyList.length === 0) {
+    return { success: false, error: 'No keys found for provider: ' + provider };
+  }
   
   for (let i = 0; i < keyList.length; i++) {
     // Pick next key in rotation
@@ -125,12 +204,12 @@ async function tryWithFallback(provider, model, messages, temperature, maxTokens
         return { success: true, content: result, keyNumber: idx + 1 };
       }
     } catch (err) {
-      console.log('Key ' + (idx + 1) + ' failed: ' + err.message);
+      console.log('Key ' + (idx + 1) + ' failed for ' + provider + ': ' + err.message);
       // Try next key
     }
   }
   
-  return { success: false, error: 'All 5 keys exhausted' };
+  return { success: false, error: 'All ' + keyList.length + ' keys exhausted for ' + provider };
 }
 
 // ====== CALL THE ACTUAL AI PROVIDER ======
