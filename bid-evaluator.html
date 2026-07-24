@@ -957,11 +957,15 @@ async function runEligibilityExtraction(){
     for(let i=0; i<chunks.length; i++){
       const prompt = `You are extracting rows from a tender document's ELIGIBILITY CRITERIA TABLE. This is chunk ${i+1} of ${chunks.length} of a tender document (which may include both the original RFP and a later corrigendum that can amend/override RFP clauses). Only extract what's actually present here, don't guess at missing chunks.
 
-MOST IMPORTANT RULE: Most tenders present eligibility criteria as ONE literal table or numbered list under a heading like "Eligibility Criteria", "Eligibility Conditions", "Qualification Requirements", or "Pre-Qualification Criteria" — usually with its own "#"/Sr. No. column and often a "Documentary proof to be submitted" column alongside it. If this excerpt contains such a table, extract ONLY the rows that are literally printed in that table, in the exact order they appear, and CAPTURE THE TABLE'S OWN PRINTED SERIAL NUMBER for each row exactly as shown — even if the table's own numbering repeats a number (e.g. two rows both numbered "1") or skips numbers (e.g. jumps from 3 straight to 6). Do not renumber, deduplicate by number, or "fix" the table's own numbering — reproduce it exactly as printed, since that is how it will be referenced later.
+MOST IMPORTANT RULE: Most tenders present eligibility criteria as ONE literal table or numbered list under a heading that literally contains the word "Eligibility" — e.g. "Eligibility Criteria", "Eligibility Conditions", "Eligibility and Evaluation criteria" (the eligibility PART of it). It usually has its own "#"/Sr. No. column and often a "Documentary proof to be submitted" column alongside it, and lists conditions the BIDDER'S FIRM must meet (turnover, registration, past project value, blacklisting declaration, etc.).
 
-Do NOT invent or add criteria from other parts of the document (scope of work, general instructions, definitions, submission procedure) that are not literal rows of this table, even if they sound like qualifications. If no such table appears in this excerpt, return [].
+HARD EXCLUSION — DO NOT extract from a "Team", "Key Personnel", "Key Professionals", "Staffing", or similar section, even though it lists things like "minimum 10 years experience" or "Bachelor's Degree in Civil Engineering." That section describes the REQUIRED PROJECT TEAM/PERSONNEL the winning bidder must deploy for the assignment — it is part of the Terms of Reference / Scope of Work, not bidder eligibility. A row like "Team Leader — minimum 10 years, Bachelor's + Master's degree" is about a PERSON'S qualifications for a job role, not the BIDDER FIRM's eligibility to bid — always exclude it, even if it appears numbered or tabular. Eligibility criteria describe the FIRM's turnover, registration, past projects, legal standing, tax compliance — not a named role's individual CV requirements.
 
-Note: a row for "Bid Processing Fee & EMD Deposit" (or similar tender-fee/EMD submission compliance) commonly appears AS ITS OWN ROW in this table — if the table includes it, extract it like any other row; do not skip it as "not a real qualification."
+If this excerpt contains a genuine eligibility-heading table, extract ONLY the rows literally printed in that table, in the exact order they appear, and CAPTURE THE TABLE'S OWN PRINTED SERIAL NUMBER for each row exactly as shown — even if the table's own numbering repeats a number (e.g. two rows both numbered "1") or skips numbers (e.g. jumps from 3 straight to 6). Do not renumber, deduplicate by number, or "fix" the table's own numbering — reproduce it exactly as printed, since that is how it will be referenced later.
+
+Do NOT invent or add criteria from other parts of the document (scope of work, general instructions, definitions, submission procedure, team/staffing requirements) that are not literal rows of the eligibility-heading table, even if they sound like qualifications. If no genuine eligibility-heading table appears in this excerpt, return [].
+
+Note: a row for "Bid Processing Fee & EMD Deposit" (or similar tender-fee/EMD submission compliance) commonly appears AS ITS OWN ROW inside the eligibility table itself — if the eligibility table includes it, extract it like any other row; do not skip it as "not a real qualification."
 
 For each row, capture:
 - description: the condition text as printed (may reference a documentary proof column too — include that briefly if present)
@@ -1005,7 +1009,19 @@ Excerpt:
       }
     }
 
-    state.eligibility = deduped.map((c,i)=>({ id: 'crit_'+(i+1), ...c }));
+    // Deterministic safety net: prompt instructions alone don't reliably keep the
+    // model out of the Team/Key Personnel section (it still leaks through sometimes
+    // despite explicit exclusion wording). Strip anything matching known role-title
+    // patterns regardless of what the model returned — this is a hard code-level
+    // filter, not just a prompt request, so it can't be "forgotten" mid-extraction.
+    const ROLE_TITLE_PATTERN = /\b(team leader|resident engineer|structural designer|construction (project )?management expert|site engineer|project manager|key personnel|key professional|curriculum vitae|\bcv\b|deputy team leader|assistant engineer)\b/i;
+    const filtered = deduped.filter(c => !ROLE_TITLE_PATTERN.test(c.description || ''));
+    const removedCount = deduped.length - filtered.length;
+    if(removedCount > 0){
+      log(`Filtered out ${removedCount} row(s) that matched Team/Key Personnel role-title patterns (not genuine bidder eligibility)`);
+    }
+
+    state.eligibility = filtered.map((c,i)=>({ id: 'crit_'+(i+1), ...c }));
     log('Extracted ' + state.eligibility.length + ' unique eligibility criteria (from ' + merged.length + ' raw matches)');
   } catch(err){
     log('Eligibility extraction failed: ' + err.message);
