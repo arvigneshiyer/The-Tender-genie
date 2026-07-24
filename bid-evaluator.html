@@ -187,9 +187,6 @@
 
 <header>
   <h1>The Tender <span>Genie</span> — Bid Evaluator</h1>
-  <div class="row" style="margin:0;gap:12px">
-    <div class="muted" id="apiStatus" style="color:#8FA8C8">API: /api/ai.js</div>
-  </div>
 </header>
 
 <div id="rfpBannerHost"></div>
@@ -313,7 +310,6 @@ async function callAI(task, messages, opts={}){
   if(!res.ok || !data.success){
     throw new Error(data.error || 'AI call failed');
   }
-  log(`AI(${task}) via ${data.provider}/${data.model} key#${data.key_used}`);
   return data.content;
 }
 
@@ -511,7 +507,7 @@ async function showScoringCriterionPreview(critIndex){
   if(!crit || !crit.sourcePage) return;
   const isCorr = crit.sourceDoc === 'Corrigendum';
   const file = isCorr ? state.corrigendumFiles[0] : state.rfpFiles[0];
-  await openPagePreview(file, crit.sourcePage, `${isCorr ? 'Corrigendum' : 'RFP'} — Page ${crit.sourcePage}`, crit.name);
+  await openPagePreview(file, crit.sourcePage, `${isCorr ? 'Corrigendum' : 'RFP'} — Page ${crit.sourcePage}`, crit.description);
 }
 
 // For Stage 7: preview the exact page in a BIDDER's technical bid where evidence
@@ -634,7 +630,7 @@ function removeRFP(i){ state.rfpFiles.splice(i,1); render(); }
 // Reads the RFP's opening pages to identify the issuing Authority/Client and
 // the project/assignment name, so it can be shown as a banner across every stage.
 async function detectAuthorityAndProject(fullText){
-  const excerpt = fullText.slice(0, 3500);
+  const excerpt = fullText.slice(0, 6000); // wider window — title pages often have sparse text density
   const prompt = `This is the opening excerpt of a government tender/RFP document. Identify:
 1. authorityName — the Authority/Client organization that issued this tender (not a consultant or bidder)
 2. projectName — the short name/title of the project or assignment being tendered
@@ -650,8 +646,10 @@ Return ONLY valid JSON: {"authorityName": "..." or null, "projectName": "..." or
     if(parsed.projectName) state.tender.projectName = String(parsed.projectName).trim().slice(0,200);
     if(parsed.authorityName || parsed.projectName){
       log(`Identified: ${parsed.authorityName || '(authority not found)'} — ${parsed.projectName || '(project not found)'}`);
-      render();
+    } else {
+      log('Authority/project detection returned no values — raw response: ' + raw.slice(0,200));
     }
+    render();
   } catch(err){
     log('Authority/project detection failed (non-fatal): ' + err.message);
   }
@@ -748,7 +746,7 @@ async function handleCorrigendumUpload(e){
   const file = e.target.files[0];
   if(!file) return;
   state.corrigendumFiles.push(file);
-  setProcessing(4);
+  setProcessing(3);
   try{
     const raw = await extractTextFromFile(file);
     // Distinguish corrigendum pages from RFP pages so eligibility extraction
@@ -793,32 +791,26 @@ function runDeltaCompare(){
    STAGE 4 — Eligibility
    ============================================================ */
 function renderStage5(){
+  const waiting = !state.tender.extractedText;
   return `
   <div class="card">
     <h2>Stage 4 · Check Eligibility</h2>
     <div class="sub">Runs automatically once the RFP (and corrigendum, if uploaded) are parsed — combines both, with corrigendum amendments taking precedence. Click any criterion's "View Page" to see the exact source page. Criteria are listed in the same serial order they appear in the source document.</div>
 
-    <div class="row">
-      <button ${!state.tender.extractedText ? 'disabled':''} onclick="runEligibilityExtraction()" id="eligBtn">
-        Extract Eligibility Criteria
-      </button>
-    </div>
+    ${waiting ? `<div class="muted" style="margin-top:6px">Waiting for RFP upload (Stage 1)…</div>` : ''}
     ${state.eligibility.length ? `
       <table>
-        <tr><th>#</th><th>Description</th><th>Type</th><th>Threshold</th><th>Weight</th><th>Source</th><th></th></tr>
+        <tr><th>#</th><th>Eligibility Conditions</th><th>Source</th><th></th></tr>
         ${state.eligibility.map((c,ci)=>`
           <tr>
             <td>${escapeHtml(c.originalNo != null ? String(c.originalNo) : String(ci+1))}</td>
             <td>${escapeHtml(c.description)}</td>
-            <td><span class="badge ${c.type==='mandatory'?'err':'info'}">${c.type}</span></td>
-            <td>${escapeHtml(c.threshold||'—')}</td>
-            <td>${escapeHtml(String(c.weight||'—'))}</td>
             <td>${c.sourcePage ? `<span class="badge ${c.sourceDoc==='Corrigendum'?'warn':'info'}">${escapeHtml(c.sourceDoc||'RFP')} p.${escapeHtml(String(c.sourcePage))}</span>` : '—'}</td>
             <td>${c.sourcePage ? `<button class="secondary small" onclick="showCriterionPreview(${ci})">👁 View Page</button>` : ''}</td>
           </tr>
         `).join('')}
       </table>
-    ` : `<div class="muted" style="margin-top:12px">No eligibility criteria extracted yet.</div>`}
+    ` : (!waiting ? `<div class="muted" style="margin-top:12px">No eligibility criteria found yet — processing…</div>` : '')}
   </div>`;
 }
 
@@ -826,15 +818,12 @@ function renderStage5(){
    STAGE 5 — Technical Scoring Rubric (its own page, always after Eligibility)
    ============================================================ */
 function renderStageTechnical(){
+  const waiting = !state.tender.extractedText;
   return `
   <div class="card">
     <h2>Stage 5 · Technical Scoring Criteria</h2>
     <div class="sub">The marks-based evaluation table (separate from pass/fail eligibility) — used in Stage 7 to score bidders against fixed max marks instead of a generic 0–100 guess. Criteria are listed in the same serial order they appear in the source document.</div>
-    <div class="row">
-      <button ${!state.tender.extractedText ? 'disabled':''} onclick="runScoringCriteriaExtraction()" id="scoreCritBtn">
-        Extract Technical Scoring Criteria
-      </button>
-    </div>
+    ${waiting ? `<div class="muted" style="margin-top:6px">Waiting for RFP upload (Stage 1)…</div>` : ''}
     ${state.selectionMethod.method ? `
       <div class="kv">
         <div>Selection Method</div><div>${escapeHtml(state.selectionMethod.method)}</div>
@@ -843,22 +832,37 @@ function renderStageTechnical(){
     ` : ''}
     ${state.scoringCriteria.length ? `
       <table>
-        <tr><th>#</th><th>Criterion</th><th>Max Marks</th><th>Tiers</th><th>Sub-Weights</th><th>Assessable from Docs?</th><th></th></tr>
+        <tr><th>#</th><th>Criteria</th><th>Maximum Marks</th><th>Documents to be Submitted</th><th>Source</th><th></th></tr>
         ${state.scoringCriteria.map((c,ci)=>`
           <tr>
-            <td>${ci+1}</td>
-            <td>${escapeHtml(c.name)}</td>
-            <td>${escapeHtml(String(c.maxMarks ?? '—'))}</td>
-            <td>${escapeHtml(c.tiers || '—')}</td>
-            <td>${escapeHtml(c.subWeights || '—')}</td>
-            <td>${c.requiresLiveAssessment ? '<span class="badge warn">No — live only</span>' : '<span class="badge ok">Yes</span>'}</td>
+            <td>${escapeHtml(c.originalNo != null ? String(c.originalNo) : String(ci+1))}</td>
+            <td>${escapeHtml(c.description)}${c.requiresLiveAssessment ? ' <span class="badge warn">Live assessment only</span>' : ''}</td>
+            <td><input type="text" inputmode="decimal" value="${escapeHtml(c.maxMarks != null ? String(c.maxMarks) : '')}" style="width:70px" oninput="updateScoringMaxMarks(${ci}, this.value)"></td>
+            <td>${escapeHtml(c.documentsRequired || '—')}</td>
+            <td>${c.sourcePage ? `<span class="badge ${c.sourceDoc==='Corrigendum'?'warn':'info'}">${escapeHtml(c.sourceDoc||'RFP')} p.${escapeHtml(String(c.sourcePage))}</span>` : '—'}</td>
             <td>${c.sourcePage ? `<button class="secondary small" onclick="showScoringCriterionPreview(${ci})">👁 View Page</button>` : ''}</td>
           </tr>
         `).join('')}
+        <tr>
+          <td></td>
+          <td style="text-align:right;font-weight:700">Total Maximum Marks</td>
+          <td style="font-weight:700"><span id="scoringTotalMarks">${state.scoringCriteria.reduce((s,c)=>s+(Number(c.maxMarks)||0),0)}</span></td>
+          <td></td><td></td><td></td>
+        </tr>
       </table>
-      ${state.scoringCriteria.some(c=>c.requiresLiveAssessment) ? `<div class="sub" style="margin-top:10px">⚠ Criteria marked "live only" (e.g. presentations/interviews) can't be scored from documents — Stage 8 will flag these for manual entry.</div>` : ''}
-    ` : `<div class="muted" style="margin-top:12px">No scoring rubric extracted yet.</div>`}
+      ${state.scoringCriteria.some(c=>c.requiresLiveAssessment) ? `<div class="sub" style="margin-top:10px">⚠ Criteria marked "Live assessment only" (e.g. presentations/interviews) can't be scored from documents — Stage 7 will flag these for manual entry.</div>` : ''}
+    ` : (!waiting ? `<div class="muted" style="margin-top:12px">No scoring rubric found yet — processing…</div>` : '')}
   </div>`;
+}
+
+function updateScoringMaxMarks(idx, val){
+  const num = parseFloat(val);
+  state.scoringCriteria[idx].maxMarks = isNaN(num) ? null : num;
+  // Update just the total in place — avoids a full re-render that would drop input focus mid-edit.
+  const totalEl = document.getElementById('scoringTotalMarks');
+  if(totalEl){
+    totalEl.textContent = state.scoringCriteria.reduce((s,c)=>s+(Number(c.maxMarks)||0),0);
+  }
 }
 
 /* ============================================================
@@ -941,10 +945,65 @@ function combinedEligibilitySourceText(){
   return corr ? (rfp + '\n\n=== CORRIGENDUM (may amend the RFP above) ===\n\n' + corr) : rfp;
 }
 
+// Finds the nearest preceding [PAGE N] or [CORR PAGE N] marker before a given
+// character index in the combined source text — used to attach a real source
+// page to values pulled by regex rather than by the LLM (e.g. Data Sheet amounts).
+function findNearestPageMarker(text, matchIndex){
+  const before = text.slice(0, matchIndex);
+  const markers = [...before.matchAll(/\[(CORR )?PAGE (\d+)\]/g)];
+  if(!markers.length) return { page: null, doc: 'RFP' };
+  const last = markers[markers.length-1];
+  return { page: last[2], doc: last[1] ? 'Corrigendum' : 'RFP' };
+}
+
+// The Bid Processing/Tender Fee and EMD amounts are almost always stated in the
+// RFP's Data Sheet (Clause 1), not inside the eligibility table itself (which
+// typically just references "Form 6" as proof). Pull the real amounts directly
+// via regex so the eligibility rows show actual numbers instead of a vague
+// "Form 6" reference.
+function extractFeeAndEmdFromDataSheet(fullText){
+  const feePatterns = [
+    /(?:Tender|Bid)\s*Processing\s*Fee\s*[:\-]?\s*(?:Rs\.?|INR|₹)\s*([\d,]+(?:\.\d+)?)/i,
+    /Processing\s*Fee\s*[:\-]?\s*(?:Rs\.?|INR|₹)\s*([\d,]+(?:\.\d+)?)/i,
+  ];
+  const emdPatterns = [
+    /Earnest\s*Money\s*Deposit\s*[:\-]?\s*(?:Rs\.?|INR|₹)\s*([\d,]+(?:\.\d+)?)/i,
+    /\bEMD\b\s*[:\-]?\s*(?:Rs\.?|INR|₹)\s*([\d,]+(?:\.\d+)?)/i,
+  ];
+  let fee = null, feeIdx = -1, emd = null, emdIdx = -1;
+  for(const re of feePatterns){ const m = fullText.match(re); if(m){ fee = m[1]; feeIdx = m.index; break; } }
+  for(const re of emdPatterns){ const m = fullText.match(re); if(m){ emd = m[1]; emdIdx = m.index; break; } }
+  return {
+    fee, feeSource: feeIdx >= 0 ? findNearestPageMarker(fullText, feeIdx) : null,
+    emd, emdSource: emdIdx >= 0 ? findNearestPageMarker(fullText, emdIdx) : null,
+  };
+}
+
+// The selection method (L1, QCBS 70:30, QCBS 80:20, Empanelment, etc.) and the
+// qualifying technical threshold are almost always stated plainly in the RFP's
+// Data Sheet (e.g. "Method of selection: L1") — pull them directly via regex
+// rather than relying solely on the LLM noticing it buried in a long document.
+function extractSelectionMethodFromDataSheet(fullText){
+  const methodPatterns = [
+    /Method\s*of\s*[Ss]election\s*[:\-]?\s*(QCBS\s*\(?\s*\d{1,3}\s*[:\-]\s*\d{1,3}\s*\)?|L\s*1|QCBS|Empanelment|Least\s*Cost)/i,
+    /\b(QCBS\s*\(?\s*\d{1,3}\s*[:\-]\s*\d{1,3}\s*\)?)\b/i,
+  ];
+  const thresholdPatterns = [
+    /minimum\s*(?:technical\s*)?score\s*of\s*(\d{1,3})\s*%/i,
+    /qualifying\s*technical\s*score\s*(?:is|of)?\s*(\d{1,3})\s*%/i,
+    /technical\s*score\s*of\s*(\d{1,3})\s*%\s*is\s*fixed/i,
+  ];
+  let method = null;
+  for(const re of methodPatterns){ const m = fullText.match(re); if(m){ method = m[1].replace(/\s+/g,' ').trim(); break; } }
+  let pct = null;
+  for(const re of thresholdPatterns){ const m = fullText.match(re); if(m){ pct = parseFloat(m[1]); break; } }
+  return { method, qualifyingThresholdPct: pct };
+}
+
 async function runEligibilityExtraction(){
   const btn = document.getElementById('eligBtn');
   if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Extracting…'; }
-  setProcessing(5);
+  setProcessing(4);
   try{
     const fullText = combinedEligibilitySourceText();
     const chunks = chunkText(fullText, 6000, 500);
@@ -1021,7 +1080,31 @@ Excerpt:
       log(`Filtered out ${removedCount} row(s) that matched Team/Key Personnel role-title patterns (not genuine bidder eligibility)`);
     }
 
-    state.eligibility = filtered.map((c,i)=>({ id: 'crit_'+(i+1), ...c }));
+    // The eligibility table usually has one combined row like "Bid Processing
+    // Fee & EMD Deposit" that just references a form number, with no actual
+    // amount — the real numbers live in the Data Sheet elsewhere in the RFP.
+    // Replace that row with two precise ones showing the real amounts.
+    const FEE_EMD_PATTERN = /\b(bid processing fee|tender processing fee|emd|earnest money deposit)\b/i;
+    const withoutFeeEmdRow = filtered.filter(c => !FEE_EMD_PATTERN.test(c.description || ''));
+    const { fee, feeSource, emd, emdSource } = extractFeeAndEmdFromDataSheet(fullText);
+    const feeEmdRows = [];
+    if(fee){
+      feeEmdRows.push({
+        description: `Bid processing fee - INR ${fee}`,
+        sourcePage: feeSource && feeSource.page, sourceDoc: feeSource ? feeSource.doc : 'RFP',
+        originalNo: '1',
+      });
+    }
+    if(emd){
+      feeEmdRows.push({
+        description: `EMD - INR ${emd}`,
+        sourcePage: emdSource && emdSource.page, sourceDoc: emdSource ? emdSource.doc : 'RFP',
+        originalNo: '1',
+      });
+    }
+    if(feeEmdRows.length) log(`Split Bid Processing Fee / EMD into ${feeEmdRows.length} row(s) with real amounts from the Data Sheet`);
+
+    state.eligibility = [...feeEmdRows, ...withoutFeeEmdRow].map((c,i)=>({ id: 'crit_'+(i+1), ...c }));
     log('Extracted ' + state.eligibility.length + ' unique eligibility criteria (from ' + merged.length + ' raw matches)');
   } catch(err){
     log('Eligibility extraction failed: ' + err.message);
@@ -1037,7 +1120,7 @@ Excerpt:
    qualifying threshold, and selection method like L1/QCBS.)
    ============================================================ */
 async function runScoringCriteriaExtraction(){
-  setProcessing(6);
+  setProcessing(5);
   try{
     const fullText = combinedEligibilitySourceText();
     const chunks = chunkText(fullText, 6000, 500);
@@ -1045,21 +1128,24 @@ async function runScoringCriteriaExtraction(){
 
     let merged = [];
     for(let i=0; i<chunks.length; i++){
-      const prompt = `You are extracting the MARKS-BASED TECHNICAL SCORING RUBRIC from a tender document — NOT the pass/fail eligibility criteria, but the table that assigns maximum marks per criterion for ranking qualified bidders (often titled "Evaluation Criteria", "Technical Evaluation", "Marking Scheme"). This is chunk ${i+1} of ${chunks.length} of a tender document (which may include both the original RFP and a later corrigendum that can amend/override RFP scoring rules — e.g. a revised max-marks value, changed tier thresholds, or an added/removed criterion). Only extract what's actually present here.
+      const prompt = `You are extracting rows from a tender document's TECHNICAL EVALUATION CRITERIA TABLE — the marks-based scoring table used to rank qualified bidders (often titled "Evaluation Criteria", "Technical Evaluation", "Marking Scheme"), NOT the pass/fail eligibility table. This is chunk ${i+1} of ${chunks.length} of a tender document (which may include both the original RFP and a later corrigendum that can amend/override RFP scoring rules — e.g. a revised max-marks value, changed tier thresholds, or an added/removed criterion). Only extract what's actually present here.
 
-For each scoring criterion found, capture:
-- name: short label (e.g. "Firm's Relevant Experience", "Team Leader", "Technical Presentation")
-- maxMarks: the maximum marks/points for this criterion
-- tiers: if scoring is tiered/bucketed (e.g. "1-2 projects: 10 marks, 3-4: 20, 5-6: 30"), describe the tiers as a short string; null if not tiered
-- subWeights: if the criterion is broken into weighted sub-parts (e.g. "general qualifications 25%, project adequacy 50%, years experience 25%"), describe briefly; null if none
+MOST IMPORTANT RULE: mirror the table exactly as printed. Each row typically has: a serial number, a "Criteria" cell (which itself contains the criterion name PLUS its full scoring rule — tiered marks, sub-weighted components, definitions like "Similar Projects shall mean...", all as one block of text, exactly like the source), a "Maximum Marks" cell, and a "Documents to be Submitted" cell. Reproduce the Criteria cell's full text faithfully — do not split tiers/sub-weights out into separate structured fields; keep them inline as the source presents them, since that is how this will be compared against a real filled-in evaluation report.
+
+For each row found, capture:
+- description: the FULL "Criteria" cell text as printed — criterion name + its complete scoring rule (tiers, sub-weights, definitions) all together, exactly as the source presents it
+- maxMarks: the maximum marks/points for this row
+- documentsRequired: the "Documents to be Submitted" cell text, or null if the table has no such column / this row has none listed
 - requiresLiveAssessment: true if this criterion can ONLY be judged live (e.g. an oral technical presentation, interview, site visit) and NOT from submitted documents alone; false otherwise
-- notes: any other scoring detail worth keeping, or null
+- originalNo: the table's own printed serial number for this row, as a string, exactly as shown — preserve it even if it repeats or skips
 - sourcePage: the number from the nearest [PAGE N] or [CORR PAGE N] marker in this excerpt, if present
 - sourceDoc: "Corrigendum" if it came from a [CORR PAGE N] marker, otherwise "RFP"
 
-Also, if this chunk states the overall qualifying/minimum technical score (e.g. "minimum technical score of 70%") or the selection method (e.g. "L1", "QCBS 70:30", "80:20"), include ONE extra object: {"name": "SELECTION_METHOD", "maxMarks": null, "tiers": null, "subWeights": null, "requiresLiveAssessment": false, "notes": "method=... ; qualifyingThresholdPct=..."}.
+HARD EXCLUSION — do not extract anything from a "Team", "Key Personnel", "Key Professionals", or "Staffing" section describing required project-team roles (e.g. Team Leader, Structural Designer, Resident Engineer) UNLESS it appears as a row inside the technical evaluation criteria table itself with its own marks allocation (e.g. "Relevant Experience of Key Personnel — 40 marks" as one scoring row is fine to include; a standalone staffing requirements list elsewhere in the document is not).
 
-Return ONLY valid JSON: an array of objects as described. If nothing relevant appears in this excerpt, return [].
+Also, if this chunk states the overall qualifying/minimum technical score (e.g. "minimum technical score of 70%") or the selection method (e.g. "L1", "QCBS 70:30", "80:20"), include ONE extra object: {"description": "SELECTION_METHOD", "maxMarks": null, "documentsRequired": null, "requiresLiveAssessment": false, "notes": "method=... ; qualifyingThresholdPct=..."}.
+
+Return ONLY valid JSON: an array of objects as described. If no genuine technical-evaluation-criteria table appears in this excerpt, return [].
 
 Excerpt:
 """${chunks[i]}"""`;
@@ -1073,26 +1159,34 @@ Excerpt:
       }
     }
 
-    // Pull out the selection-method marker, if any, into tender-level state
-    const methodEntry = merged.find(m => m.name === 'SELECTION_METHOD');
+    // Pull out the selection-method marker, if any, from the LLM pass, but prefer
+    // the direct regex read of the Data Sheet — it's usually a one-line plain
+    // statement ("Method of selection: L1") that's more reliable to grab directly
+    // than to trust an LLM to notice buried in a long document scan.
+    const methodEntry = merged.find(m => m.description === 'SELECTION_METHOD');
+    let llmMethod = null, llmPct = null;
     if(methodEntry){
       const methodMatch = (methodEntry.notes || '').match(/method\s*=\s*([^;]+)/i);
       const pctMatch = (methodEntry.notes || '').match(/qualifyingThresholdPct\s*=\s*([\d.]+)/i);
-      state.selectionMethod = {
-        method: methodMatch ? methodMatch[1].trim() : (methodEntry.notes || ''),
-        qualifyingThresholdPct: pctMatch ? parseFloat(pctMatch[1]) : null,
-      };
+      llmMethod = methodMatch ? methodMatch[1].trim() : (methodEntry.notes || null);
+      llmPct = pctMatch ? parseFloat(pctMatch[1]) : null;
     }
+    const regexMethod = extractSelectionMethodFromDataSheet(fullText);
+    state.selectionMethod = {
+      method: regexMethod.method || llmMethod || '',
+      qualifyingThresholdPct: regexMethod.qualifyingThresholdPct != null ? regexMethod.qualifyingThresholdPct : llmPct,
+    };
+    if(state.selectionMethod.method) log(`Selection method identified: ${state.selectionMethod.method}${state.selectionMethod.qualifyingThresholdPct ? ' (qualifying threshold ' + state.selectionMethod.qualifyingThresholdPct + '%)' : ''}`);
 
     // Dedupe actual scoring criteria (excluding the selection-method marker).
     // Same precedence rule as eligibility: if a corrigendum version and an RFP
     // version of the same criterion both appear, the corrigendum wins — it's
     // the later, binding amendment.
-    const criteriaOnly = merged.filter(m => m.name !== 'SELECTION_METHOD' && m.name);
+    const criteriaOnly = merged.filter(m => m.description !== 'SELECTION_METHOD' && m.description);
     const deduped = [];
     for(const c of criteriaOnly){
       const dupeIdx = deduped.findIndex(d => {
-        const a = new Set(tokenize(c.name)), b = new Set(tokenize(d.name));
+        const a = new Set(tokenize(c.description)), b = new Set(tokenize(d.description));
         const overlap = [...a].filter(t => b.has(t)).length;
         return overlap / Math.max(a.size, b.size, 1) > 0.6;
       });
@@ -1103,7 +1197,17 @@ Excerpt:
       }
     }
 
-    state.scoringCriteria = deduped.map((c,i)=>({ id: 'score_'+(i+1), ...c }));
+    // Same deterministic safety net as eligibility — strip anything that's really
+    // a Team/Key Personnel staffing row, not a genuine technical scoring criterion,
+    // regardless of what the model returned.
+    const ROLE_TITLE_PATTERN_TECH = /\b(team leader|resident engineer|structural designer|construction (project )?management expert|site engineer|deputy team leader|assistant engineer)\b/i;
+    const filteredTech = deduped.filter(c => !ROLE_TITLE_PATTERN_TECH.test(c.description || ''));
+    const removedTechCount = deduped.length - filteredTech.length;
+    if(removedTechCount > 0){
+      log(`Filtered out ${removedTechCount} row(s) that matched standalone Team/Key Personnel role-title patterns`);
+    }
+
+    state.scoringCriteria = filteredTech.map((c,i)=>({ id: 'score_'+(i+1), ...c }));
     log(`Extracted ${state.scoringCriteria.length} scoring criteria` + (state.selectionMethod.method ? ` — selection method: ${state.selectionMethod.method}${state.selectionMethod.qualifyingThresholdPct ? ', qualifying threshold ' + state.selectionMethod.qualifyingThresholdPct + '%' : ''}` : ''));
   } catch(err){
     log('Scoring rubric extraction failed: ' + err.message);
@@ -1179,7 +1283,7 @@ async function handleBidsPageUpload(e){
   const file = e.target.files[0];
   if(!file) return;
   state.bidsPageFiles.push(file);
-  setProcessing(7);
+  setProcessing(6);
   log('OCR on bids-received page: ' + file.name);
   try{
     const text = await extractTextFromFile(file);
@@ -1212,7 +1316,7 @@ function removeBidder(i){ state.bidders.splice(i,1); render(); }
 async function handleBidFile(e, bidderIdx, field){
   const file = e.target.files[0];
   if(!file) return;
-  setProcessing(7);
+  setProcessing(6);
   const bidder = state.bidders[bidderIdx];
   const subfolder = field === 'technicalText' ? 'Technical' : 'Financial';
   log(`Parsing ${field} for ${bidder.name}: ${file.name}`);
@@ -1343,7 +1447,7 @@ function renderEvalTable(idx){
 async function runEvaluation(){
   const btn = document.getElementById('evalBtn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Evaluating…';
-  setProcessing(8);
+  setProcessing(7);
   try{
     for(const bidder of state.bidders){
       const bidText = (bidder.technicalText || '') + '\n\n' + (bidder.financialText || '');
@@ -1354,7 +1458,7 @@ async function runEvaluation(){
       for(const crit of state.eligibility){
         const excerpt = getRelevantExcerpt(bidText, crit.description, { topK: 3, maxChars: 10000 });
         const prompt = `Determine whether this bidder's bid COMPLIES with the following eligibility criterion. This is pass/fail, not a score.
-Criterion: ${crit.description} (type: ${crit.type}, threshold: ${crit.threshold || 'n/a'})
+Criterion: ${crit.description}${crit.type ? ` (type: ${crit.type}${crit.threshold ? ', threshold: ' + crit.threshold : ''})` : ''}
 
 Bid excerpts (most relevant sections of a longer document; [...] marks a gap):
 """${excerpt}"""
@@ -1382,24 +1486,21 @@ Return ONLY valid JSON: {"status": "Compliant"|"Non-Compliant"|"Needs Clarificat
       for(const crit of state.scoringCriteria){
         if(crit.requiresLiveAssessment){
           scoringResults.push({
-            criterionId: crit.id, name: crit.name, maxMarks: crit.maxMarks,
+            criterionId: crit.id, name: crit.description, maxMarks: crit.maxMarks,
             marksAwarded: null, requiresLiveAssessment: true, evidencePage: null,
             justification: 'Requires live assessment (e.g. presentation/interview) — not scoreable from documents.',
           });
           continue;
         }
-        const excerpt = getRelevantExcerpt(bidText, crit.name + ' ' + (crit.tiers||'') + ' ' + (crit.subWeights||''), { topK: 4, maxChars: 14000 });
-        const prompt = `Score this bidder against the following technical evaluation criterion, using the EXACT scoring rules given — do not invent your own scale.
-Criterion: ${crit.name}
+        const excerpt = getRelevantExcerpt(bidText, crit.description, { topK: 4, maxChars: 14000 });
+        const prompt = `Score this bidder against the following technical evaluation criterion, using the EXACT scoring rule given (including any tiers or sub-weights it states) — do not invent your own scale.
+Criterion (full rule as printed in the RFP): ${crit.description}
 Maximum marks: ${crit.maxMarks}
-${crit.tiers ? `Tiered scoring rule: ${crit.tiers}` : ''}
-${crit.subWeights ? `Sub-weighted components: ${crit.subWeights}` : ''}
-${crit.notes ? `Additional notes: ${crit.notes}` : ''}
 
 Bid excerpts (most relevant sections of a longer document; [...] marks a gap):
 """${excerpt}"""
 
-Award marks strictly within 0 to ${crit.maxMarks}, following the tiered/weighted rule above if one is given. Justify briefly by naming what was found in the bid (e.g. which projects, whose CV, what experience count).
+Award marks strictly within 0 to ${crit.maxMarks}, following the tiered/weighted rule stated in the criterion text above if one is given. Justify briefly by naming what was found in the bid (e.g. which projects, whose CV, what experience count).
 
 Return ONLY valid JSON: {"marksAwarded": number, "justification": "...", "evidencePage": "the number from the nearest [PAGE N] marker where the key evidence was found, or null if none identifiable"}`;
         try{
@@ -1407,12 +1508,12 @@ Return ONLY valid JSON: {"marksAwarded": number, "justification": "...", "eviden
           const parsed = safeParseJsonObject(raw);
           const awarded = Math.max(0, Math.min(crit.maxMarks ?? 100, Number(parsed.marksAwarded) || 0));
           scoringResults.push({
-            criterionId: crit.id, name: crit.name, maxMarks: crit.maxMarks,
+            criterionId: crit.id, name: crit.description, maxMarks: crit.maxMarks,
             marksAwarded: awarded, requiresLiveAssessment: false, evidencePage: parsed.evidencePage || null,
             justification: parsed.justification || '',
           });
         } catch(err){
-          scoringResults.push({ criterionId: crit.id, name: crit.name, maxMarks: crit.maxMarks, marksAwarded: 0, requiresLiveAssessment: false, evidencePage: null, justification: 'Evaluation error: ' + err.message });
+          scoringResults.push({ criterionId: crit.id, name: crit.description, maxMarks: crit.maxMarks, marksAwarded: 0, requiresLiveAssessment: false, evidencePage: null, justification: 'Evaluation error: ' + err.message });
         }
       }
       state.scoringResults[bidder.id] = scoringResults;
@@ -1540,7 +1641,7 @@ function rankedBidders(){
 async function runReportGeneration(){
   const btn = document.getElementById('reportBtn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Drafting…';
-  setProcessing(9);
+  setProcessing(8);
   try{
     const ranked = rankedBidders();
     const prompt = `Draft an executive summary and presentation-invitation recommendation from this bid evaluation. This evaluation happens BEFORE any presentation — it determines which bidders get invited to present, using only document-assessable technical criteria.
@@ -1630,15 +1731,15 @@ function exportExcel(){
   });
 
   const eligSheet = XLSX.utils.aoa_to_sheet([
-    ['Description','Type','Threshold','Weight'],
-    ...state.eligibility.map(c=>[c.description, c.type, c.threshold||'', c.weight||'']),
+    ['#','Eligibility Conditions','Source'],
+    ...state.eligibility.map((c,i)=>[c.originalNo != null ? String(c.originalNo) : String(i+1), c.description, c.sourcePage ? `${c.sourceDoc||'RFP'} p.${c.sourcePage}` : '']),
   ]);
   eligSheet['!pageSetup'] = { orientation: landscape ? 'landscape' : 'portrait', fitToPage: true };
   XLSX.utils.book_append_sheet(wb, eligSheet, 'Eligibility Criteria');
 
   const scoreCritSheet = XLSX.utils.aoa_to_sheet([
-    ['Criterion','Max Marks','Tiers','Sub-Weights','Requires Live Assessment','Notes'],
-    ...state.scoringCriteria.map(c=>[c.name, c.maxMarks||'', c.tiers||'', c.subWeights||'', c.requiresLiveAssessment?'Yes':'No', c.notes||'']),
+    ['#','Criteria','Maximum Marks','Documents to be Submitted','Live Assessment Only?'],
+    ...state.scoringCriteria.map((c,i)=>[c.originalNo != null ? String(c.originalNo) : String(i+1), c.description, c.maxMarks||'', c.documentsRequired||'', c.requiresLiveAssessment?'Yes':'No']),
   ]);
   scoreCritSheet['!pageSetup'] = { orientation: landscape ? 'landscape' : 'portrait', fitToPage: true };
   XLSX.utils.book_append_sheet(wb, scoreCritSheet, 'Scoring Rubric');
@@ -1657,7 +1758,7 @@ async function exportWordReport(){
   const btn = document.getElementById('wordBtn');
   const orig = btn.innerHTML;
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Building…';
-  setProcessing(9);
+  setProcessing(8);
   try{
     const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, HeadingLevel,
             WidthType, PageOrientation, ShadingType, BorderStyle, AlignmentType } = docx;
