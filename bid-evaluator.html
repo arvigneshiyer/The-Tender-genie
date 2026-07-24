@@ -7,6 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.min.js"></script>
 <style>
   :root{
     --navy:#0B1F3A; --navyMid:#152E55; --blue:#1A5CA8; --blueL:#2574D4;
@@ -74,6 +75,17 @@
   .boot-bar{width:200px;height:3px;background:rgba(255,255,255,.15);border-radius:2px;overflow:hidden}
   .boot-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--goldL));border-radius:2px;animation:load 1.4s ease-in-out forwards}
   @keyframes load{from{width:0}to{width:100%}}
+  #previewOverlay{position:fixed;inset:0;z-index:5000}
+  .preview-scrim{position:absolute;inset:0;background:rgba(11,31,58,.55)}
+  .preview-pane{
+    position:absolute;top:0;right:0;bottom:0;width:min(560px,90vw);
+    background:var(--white);box-shadow:-8px 0 24px rgba(11,31,58,.25);
+    display:flex;flex-direction:column;animation:slideIn .25s ease-out;
+  }
+  @keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
+  .preview-header{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+  .preview-title{font-size:15px;font-weight:700;color:var(--navy);font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+  .preview-body{flex:1;overflow:auto;padding:18px}
 </style>
 </head>
 <body>
@@ -88,8 +100,6 @@
 <header>
   <h1>The Tender <span>Genie</span> — Bid Evaluator</h1>
   <div class="row" style="margin:0;gap:12px">
-    <button class="secondary small" onclick="chooseLocalFolder()" id="folderBtn">📁 Choose Local Folder</button>
-    <div class="muted" id="folderStatus" style="color:#8FA8C8">No local folder selected</div>
     <div class="muted" id="apiStatus" style="color:#8FA8C8">API: /api/ai.js</div>
   </div>
 </header>
@@ -122,14 +132,18 @@ const state = {
   corrigendumFiles: [],
   corrigendumDelta: '',
   eligibility: [], // {id, description, type, threshold, weight}
+  scoringCriteria: [], // {id, name, maxMarks, tiers, subWeights, requiresLiveAssessment, notes}
+  selectionMethod: { method: '', qualifyingThresholdPct: null }, // e.g. L1, 70%
+  referenceReport: { file: null, extractedText: '' },
   bidsPageFiles: [],
   bidders: [], // {id, name, files:[], technicalText:'', financialText:''}
-  evaluation: {}, // bidderId -> [{criterionId, score, reasoning, citation, flags}]
-  consensus: {}, // bidderId -> {avgScore, variance, needsReview}
+  evaluation: {}, // legacy, unused now — kept for compatibility
+  eligibilityCompliance: {}, // bidderId -> [{criterionId, description, status, evidence}]
+  scoringResults: {}, // bidderId -> [{criterionId, name, maxMarks, marksAwarded, requiresLiveAssessment, justification}]
+  consensus: {}, // bidderId -> {allEligibleCompliant, docsAwarded, docsMax, docsPct, liveMax, needsReview}
   report: { executiveSummary: '', recommendation: '' },
+  reportOrientation: 'portrait', // 'portrait' | 'landscape' — applies to both Word and Excel exports
   log: [],
-  localDir: null,       // FileSystemDirectoryHandle for the tender root folder
-  localDirName: '',
 };
 
 const STEPS = [
@@ -147,101 +161,6 @@ function log(msg){
   state.log.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
   const el = document.getElementById('logBox');
   if(el){ el.textContent = state.log.slice(-40).join('\n'); el.scrollTop = el.scrollHeight; }
-}
-
-/* ============================================================
-   LOCAL FOLDER STORAGE
-   - Uses the File System Access API (Chrome/Edge) to write real
-     files into a folder the user picks once, organized as:
-       <TenderFolder>/RFP/, /eTender/, /PreBid/, /Corrigendum/,
-       /BidsPage/, /Bidders/<name>/Technical|Financial/
-   - Falls back to triggering a browser download if the API
-     isn't supported (e.g. Firefox, Safari).
-   ============================================================ */
-const supportsFSAccess = 'showDirectoryPicker' in window;
-
-async function chooseLocalFolder(){
-  if(!supportsFSAccess){
-    alert('Your browser doesn\'t support folder access (File System Access API). Files will be saved to your Downloads folder instead.');
-    state.localDir = 'fallback';
-    document.getElementById('folderStatus').textContent = 'Using Downloads (fallback mode)';
-    return;
-  }
-  try{
-    const handle = await window.showDirectoryPicker();
-    state.localDir = handle;
-    state.localDirName = handle.name;
-    document.getElementById('folderStatus').textContent = 'Saving to: ' + handle.name;
-    log('Local folder selected: ' + handle.name);
-  } catch(err){
-    log('Folder selection cancelled or failed: ' + err.message);
-  }
-}
-
-// Get (or create) a nested directory handle from a path array, e.g. ['Bidders','ABC Ltd','Technical']
-async function getOrCreateDir(pathParts){
-  let dir = state.localDir;
-  for(const part of pathParts){
-    dir = await dir.getDirectoryHandle(sanitizeName(part), { create: true });
-  }
-  return dir;
-}
-
-function sanitizeName(name){
-  return String(name || 'untitled').replace(/[\/\\:*?"<>|]/g, '_').trim().slice(0,80) || 'untitled';
-}
-
-// Save a File object into pathParts (array of folder names) under the chosen root.
-// If no folder has been chosen yet, prompts the user for one first (first-upload prompt),
-// then reuses that same folder for every subsequent file in this session.
-async function saveFileLocally(file, pathParts){
-  if(!file) return;
-
-  if(!state.localDir){
-    if(!supportsFSAccess){
-      // No folder API available at all — fall back to downloads immediately, no prompt needed.
-      state.localDir = 'fallback';
-      document.getElementById('folderStatus') && (document.getElementById('folderStatus').textContent = 'Using Downloads (fallback mode)');
-      triggerDownload(file);
-      return;
-    }
-    try{
-      const handle = await window.showDirectoryPicker();
-      state.localDir = handle;
-      state.localDirName = handle.name;
-      const statusEl = document.getElementById('folderStatus');
-      if(statusEl) statusEl.textContent = 'Saving to: ' + handle.name;
-      log('Local folder selected: ' + handle.name);
-    } catch(err){
-      log('Folder selection cancelled — file not saved locally: ' + file.name);
-      return; // user declined the picker; skip saving this file, don't block the rest of the app
-    }
-  }
-
-  if(state.localDir === 'fallback'){
-    triggerDownload(file);
-    return;
-  }
-
-  try{
-    const dir = await getOrCreateDir(pathParts);
-    const fileHandle = await dir.getFileHandle(sanitizeName(file.name), { create: true });
-    const writable = await fileHandle.createWritable();
-    await writable.write(file);
-    await writable.close();
-    log('Saved locally: ' + pathParts.join('/') + '/' + file.name);
-  } catch(err){
-    log('Local save failed for ' + file.name + ': ' + err.message);
-  }
-}
-
-function triggerDownload(file){
-  const url = URL.createObjectURL(file);
-  const a = document.createElement('a');
-  a.href = url; a.download = file.name;
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
-  log('Downloaded (fallback): ' + file.name);
 }
 
 /* ============================================================
@@ -289,7 +208,8 @@ async function extractTextFromPDF(file){
   for(let p=1; p<=pdf.numPages; p++){
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
-    text += content.items.map(i=>i.str).join(' ') + '\n\n';
+    // Tag each page so later stages can cite real page numbers instead of guessing.
+    text += `\n[PAGE ${p}]\n` + content.items.map(i=>i.str).join(' ') + '\n\n';
   }
   if(text.trim().length < 20){
     // likely scanned — fall back to OCR on rendered pages
@@ -309,7 +229,7 @@ async function ocrPDF(pdf){
     canvas.width = viewport.width; canvas.height = viewport.height;
     await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
     const { data: { text: t } } = await Tesseract.recognize(canvas, 'eng');
-    text += t + '\n\n';
+    text += `\n[PAGE ${p}]\n` + t + '\n\n';
   }
   return text;
 }
@@ -361,6 +281,137 @@ function render(){
       <button onclick="goToStep(${Math.min(8,state.step+1)})" ${state.step===8?'disabled':''}>Next →</button>
     </footer>
   `);
+  renderPreviewPanel();
+}
+
+/* ============================================================
+   SOURCE PAGE PREVIEW PANEL (side-by-side split view)
+   ============================================================ */
+const pageImageCache = new Map(); // "filename|page" -> dataURL
+
+function renderPreviewPanel(){
+  let panel = document.getElementById('previewOverlay');
+  if(!panel){
+    panel = document.createElement('div');
+    panel.id = 'previewOverlay';
+    document.body.appendChild(panel);
+  }
+  if(!state._previewOpen){
+    panel.innerHTML = '';
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = 'block';
+  panel.innerHTML = `
+    <div class="preview-scrim" onclick="closeCriterionPreview()"></div>
+    <div class="preview-pane">
+      <div class="preview-header">
+        <div>
+          <div class="preview-title">${escapeHtml(state._previewTitle || 'Source Page')}</div>
+          <div class="muted">${escapeHtml(state._previewCriterionText || '')}</div>
+        </div>
+        <button class="secondary small" onclick="closeCriterionPreview()">✕ Close</button>
+      </div>
+      <div class="preview-body">
+        ${state._previewLoading
+          ? `<div class="muted" style="padding:40px;text-align:center"><span class="spinner"></span>Rendering page…</div>`
+          : (state._previewImg
+              ? `<img src="${state._previewImg}" style="width:100%;border:1px solid var(--border);border-radius:6px" />`
+              : `<div class="muted" style="padding:40px;text-align:center">${escapeHtml(state._previewError || 'Could not render this page.')}</div>`)
+        }
+      </div>
+    </div>
+  `;
+}
+
+async function showCriterionPreview(critIndex){
+  const crit = state.eligibility[critIndex];
+  if(!crit || !crit.sourcePage) return;
+  const isCorr = crit.sourceDoc === 'Corrigendum';
+  const file = isCorr ? state.corrigendumFiles[0] : state.rfpFiles[0];
+  await openPagePreview(file, crit.sourcePage, `${isCorr ? 'Corrigendum' : 'RFP'} — Page ${crit.sourcePage}`, crit.description);
+}
+
+async function showScoringCriterionPreview(critIndex){
+  const crit = state.scoringCriteria[critIndex];
+  if(!crit || !crit.sourcePage) return;
+  const isCorr = crit.sourceDoc === 'Corrigendum';
+  const file = isCorr ? state.corrigendumFiles[0] : state.rfpFiles[0];
+  await openPagePreview(file, crit.sourcePage, `${isCorr ? 'Corrigendum' : 'RFP'} — Page ${crit.sourcePage}`, crit.name);
+}
+
+// For Stage 7: preview the exact page in a BIDDER's technical bid where evidence
+// for a compliance check or a scoring award was found — so the user can visually
+// confirm the AI read the right section before trusting the result.
+async function showBidEvidencePreview(bidderIdx, kind, itemIndex){
+  const bidder = state.bidders[bidderIdx];
+  if(!bidder || !bidder.technicalFile) { log('Preview unavailable — no technical bid file on record for this bidder'); return; }
+  const item = kind === 'compliance'
+    ? (state.eligibilityCompliance[bidder.id] || [])[itemIndex]
+    : (state.scoringResults[bidder.id] || [])[itemIndex];
+  if(!item || !item.evidencePage) { log('Preview unavailable — no page reference for this item'); return; }
+  const label = kind === 'compliance' ? item.description : item.name;
+  await openPagePreview(bidder.technicalFile, item.evidencePage, `${bidder.name} — Technical Bid, Page ${item.evidencePage}`, label);
+}
+
+// Core preview logic shared by all three entry points above.
+async function openPagePreview(file, sourcePage, title, contextText){
+  if(!file){ log('Preview unavailable — source file not found'); return; }
+  const pageNum = parseInt(sourcePage, 10);
+  if(!pageNum || pageNum < 1){ log('Preview unavailable — no valid page number'); return; }
+
+  state._previewOpen = true;
+  state._previewLoading = true;
+  state._previewImg = null;
+  state._previewError = null;
+  state._previewTitle = title;
+  state._previewCriterionText = contextText || '';
+  render();
+
+  const cacheKey = file.name + '|' + pageNum;
+  try{
+    let dataUrl = pageImageCache.get(cacheKey);
+    if(!dataUrl){
+      dataUrl = await renderPdfPageToImage(file, pageNum);
+      pageImageCache.set(cacheKey, dataUrl);
+    }
+    state._previewImg = dataUrl;
+  } catch(err){
+    state._previewError = 'Could not render page: ' + err.message;
+    log('Page preview render failed: ' + err.message);
+  }
+  state._previewLoading = false;
+  render();
+}
+
+function closeCriterionPreview(){
+  state._previewOpen = false;
+  render();
+}
+
+async function renderPdfPageToImage(file, pageNum){
+  if(!file.type || file.type !== 'application/pdf'){
+    // Image file (e.g. scanned corrigendum page uploaded as a single image) — just show it directly.
+    return await fileToDataUrl(file);
+  }
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  if(pageNum > pdf.numPages) throw new Error(`Page ${pageNum} exceeds document length (${pdf.numPages} pages)`);
+  const page = await pdf.getPage(pageNum);
+  const viewport = page.getViewport({scale: 1.6});
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width; canvas.height = viewport.height;
+  await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+  return canvas.toDataURL('image/png');
+}
+
+function fileToDataUrl(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 /* ============================================================
@@ -389,12 +440,12 @@ async function handleRFPUpload(e){
   if(!file) return;
   state.rfpFiles.push(file);
   render();
-  saveFileLocally(file, ['RFP']);
   log('Parsing RFP: ' + file.name);
   try{
     const text = await extractTextFromFile(file);
     state.tender.extractedText = text;
     log('RFP parsed OK');
+    maybeAutoRunEligibility();
   } catch(err){ log('RFP parse error: ' + err.message); }
   render();
 }
@@ -429,7 +480,6 @@ async function handleETenderUpload(e){
   if(!file) return;
   state.etenderFiles.push(file);
   render();
-  saveFileLocally(file, ['eTender']);
   log('OCR on eTender page: ' + file.name);
   try{
     const text = await extractTextFromFile(file);
@@ -474,7 +524,6 @@ async function handlePrebidUpload(e){
   for(const file of e.target.files){
     state.prebidFiles.push(file);
     render();
-    saveFileLocally(file, ['PreBid']);
     try{ file._text = await extractTextFromFile(file); log('Parsed pre-bid doc: ' + file.name); }
     catch(err){ log('Parse error: ' + err.message); }
   }
@@ -507,8 +556,14 @@ async function handleCorrigendumUpload(e){
   if(!file) return;
   state.corrigendumFiles.push(file);
   render();
-  saveFileLocally(file, ['Corrigendum']);
-  try{ file._text = await extractTextFromFile(file); log('Parsed corrigendum: ' + file.name); }
+  try{
+    const raw = await extractTextFromFile(file);
+    // Distinguish corrigendum pages from RFP pages so eligibility extraction
+    // can tell which document a criterion (or amendment to one) came from.
+    file._text = raw.replace(/\[PAGE (\d+)\]/g, '[CORR PAGE $1]');
+    log('Parsed corrigendum: ' + file.name);
+    maybeAutoRunEligibility();
+  }
   catch(err){ log('Parse error: ' + err.message); }
   render();
 }
@@ -548,7 +603,19 @@ function renderStage5(){
   return `
   <div class="card">
     <h2>Stage 5 · Check Eligibility <span class="badge info">LLM</span></h2>
-    <div class="sub">Extracts mandatory/qualifying eligibility criteria with thresholds from the RFP text.</div>
+    <div class="sub">Runs automatically once the RFP (and corrigendum, if uploaded) are parsed — combines both, with corrigendum amendments taking precedence. Click any criterion's "View Page" to see the exact source page.</div>
+
+    <div class="sub" style="margin-top:0;font-weight:700;color:var(--navy)">Optional: Reference Template</div>
+    <div class="sub" style="margin-bottom:10px">Upload a past eligibility/evaluation report to guide the AI toward your organization's usual categories and scope — helps prevent over-extraction of unrelated requirements.</div>
+    <div class="drop" onclick="document.getElementById('refReportInput').click()">Click to upload a reference evaluation report (PDF/Image)</div>
+    <input type="file" id="refReportInput" accept=".pdf,image/*" onchange="handleReferenceReportUpload(event)">
+    ${state.referenceReport.file ? `
+      <div class="fileitem">
+        <span>${escapeHtml(state.referenceReport.file.name)} ${state.referenceReport.extractedText ? '<span class="badge ok" style="margin-left:8px">parsed — will guide extraction</span>' : ''}</span>
+        <span class="x" onclick="removeReferenceReport()">✕</span>
+      </div>
+    ` : ''}
+
     <div class="row">
       <button ${!state.tender.extractedText ? 'disabled':''} onclick="runEligibilityExtraction()" id="eligBtn">
         Extract Eligibility Criteria
@@ -556,18 +623,71 @@ function renderStage5(){
     </div>
     ${state.eligibility.length ? `
       <table>
-        <tr><th>Description</th><th>Type</th><th>Threshold</th><th>Weight</th></tr>
-        ${state.eligibility.map(c=>`
+        <tr><th>Description</th><th>Type</th><th>Threshold</th><th>Weight</th><th>Source</th><th></th></tr>
+        ${state.eligibility.map((c,ci)=>`
           <tr>
             <td>${escapeHtml(c.description)}</td>
             <td><span class="badge ${c.type==='mandatory'?'err':'info'}">${c.type}</span></td>
             <td>${escapeHtml(c.threshold||'—')}</td>
             <td>${escapeHtml(String(c.weight||'—'))}</td>
+            <td>${c.sourcePage ? `<span class="badge ${c.sourceDoc==='Corrigendum'?'warn':'info'}">${escapeHtml(c.sourceDoc||'RFP')} p.${escapeHtml(String(c.sourcePage))}</span>` : '—'}</td>
+            <td>${c.sourcePage ? `<button class="secondary small" onclick="showCriterionPreview(${ci})">👁 View Page</button>` : ''}</td>
           </tr>
         `).join('')}
       </table>
     ` : `<div class="muted" style="margin-top:12px">No eligibility criteria extracted yet.</div>`}
+  </div>
+
+  <div class="card">
+    <h2>Technical Scoring Rubric <span class="badge info">LLM</span></h2>
+    <div class="sub">The marks-based evaluation table (separate from pass/fail eligibility) — used in Stage 7 to score bidders against fixed max marks instead of a generic 0–100 guess.</div>
+    <div class="row">
+      <button ${!state.tender.extractedText ? 'disabled':''} onclick="runScoringCriteriaExtraction()" id="scoreCritBtn" class="secondary">
+        Re-extract Scoring Rubric
+      </button>
+    </div>
+    ${state.selectionMethod.method ? `
+      <div class="kv">
+        <div>Selection Method</div><div>${escapeHtml(state.selectionMethod.method)}</div>
+        ${state.selectionMethod.qualifyingThresholdPct ? `<div>Qualifying Threshold</div><div>${state.selectionMethod.qualifyingThresholdPct}%</div>` : ''}
+      </div>
+    ` : ''}
+    ${state.scoringCriteria.length ? `
+      <table>
+        <tr><th>Criterion</th><th>Max Marks</th><th>Tiers</th><th>Sub-Weights</th><th>Assessable from Docs?</th><th></th></tr>
+        ${state.scoringCriteria.map((c,ci)=>`
+          <tr>
+            <td>${escapeHtml(c.name)}</td>
+            <td>${escapeHtml(String(c.maxMarks ?? '—'))}</td>
+            <td>${escapeHtml(c.tiers || '—')}</td>
+            <td>${escapeHtml(c.subWeights || '—')}</td>
+            <td>${c.requiresLiveAssessment ? '<span class="badge warn">No — live only</span>' : '<span class="badge ok">Yes</span>'}</td>
+            <td>${c.sourcePage ? `<button class="secondary small" onclick="showScoringCriterionPreview(${ci})">👁 View Page</button>` : ''}</td>
+          </tr>
+        `).join('')}
+      </table>
+      ${state.scoringCriteria.some(c=>c.requiresLiveAssessment) ? `<div class="sub" style="margin-top:10px">⚠ Criteria marked "live only" (e.g. presentations/interviews) can't be scored from documents — Stage 7 will flag these for manual entry.</div>` : ''}
+    ` : `<div class="muted" style="margin-top:12px">No scoring rubric extracted yet.</div>`}
   </div>`;
+}
+
+async function handleReferenceReportUpload(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  state.referenceReport.file = file;
+  render();
+  log('Parsing reference template: ' + file.name);
+  try{
+    const text = await extractTextFromFile(file);
+    state.referenceReport.extractedText = text;
+    log('Reference template parsed — will guide eligibility extraction categories');
+  } catch(err){ log('Reference template parse error: ' + err.message); }
+  render();
+}
+
+function removeReferenceReport(){
+  state.referenceReport = { file: null, extractedText: '' };
+  render();
 }
 
 /* ============================================================
@@ -628,22 +748,63 @@ function getRelevantExcerpt(text, query, {chunkSize=3500, overlap=400, topK=4, m
 /* ============================================================
    ELIGIBILITY EXTRACTION LOGIC
    ============================================================ */
+
+// Called after RFP or Corrigendum finishes parsing. Auto-runs (or re-runs)
+// eligibility extraction once the RFP is available, folding in the
+// corrigendum too if it's been uploaded by then.
+let _eligAutoRunToken = 0;
+async function maybeAutoRunEligibility(){
+  if(!state.tender.extractedText) return; // need at least the RFP
+  const myToken = ++_eligAutoRunToken;
+  // Small debounce so near-simultaneous RFP+corrigendum uploads don't trigger two runs
+  await new Promise(r => setTimeout(r, 400));
+  if(myToken !== _eligAutoRunToken) return; // a newer upload superseded this one
+  log('Auto-running eligibility extraction (RFP' + (state.corrigendumFiles[0]?._text ? ' + corrigendum' : '') + ')');
+  await runEligibilityExtraction();
+  await runScoringCriteriaExtraction();
+}
+
+function combinedEligibilitySourceText(){
+  const rfp = state.tender.extractedText || '';
+  const corr = (state.corrigendumFiles[0] && state.corrigendumFiles[0]._text) || '';
+  return corr ? (rfp + '\n\n=== CORRIGENDUM (may amend the RFP above) ===\n\n' + corr) : rfp;
+}
+
 async function runEligibilityExtraction(){
   const btn = document.getElementById('eligBtn');
-  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Extracting…';
+  if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Extracting…'; }
   try{
-    const fullText = state.tender.extractedText || '';
+    const fullText = combinedEligibilitySourceText();
     const chunks = chunkText(fullText, 6000, 500);
-    log(`RFP split into ${chunks.length} chunk(s) for eligibility scan`);
+    const hasCorr = !!(state.corrigendumFiles[0] && state.corrigendumFiles[0]._text);
+    log(`Document split into ${chunks.length} chunk(s) for eligibility scan${hasCorr ? ' (RFP + corrigendum)' : ' (RFP only)'}${state.referenceReport.extractedText ? ' — using reference template as guide' : ''}`);
 
     // Scan every chunk (eligibility clauses can appear anywhere in a 100+ page RFP),
     // merge results, then dedupe near-identical criteria.
+    // If a reference template (past eligibility/evaluation report) was uploaded,
+    // use it to anchor the model on this organization's actual criteria categories
+    // instead of guessing generically from RFP language.
+    const templateGuide = state.referenceReport.extractedText
+      ? `\n\nREFERENCE TEMPLATE — a past eligibility/evaluation report from this organization is provided below. Use it ONLY to understand the CATEGORIES and SCOPE of criteria this organization typically evaluates (e.g. "if they never track equipment ownership, don't invent an equipment criterion"). Do NOT copy its specific values/thresholds — those belong to a different tender. Match the new RFP's own stated criteria to these same categories where applicable, and stay within this same general scope.
+
+Reference template excerpt:
+"""${state.referenceReport.extractedText.slice(0, 6000)}"""`
+      : '';
+
     let merged = [];
     for(let i=0; i<chunks.length; i++){
-      const prompt = `Extract all mandatory and qualifying eligibility criteria from this tender text excerpt with thresholds. This is chunk ${i+1} of ${chunks.length} — only extract what's actually present here, don't guess at missing chunks.
+      const prompt = `You are extracting BIDDER ELIGIBILITY / QUALIFICATION criteria only — the specific pass/fail or scoring conditions a bidder's firm must meet to be considered eligible to bid. This is chunk ${i+1} of ${chunks.length} of a tender document (which may include both the original RFP and a later corrigendum that can amend/override RFP clauses). Only extract what's actually present here, don't guess at missing chunks.
+
+STRICT SCOPE — only include criteria that determine whether a BIDDER (the firm/entity) qualifies, typically found under headings like "Eligibility Criteria", "Qualification Requirements", "Pre-Qualification Criteria", "Technical Qualification", "Financial Qualification". Examples of what COUNTS: minimum annual turnover, years of experience, similar past project count/value, minimum net worth, registration/certification requirements (e.g. GST, PAN, incorporation), litigation/blacklisting declarations, manpower/equipment minimums specifically required for qualification.
+
+Do NOT include: general scope-of-work descriptions, technical specifications of the deliverable itself, submission format/procedure instructions, definitions, EMD/tender fee amounts (those aren't bidder qualifications), payment terms, or timeline/schedule details. If a sentence describes what the WORK involves rather than what the BIDDER must have/prove, exclude it.
+
+When genuinely unsure whether something is a qualification criterion, exclude it — under-extraction is preferred over over-extraction here.${templateGuide}
+
 Return ONLY valid JSON: an array of objects like
-{"description": "...", "type": "mandatory|qualifying", "threshold": "...", "weight": number|null}
-If no eligibility criteria appear in this excerpt, return [].
+{"description": "...", "type": "mandatory|qualifying", "threshold": "...", "weight": number|null, "sourcePage": "...", "sourceDoc": "RFP|Corrigendum"}
+Set "sourcePage" to the number from the nearest [PAGE N] or [CORR PAGE N] marker in the excerpt this criterion came from, if present (just the number). Set "sourceDoc" to "Corrigendum" if it came from a [CORR PAGE N] marker, otherwise "RFP".
+If no genuine bidder-eligibility criteria appear in this excerpt, return [].
 
 Excerpt:
 """${chunks[i]}"""`;
@@ -657,24 +818,103 @@ Excerpt:
       }
     }
 
-    // Dedupe: drop criteria whose description is near-identical to one already kept
+    // Dedupe: drop criteria whose description is near-identical to one already kept.
+    // If a corrigendum version and an RFP version of the same criterion both appear,
+    // prefer the corrigendum one (it's the amendment / latest word).
     const deduped = [];
     for(const c of merged){
       const desc = (c.description || '').toLowerCase().trim();
       if(!desc) continue;
-      const isDupe = deduped.some(d => {
+      const dupeIdx = deduped.findIndex(d => {
         const a = new Set(tokenize(desc)), b = new Set(tokenize(d.description || ''));
         const overlap = [...a].filter(t => b.has(t)).length;
         return overlap / Math.max(a.size, b.size, 1) > 0.7;
       });
-      if(!isDupe) deduped.push(c);
+      if(dupeIdx === -1){
+        deduped.push(c);
+      } else if(c.sourceDoc === 'Corrigendum' && deduped[dupeIdx].sourceDoc !== 'Corrigendum'){
+        deduped[dupeIdx] = c; // corrigendum supersedes the RFP version
+      }
     }
 
     state.eligibility = deduped.map((c,i)=>({ id: 'crit_'+(i+1), ...c }));
     log('Extracted ' + state.eligibility.length + ' unique eligibility criteria (from ' + merged.length + ' raw matches)');
   } catch(err){
     log('Eligibility extraction failed: ' + err.message);
-    alert('Eligibility extraction failed: ' + err.message);
+  }
+  render();
+}
+
+/* ============================================================
+   SCORING/EVALUATION RUBRIC EXTRACTION LOGIC
+   (Separate from pass/fail eligibility — this is the marks-based
+   technical scoring table, e.g. RFP Clause 4.1.2 / 4.2 style:
+   fixed max marks per criterion, tiered scoring, sub-weights,
+   qualifying threshold, and selection method like L1/QCBS.)
+   ============================================================ */
+async function runScoringCriteriaExtraction(){
+  try{
+    const fullText = combinedEligibilitySourceText();
+    const chunks = chunkText(fullText, 6000, 500);
+    log(`Scanning ${chunks.length} chunk(s) for the marks-based evaluation/scoring rubric`);
+
+    let merged = [];
+    for(let i=0; i<chunks.length; i++){
+      const prompt = `You are extracting the MARKS-BASED TECHNICAL SCORING RUBRIC from a tender document — NOT the pass/fail eligibility criteria, but the table that assigns maximum marks per criterion for ranking qualified bidders (often titled "Evaluation Criteria", "Technical Evaluation", "Marking Scheme"). This is chunk ${i+1} of ${chunks.length}. Only extract what's actually present here.
+
+For each scoring criterion found, capture:
+- name: short label (e.g. "Firm's Relevant Experience", "Team Leader", "Technical Presentation")
+- maxMarks: the maximum marks/points for this criterion
+- tiers: if scoring is tiered/bucketed (e.g. "1-2 projects: 10 marks, 3-4: 20, 5-6: 30"), describe the tiers as a short string; null if not tiered
+- subWeights: if the criterion is broken into weighted sub-parts (e.g. "general qualifications 25%, project adequacy 50%, years experience 25%"), describe briefly; null if none
+- requiresLiveAssessment: true if this criterion can ONLY be judged live (e.g. an oral technical presentation, interview, site visit) and NOT from submitted documents alone; false otherwise
+- notes: any other scoring detail worth keeping, or null
+- sourcePage: the number from the nearest [PAGE N] or [CORR PAGE N] marker in this excerpt, if present
+- sourceDoc: "Corrigendum" if it came from a [CORR PAGE N] marker, otherwise "RFP"
+
+Also, if this chunk states the overall qualifying/minimum technical score (e.g. "minimum technical score of 70%") or the selection method (e.g. "L1", "QCBS 70:30", "80:20"), include ONE extra object: {"name": "SELECTION_METHOD", "maxMarks": null, "tiers": null, "subWeights": null, "requiresLiveAssessment": false, "notes": "method=... ; qualifyingThresholdPct=..."}.
+
+Return ONLY valid JSON: an array of objects as described. If nothing relevant appears in this excerpt, return [].
+
+Excerpt:
+"""${chunks[i]}"""`;
+      try{
+        const raw = await callAI('eligibility', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:2000});
+        const parsed = safeParseJsonArray(raw);
+        merged = merged.concat(parsed);
+        log(`Chunk ${i+1}/${chunks.length}: ${parsed.length} scoring item(s) found`);
+      } catch(err){
+        log(`Chunk ${i+1}/${chunks.length} scoring extraction failed: ${err.message}`);
+      }
+    }
+
+    // Pull out the selection-method marker, if any, into tender-level state
+    const methodEntry = merged.find(m => m.name === 'SELECTION_METHOD');
+    if(methodEntry){
+      const methodMatch = (methodEntry.notes || '').match(/method\s*=\s*([^;]+)/i);
+      const pctMatch = (methodEntry.notes || '').match(/qualifyingThresholdPct\s*=\s*([\d.]+)/i);
+      state.selectionMethod = {
+        method: methodMatch ? methodMatch[1].trim() : (methodEntry.notes || ''),
+        qualifyingThresholdPct: pctMatch ? parseFloat(pctMatch[1]) : null,
+      };
+    }
+
+    // Dedupe actual scoring criteria (excluding the selection-method marker)
+    const criteriaOnly = merged.filter(m => m.name !== 'SELECTION_METHOD' && m.name);
+    const deduped = [];
+    for(const c of criteriaOnly){
+      const isDupe = deduped.some(d => {
+        const a = new Set(tokenize(c.name)), b = new Set(tokenize(d.name));
+        const overlap = [...a].filter(t => b.has(t)).length;
+        return overlap / Math.max(a.size, b.size, 1) > 0.6;
+      });
+      if(!isDupe) deduped.push(c);
+    }
+
+    state.scoringCriteria = deduped.map((c,i)=>({ id: 'score_'+(i+1), ...c }));
+    log(`Extracted ${state.scoringCriteria.length} scoring criteria` + (state.selectionMethod.method ? ` — selection method: ${state.selectionMethod.method}${state.selectionMethod.qualifyingThresholdPct ? ', qualifying threshold ' + state.selectionMethod.qualifyingThresholdPct + '%' : ''}` : ''));
+  } catch(err){
+    log('Scoring rubric extraction failed: ' + err.message);
   }
   render();
 }
@@ -683,12 +923,21 @@ Excerpt:
    STAGE 6 — Bids Received & Submissions
    ============================================================ */
 function renderStage6(){
+  const hasETenderData = !!(state.tender.nitNo || state.tender.closeDate || state.tender.department || state.etenderFiles.length > 0);
   return `
   <div class="card">
     <h2>Stage 6 · Upload Bids-Received Page & Bid Submissions</h2>
-    <div class="sub">Extract bidder list, then attach technical/financial bid files per bidder.</div>
-    <div class="drop" onclick="document.getElementById('bidsPageInput').click()">Click to upload bids-received page (screenshot/PDF)</div>
-    <input type="file" id="bidsPageInput" accept=".pdf,image/*" onchange="handleBidsPageUpload(event)">
+    <div class="sub">Extract bidder list, then attach technical bid files per bidder. Financial bids aren't collected at this stage.</div>
+    ${hasETenderData ? `
+      <div class="drop" onclick="document.getElementById('bidsPageInput').click()">Click to upload bids-received page (screenshot/PDF)</div>
+      <input type="file" id="bidsPageInput" accept=".pdf,image/*" onchange="handleBidsPageUpload(event)">
+    ` : `
+      <div class="sub" style="margin-top:0">No eTender details on file yet (Stage 2) — enter how many bidders submitted instead, and folders will be created for you to rename.</div>
+      <div class="row" style="margin-top:0">
+        <input type="text" inputmode="numeric" pattern="[0-9]*" id="bidderCountInput" placeholder="Number of bidders" style="max-width:180px">
+        <button onclick="createBidderFoldersByCount()">Create Bidder Folders</button>
+      </div>
+    `}
     <div class="row">
       <button class="secondary" onclick="addBidderManually()">+ Add Bidder Manually</button>
     </div>
@@ -698,7 +947,7 @@ function renderStage6(){
     ${state.bidders.length === 0 ? `<div class="muted">No bidders yet.</div>` : state.bidders.map((b,bi)=>`
       <div class="card" style="background:var(--panel2);margin-bottom:10px">
         <div class="row" style="justify-content:space-between;align-items:center;margin-top:0">
-          <input type="text" value="${b.name}" oninput="renameBidder(${bi},this.value)" style="max-width:260px">
+          <input type="text" value="${escapeHtml(b.name)}" oninput="renameBidder(${bi},this.value)" style="max-width:260px">
           <button class="secondary small" onclick="removeBidder(${bi})">Remove</button>
         </div>
         <div class="row">
@@ -708,16 +957,25 @@ function renderStage6(){
             <input type="file" id="techInput${bi}" style="display:none" accept=".pdf,image/*" onchange="handleBidFile(event,${bi},'technicalText')">
             ${b.technicalText ? '<span class="badge ok" style="margin-left:8px">parsed</span>' : ''}
           </div>
-          <div>
-            <div class="muted" style="margin-bottom:4px">Financial Bid</div>
-            <button class="secondary small" onclick="document.getElementById('finInput${bi}').click()">Upload</button>
-            <input type="file" id="finInput${bi}" style="display:none" accept=".pdf,image/*" onchange="handleBidFile(event,${bi},'financialText')">
-            ${b.financialText ? '<span class="badge ok" style="margin-left:8px">parsed</span>' : ''}
-          </div>
         </div>
       </div>
     `).join('')}
   </div>`;
+}
+
+function createBidderFoldersByCount(){
+  const input = document.getElementById('bidderCountInput');
+  const n = parseInt(input.value, 10);
+  if(!n || n < 1){
+    log('Enter a valid number of bidders first');
+    return;
+  }
+  const startAt = state.bidders.length;
+  for(let i=1; i<=n; i++){
+    addBidder('Bidder ' + (startAt + i), true);
+  }
+  log(`Created ${n} bidder folder(s) — rename each as needed`);
+  render();
 }
 
 async function handleBidsPageUpload(e){
@@ -725,7 +983,6 @@ async function handleBidsPageUpload(e){
   if(!file) return;
   state.bidsPageFiles.push(file);
   render();
-  saveFileLocally(file, ['BidsPage']);
   log('OCR on bids-received page: ' + file.name);
   try{
     const text = await extractTextFromFile(file);
@@ -740,11 +997,19 @@ async function handleBidsPageUpload(e){
   render();
 }
 
-function addBidder(name){
-  state.bidders.push({ id: 'bidder_' + (state.bidders.length+1), name: name || ('Bidder ' + (state.bidders.length+1)), technicalText:'', financialText:'' });
+function addBidder(name, isPlaceholder){
+  state.bidders.push({
+    id: 'bidder_' + (state.bidders.length+1),
+    name: name || ('Bidder ' + (state.bidders.length+1)),
+    technicalText:'', financialText:'', technicalFile:null,
+    autoNamed: isPlaceholder || !name, // placeholder names (no name given, or explicitly marked) can be overwritten by auto-detection; a real detected/typed name locks it
+  });
 }
 function addBidderManually(){ addBidder(''); render(); }
-function renameBidder(i, name){ state.bidders[i].name = name; }
+function renameBidder(i, name){
+  state.bidders[i].name = name;
+  state.bidders[i].autoNamed = false; // manual edit always wins from here on — auto-detect will no longer overwrite
+}
 function removeBidder(i){ state.bidders.splice(i,1); render(); }
 
 async function handleBidFile(e, bidderIdx, field){
@@ -753,28 +1018,64 @@ async function handleBidFile(e, bidderIdx, field){
   render();
   const bidder = state.bidders[bidderIdx];
   const subfolder = field === 'technicalText' ? 'Technical' : 'Financial';
-  saveFileLocally(file, ['Bidders', bidder.name || ('Bidder ' + (bidderIdx+1)), subfolder]);
   log(`Parsing ${field} for ${bidder.name}: ${file.name}`);
   try{
-    const text = await extractTextFromFile(file);
+    const text = await extractTextFromFile(file); // already page-tagged via extractTextFromPDF/[PAGE N]
     state.bidders[bidderIdx][field] = text;
+    if(field === 'technicalText') state.bidders[bidderIdx].technicalFile = file; // keep reference for page preview
     log('Parsed OK');
+    if(field === 'technicalText' && state.bidders[bidderIdx].autoNamed){
+      detectBidderNameFromCoverPage(bidderIdx, text);
+    }
   } catch(err){ log('Parse error: ' + err.message); }
   render();
+}
+
+// Reads the cover page of a technical bid (first page, where the bidder's firm
+// name and the project title usually appear) and renames the "Bidder N"
+// placeholder to the detected name — but only if the user hasn't already
+// renamed it manually (see autoNamed flag). The name field stays editable
+// either way, so an incorrect detection can always be corrected by hand.
+async function detectBidderNameFromCoverPage(bidderIdx, fullText){
+  const coverExcerpt = fullText.slice(0, 3000); // first page or two, given [PAGE N] tagging
+  const prompt = `This is the opening excerpt of a bid submission document (cover page / letterhead area). Identify the name of the BIDDER (the firm/company/consortium submitting the bid) — not the client/authority who issued the tender.
+
+Excerpt:
+"""${coverExcerpt}"""
+
+Return ONLY valid JSON: {"bidderName": "..." or null if not confidently identifiable}`;
+  try{
+    const raw = await callAI('extract', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:150});
+    const parsed = safeParseJsonObject(raw);
+    const bidder = state.bidders[bidderIdx];
+    // Guard against races: only apply if this bidder still exists, is still on
+    // its placeholder name, and the file hasn't been swapped out for another.
+    if(parsed.bidderName && bidder && bidder.autoNamed){
+      const detected = String(parsed.bidderName).trim().slice(0, 100);
+      if(detected){
+        bidder.name = detected;
+        // stays autoNamed:true — a fresh auto-detection on a re-upload can still refine it,
+        // until the user types into the name field themselves (renameBidder sets it false)
+        log(`Detected bidder name from cover page: "${detected}" (edit the name field if this is wrong)`);
+        render();
+      }
+    }
+  } catch(err){
+    log('Bidder name auto-detection failed (non-fatal): ' + err.message);
+  }
 }
 
 /* ============================================================
    STAGE 7 — Evaluate Bids (LLM, heavy, per bidder x criterion)
    ============================================================ */
 function renderStage7(){
-  const ready = state.eligibility.length > 0 && state.bidders.length > 0;
+  const ready = (state.eligibility.length > 0 || state.scoringCriteria.length > 0) && state.bidders.length > 0;
   return `
   <div class="card">
     <h2>Stage 7 · Evaluate Bids <span class="badge info">LLM · Heavy</span></h2>
-    <div class="sub">Scores each bidder against every eligibility criterion, with reasoning. (Single-model scoring in this basic build — swap in multi-model consensus later.)</div>
     <div class="row">
       <button ${!ready?'disabled':''} onclick="runEvaluation()" id="evalBtn">Run Evaluation</button>
-      ${!ready ? '<span class="muted">Need eligibility criteria (Stage 5) and at least one bidder with bid text (Stage 6)</span>' : ''}
+      ${!ready ? '<span class="muted">Need eligibility/scoring criteria (Stage 5) and at least one bidder with bid text (Stage 6)</span>' : ''}
     </div>
   </div>
   ${state.bidders.length ? `
@@ -792,26 +1093,53 @@ function setEvalTab(i){ state._evalTab = i; render(); }
 function renderEvalTable(idx){
   const b = state.bidders[idx];
   if(!b) return '';
-  const rows = state.evaluation[b.id] || [];
+  const compliance = state.eligibilityCompliance[b.id] || [];
+  const scoring = state.scoringResults[b.id] || [];
   const consensus = state.consensus[b.id];
   return `
     ${consensus ? `
-      <div class="kv" style="margin-bottom:10px">
-        <div>Average Score</div><div>${consensus.avgScore.toFixed(1)}</div>
-        <div>Needs Review</div><div>${consensus.needsReview ? '<span class="flag">YES — low scores / flags present</span>' : 'No'}</div>
+      <div class="kv" style="margin-bottom:14px">
+        <div>Eligibility</div><div>${consensus.allEligibleCompliant ? '<span class="badge ok">All Compliant</span>' : '<span class="badge warn">Flagged — verify manually (see table below; may be OCR error, not necessarily disqualifying)</span>'}</div>
+        <div>Technical Score (docs-based)</div><div>${consensus.docsAwarded} / ${consensus.docsMax} (${consensus.docsPct.toFixed(1)}%)</div>
+        ${consensus.liveMax > 0 ? `<div>Presentation (separate stage)</div><div>${consensus.liveMax} marks — scored later, after invitation; not part of this decision</div>` : ''}
+        ${state.selectionMethod.qualifyingThresholdPct ? `<div>Presentation Invitation</div><div>Needs ${state.selectionMethod.qualifyingThresholdPct}% on docs-based technical criteria ${consensus.invitedToPresentation ? '<span class="badge ok">CLEARS — invite to presentation</span>' : `<span class="badge err">Does not clear (short by ${(state.selectionMethod.qualifyingThresholdPct - consensus.docsPct).toFixed(1)}pp)</span>`}</div>` : ''}
+        ${consensus.canMathematicallyReachThreshold === false ? `<div>Financial-Opening Feasibility</div><div><span class="badge err">CANNOT reach ${state.selectionMethod.qualifyingThresholdPct}% of full total even with FULL marks in presentation — short by ${consensus.marksShortEvenWithFullPresentation.toFixed(1)} marks (best case: ${consensus.bestCaseGrandPct.toFixed(1)}%)</span></div>` : ''}
+        <div>Needs Review</div><div>${consensus.needsReview ? '<span class="flag">YES — eligibility flagged, verify before finalizing</span>' : 'No'}</div>
       </div>
     ` : ''}
-    <table>
-      <tr><th>Criterion</th><th>Score</th><th>Reasoning</th><th>Flags</th></tr>
-      ${rows.length ? rows.map(r=>`
-        <tr>
-          <td>${escapeHtml(r.criterionDesc)}</td>
-          <td>${r.score}</td>
-          <td>${escapeHtml(r.reasoning)}</td>
-          <td>${(r.flags||[]).map(f=>`<span class="badge warn">${escapeHtml(f)}</span>`).join(' ') || '—'}</td>
-        </tr>
-      `).join('') : `<tr><td colspan="4" class="muted">Not evaluated yet.</td></tr>`}
-    </table>
+
+    ${compliance.length ? `
+      <h2 style="font-size:14px;margin-bottom:8px">Eligibility Compliance <span class="muted" style="font-weight:400">— informational only, does not block technical scoring below</span></h2>
+      <table style="margin-bottom:18px">
+        <tr><th>Criterion</th><th>Status</th><th>Evidence / Reasoning</th><th></th></tr>
+        ${compliance.map((r,ci)=>`
+          <tr>
+            <td>${escapeHtml(r.description)}</td>
+            <td><span class="badge ${r.status==='Compliant'?'ok':(r.status==='Needs Clarification'?'warn':'err')}">${escapeHtml(r.status)}</span>${r.status!=='Compliant' ? ' <span class="muted" style="font-size:11px">(verify — could be OCR misread)</span>' : ''}</td>
+            <td>${escapeHtml(r.evidence)}</td>
+            <td>${r.evidencePage ? `<button class="secondary small" onclick="showBidEvidencePreview(${idx},'compliance',${ci})">👁 View Page</button>` : ''}</td>
+          </tr>
+        `).join('')}
+      </table>
+    ` : ''}
+
+    ${scoring.length ? `
+      <h2 style="font-size:14px;margin-bottom:8px">Technical Scoring</h2>
+      <table>
+        <tr><th>Criterion</th><th>Max Marks</th><th>Awarded</th><th>Justification</th><th></th></tr>
+        ${scoring.map((r,ci)=>`
+          <tr>
+            <td>${escapeHtml(r.name)}</td>
+            <td>${escapeHtml(String(r.maxMarks ?? '—'))}</td>
+            <td>${r.requiresLiveAssessment ? '<span class="badge warn">Pending — live only</span>' : escapeHtml(String(r.marksAwarded ?? '—'))}</td>
+            <td>${escapeHtml(r.justification || '—')}</td>
+            <td>${r.evidencePage ? `<button class="secondary small" onclick="showBidEvidencePreview(${idx},'scoring',${ci})">👁 View Page</button>` : ''}</td>
+          </tr>
+        `).join('')}
+      </table>
+    ` : ''}
+
+    ${!compliance.length && !scoring.length ? `<div class="muted">Not evaluated yet.</div>` : ''}
   `;
 }
 
@@ -821,42 +1149,128 @@ async function runEvaluation(){
   try{
     for(const bidder of state.bidders){
       const bidText = (bidder.technicalText || '') + '\n\n' + (bidder.financialText || '');
-      log(`${bidder.name}: bid text is ${bidText.length.toLocaleString()} chars — selecting relevant excerpts per criterion`);
-      const scores = [];
+      log(`${bidder.name}: bid text is ${bidText.length.toLocaleString()} chars — evaluating`);
+
+      // --- Part A: Eligibility compliance (pass/fail, not a score) ---
+      const complianceResults = [];
       for(const crit of state.eligibility){
-        // Instead of blindly sending the first N characters (which drops anything
-        // past that point on a 100+ page bid), pick the chunks most relevant to
-        // this specific criterion's wording.
-        const excerpt = getRelevantExcerpt(bidText, crit.description, { topK: 4, maxChars: 14000 });
-        const prompt = `Evaluate this bidder's bid against the following criterion. Score 0-100 with reasoning, and note the page/paragraph if identifiable.
+        const excerpt = getRelevantExcerpt(bidText, crit.description, { topK: 3, maxChars: 10000 });
+        const prompt = `Determine whether this bidder's bid COMPLIES with the following eligibility criterion. This is pass/fail, not a score.
 Criterion: ${crit.description} (type: ${crit.type}, threshold: ${crit.threshold || 'n/a'})
 
-Note: the bid text below is the most relevant excerpts selected from a longer document, not the full text. [...] marks a gap between excerpts.
-
-Bid excerpts:
+Bid excerpts (most relevant sections of a longer document; [...] marks a gap):
 """${excerpt}"""
 
-Return ONLY valid JSON: {"score": number, "reasoning": "...", "citation": "...", "flags": ["..."]}`;
+Return ONLY valid JSON: {"status": "Compliant"|"Non-Compliant"|"Needs Clarification", "evidence": "brief evidence or reason, citing figures/dates found if present", "evidencePage": "the number from the nearest [PAGE N] marker where this evidence was found, or null if none identifiable"}`;
         try{
-          const raw = await callAI('evaluate', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:600});
+          const raw = await callAI('evaluate', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:400});
           const parsed = safeParseJsonObject(raw);
-          scores.push({
+          complianceResults.push({
             criterionId: crit.id,
-            criterionDesc: crit.description,
-            score: Number(parsed.score) || 0,
-            reasoning: parsed.reasoning || '',
-            citation: parsed.citation || '',
-            flags: parsed.flags || [],
+            description: crit.description,
+            status: parsed.status || 'Needs Clarification',
+            evidence: parsed.evidence || '',
+            evidencePage: parsed.evidencePage || null,
           });
         } catch(err){
-          scores.push({ criterionId: crit.id, criterionDesc: crit.description, score: 0, reasoning: 'Evaluation error: ' + err.message, flags:['error'] });
+          complianceResults.push({ criterionId: crit.id, description: crit.description, status: 'Needs Clarification', evidence: 'Evaluation error: ' + err.message, evidencePage: null });
         }
       }
-      state.evaluation[bidder.id] = scores;
-      const avg = scores.reduce((s,r)=>s+r.score,0) / (scores.length || 1);
-      const anyFlags = scores.some(r => (r.flags||[]).length);
-      state.consensus[bidder.id] = { avgScore: avg, variance: 0, needsReview: anyFlags || avg < 50 };
-      log(`Evaluated ${bidder.name}: avg ${avg.toFixed(1)}`);
+      state.eligibilityCompliance[bidder.id] = complianceResults;
+      render();
+
+      // --- Part B: Marks-based technical scoring against the real rubric ---
+      const scoringResults = [];
+      for(const crit of state.scoringCriteria){
+        if(crit.requiresLiveAssessment){
+          scoringResults.push({
+            criterionId: crit.id, name: crit.name, maxMarks: crit.maxMarks,
+            marksAwarded: null, requiresLiveAssessment: true, evidencePage: null,
+            justification: 'Requires live assessment (e.g. presentation/interview) — not scoreable from documents.',
+          });
+          continue;
+        }
+        const excerpt = getRelevantExcerpt(bidText, crit.name + ' ' + (crit.tiers||'') + ' ' + (crit.subWeights||''), { topK: 4, maxChars: 14000 });
+        const prompt = `Score this bidder against the following technical evaluation criterion, using the EXACT scoring rules given — do not invent your own scale.
+Criterion: ${crit.name}
+Maximum marks: ${crit.maxMarks}
+${crit.tiers ? `Tiered scoring rule: ${crit.tiers}` : ''}
+${crit.subWeights ? `Sub-weighted components: ${crit.subWeights}` : ''}
+${crit.notes ? `Additional notes: ${crit.notes}` : ''}
+
+Bid excerpts (most relevant sections of a longer document; [...] marks a gap):
+"""${excerpt}"""
+
+Award marks strictly within 0 to ${crit.maxMarks}, following the tiered/weighted rule above if one is given. Justify briefly by naming what was found in the bid (e.g. which projects, whose CV, what experience count).
+
+Return ONLY valid JSON: {"marksAwarded": number, "justification": "...", "evidencePage": "the number from the nearest [PAGE N] marker where the key evidence was found, or null if none identifiable"}`;
+        try{
+          const raw = await callAI('evaluate', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:500});
+          const parsed = safeParseJsonObject(raw);
+          const awarded = Math.max(0, Math.min(crit.maxMarks ?? 100, Number(parsed.marksAwarded) || 0));
+          scoringResults.push({
+            criterionId: crit.id, name: crit.name, maxMarks: crit.maxMarks,
+            marksAwarded: awarded, requiresLiveAssessment: false, evidencePage: parsed.evidencePage || null,
+            justification: parsed.justification || '',
+          });
+        } catch(err){
+          scoringResults.push({ criterionId: crit.id, name: crit.name, maxMarks: crit.maxMarks, marksAwarded: 0, requiresLiveAssessment: false, evidencePage: null, justification: 'Evaluation error: ' + err.message });
+        }
+      }
+      state.scoringResults[bidder.id] = scoringResults;
+
+      // --- Consensus summary ---
+      // This evaluation stage happens BEFORE the presentation, so the invitation
+      // decision can only be based on what's actually scoreable right now — the
+      // docs-based technical criteria (e.g. 70 of the 100 grand-total marks).
+      // Percentage is therefore against docs-only max, matching the real gate:
+      // "does this bidder clear the minimum % on document-assessable technical
+      // criteria to be invited to present?" — not the full 100 (which doesn't
+      // exist yet since presentation hasn't happened).
+      //
+      // Eligibility is informational, NOT a gate: technical scoring always runs
+      // regardless of eligibility outcome, since an eligibility "Non-Compliant"
+      // reading can itself be an OCR/extraction misread rather than a genuine
+      // disqualification — it's flagged for manual verification, never used to
+      // block or skip the technical pass.
+      const allEligibleCompliant = complianceResults.every(r => r.status === 'Compliant');
+      const eligibilityFlagged = complianceResults.some(r => r.status !== 'Compliant');
+      const docsAssessable = scoringResults.filter(r => !r.requiresLiveAssessment);
+      const liveOnly = scoringResults.filter(r => r.requiresLiveAssessment);
+      const docsAwarded = docsAssessable.reduce((s,r)=>s+(r.marksAwarded||0),0);
+      const docsMax = docsAssessable.reduce((s,r)=>s+(r.maxMarks||0),0) || 1;
+      const liveMax = liveOnly.reduce((s,r)=>s+(r.maxMarks||0),0);
+      const grandMax = docsMax + liveMax;
+      const docsPct = (docsAwarded/docsMax)*100; // % of docs-only max — the actual presentation-invitation gate
+      const invitedToPresentation = state.selectionMethod.qualifyingThresholdPct
+        ? docsPct >= state.selectionMethod.qualifyingThresholdPct
+        : null; // unknown if no threshold was extracted
+
+      // Separate, stricter check: the qualifying threshold for financial bid opening
+      // is applied to the FULL grand total (docs + presentation). Even a bidder who
+      // clears the docs-based invitation gate could still be mathematically unable
+      // to reach that final threshold — if their docs score is low enough that even
+      // a perfect presentation score wouldn't make up the gap, it's worth flagging
+      // now rather than discovering it only after the presentation is held.
+      let canMathematicallyReachThreshold = null;
+      let bestCaseGrandPct = null;
+      let marksShortEvenWithFullPresentation = null;
+      if(state.selectionMethod.qualifyingThresholdPct){
+        const thresholdMarksNeeded = (state.selectionMethod.qualifyingThresholdPct/100) * grandMax;
+        const bestCaseTotal = docsAwarded + liveMax; // assuming full marks in presentation
+        bestCaseGrandPct = (bestCaseTotal/grandMax)*100;
+        canMathematicallyReachThreshold = bestCaseTotal >= thresholdMarksNeeded;
+        if(!canMathematicallyReachThreshold){
+          marksShortEvenWithFullPresentation = (thresholdMarksNeeded - bestCaseTotal);
+        }
+      }
+
+      state.consensus[bidder.id] = {
+        allEligibleCompliant, eligibilityFlagged, docsAwarded, docsMax, docsPct, liveMax, grandMax,
+        invitedToPresentation, canMathematicallyReachThreshold, bestCaseGrandPct, marksShortEvenWithFullPresentation,
+        needsReview: eligibilityFlagged || canMathematicallyReachThreshold === false,
+      };
+      log(`Evaluated ${bidder.name}: eligibility ${allEligibleCompliant?'compliant':'flagged for manual check (may be OCR error)'}, docs-based technical ${docsAwarded}/${docsMax} (${docsPct.toFixed(1)}%)${invitedToPresentation!==null ? ` — ${invitedToPresentation ? 'CLEARS' : 'does not clear'} presentation threshold` : ''}${canMathematicallyReachThreshold === false ? ` — CANNOT reach financial-opening threshold even with full presentation marks (short by ${marksShortEvenWithFullPresentation.toFixed(1)})` : ''}`);
       render();
     }
   } catch(err){
@@ -869,26 +1283,46 @@ Return ONLY valid JSON: {"score": number, "reasoning": "...", "citation": "...",
    STAGE 8 — Generate Report (LLM light + Excel export)
    ============================================================ */
 function renderStage8(){
-  const hasEval = Object.keys(state.evaluation).length > 0;
+  const hasEval = Object.keys(state.consensus).length > 0;
   return `
   <div class="card">
     <h2>Stage 8 · Generate Bid Evaluation Report <span class="badge info">LLM · Light</span></h2>
     <div class="sub">Compiles rankings, compliance matrix, and an AI-drafted executive summary + recommendation.</div>
+
+    <div class="sub" style="margin-top:0;font-weight:700;color:var(--navy)">Report Orientation</div>
+    <div class="row" style="margin-top:0">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+        <input type="radio" name="orientation" value="portrait" ${state.reportOrientation==='portrait'?'checked':''} onchange="setReportOrientation('portrait')"> Portrait
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+        <input type="radio" name="orientation" value="landscape" ${state.reportOrientation==='landscape'?'checked':''} onchange="setReportOrientation('landscape')"> Landscape (wider tables — bidders side by side)
+      </label>
+    </div>
+
     <div class="row">
       <button ${!hasEval?'disabled':''} onclick="runReportGeneration()" id="reportBtn">Draft Executive Summary</button>
-      <button ${!hasEval?'disabled':''} class="secondary" onclick="exportExcel()">Export Excel</button>
+      <button ${!hasEval?'disabled':''} class="secondary" onclick="exportExcel()">Export Excel (${state.reportOrientation})</button>
+      <button ${!hasEval?'disabled':''} class="secondary" onclick="exportWordReport()" id="wordBtn">Export Word (${state.reportOrientation})</button>
     </div>
   </div>
   ${hasEval ? `
   <div class="card">
     <h2>Ranking</h2>
     <table>
-      <tr><th>Rank</th><th>Bidder</th><th>Avg Score</th><th>Needs Review</th></tr>
+      <tr><th>Rank</th><th>Bidder</th><th>Eligibility</th><th>Technical (docs-based)</th><th>Presentation Marks (separate stage)</th><th>Invite to Presentation?</th><th>Can Reach Financial-Opening Threshold?</th><th>Needs Review</th></tr>
       ${rankedBidders().map((b,i)=>`
-        <tr><td>${i+1}</td><td>${escapeHtml(b.name)}</td><td>${b.avgScore.toFixed(1)}</td>
-        <td>${b.needsReview ? '<span class="flag">Yes</span>' : 'No'}</td></tr>
+        <tr>
+          <td>${i+1}</td><td>${escapeHtml(b.name)}</td>
+          <td>${b.allEligibleCompliant ? '<span class="badge ok">Compliant</span>' : '<span class="badge warn">Flagged — verify</span>'}</td>
+          <td>${b.docsAwarded}/${b.docsMax} (${b.docsPct.toFixed(1)}%)</td>
+          <td>${b.liveMax || 0}</td>
+          <td>${b.invitedToPresentation === null ? '—' : (b.invitedToPresentation ? '<span class="badge ok">Yes</span>' : `<span class="badge err">No — short by ${(state.selectionMethod.qualifyingThresholdPct - b.docsPct).toFixed(1)}pp</span>`)}</td>
+          <td>${b.canMathematicallyReachThreshold === null ? '—' : (b.canMathematicallyReachThreshold ? `<span class="badge ok">Yes (best case ${b.bestCaseGrandPct.toFixed(1)}%)</span>` : `<span class="badge err">NO — even full presentation marks fall short by ${b.marksShortEvenWithFullPresentation.toFixed(1)}</span>`)}</td>
+          <td>${b.needsReview ? '<span class="flag">Yes</span>' : 'No'}</td>
+        </tr>
       `).join('')}
     </table>
+    ${state.selectionMethod.method ? `<div class="sub" style="margin-top:10px">Selection method: ${escapeHtml(state.selectionMethod.method)}${state.selectionMethod.qualifyingThresholdPct ? ` — minimum ${state.selectionMethod.qualifyingThresholdPct}% on docs-based technical criteria to be invited to present; the same ${state.selectionMethod.qualifyingThresholdPct}% applies to the FULL grand total (docs + presentation) to actually qualify for financial bid opening` : ''}. Eligibility flags are informational, not a gate — technical scoring always proceeds regardless, since a flagged eligibility result can itself be an extraction/OCR error rather than a genuine disqualification; verify manually before excluding a bidder.</div>` : ''}
   </div>` : ''}
   ${state.report.executiveSummary ? `
   <div class="card">
@@ -901,8 +1335,8 @@ function renderStage8(){
 function rankedBidders(){
   return state.bidders
     .map(b => ({ name: b.name, ...state.consensus[b.id] }))
-    .filter(b => b.avgScore !== undefined)
-    .sort((a,b) => b.avgScore - a.avgScore);
+    .filter(b => b.docsPct !== undefined)
+    .sort((a,b) => b.docsPct - a.docsPct);
 }
 
 async function runReportGeneration(){
@@ -910,12 +1344,14 @@ async function runReportGeneration(){
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Drafting…';
   try{
     const ranked = rankedBidders();
-    const prompt = `Draft an executive summary and award recommendation from these evaluation scores.
+    const prompt = `Draft an executive summary and presentation-invitation recommendation from this bid evaluation. This evaluation happens BEFORE any presentation — it determines which bidders get invited to present, using only document-assessable technical criteria.
 Tender: ${state.tender.nitNo || '(no NIT number captured)'}, Department: ${state.tender.department || 'n/a'}
-Ranked bidders (name, avg score, needs-review flag):
-${ranked.map(r=>`- ${r.name}: ${r.avgScore.toFixed(1)} (needs review: ${r.needsReview})`).join('\n')}
+Selection method: ${state.selectionMethod.method || 'not specified'}${state.selectionMethod.qualifyingThresholdPct ? `, minimum ${state.selectionMethod.qualifyingThresholdPct}% on docs-based technical criteria required to be invited to present` : ''}
 
-Write 3-4 short paragraphs: overview of the evaluation, key differentiators between top bidders, any compliance concerns, and a final award recommendation naming the top bidder if scores are clear.`;
+Ranked bidders (name, eligibility status, docs-based technical score, invited to presentation?, needs-review flag):
+${ranked.map(r=>`- ${r.name}: eligibility ${r.allEligibleCompliant ? 'Compliant' : 'Flagged for manual verification (may be an OCR/extraction error, not necessarily a real issue)'}; docs-based technical ${r.docsAwarded}/${r.docsMax} (${r.docsPct.toFixed(1)}%); ${r.invitedToPresentation ? 'CLEARS threshold — invite to presentation' : 'does not clear threshold'}${r.canMathematicallyReachThreshold === false ? `; CANNOT mathematically reach the financial-opening threshold even with full marks in presentation (best case only ${r.bestCaseGrandPct.toFixed(1)}%)` : ''}; needs review: ${r.needsReview}`).join('\n')}
+
+Write 3-4 short paragraphs: overview of the evaluation, key differentiators between top bidders, any eligibility flags that need manual verification before finalizing (note explicitly these could be OCR errors), and a recommendation on which bidders to invite to the technical presentation stage. Do not declare a final award — presentation and financial evaluation are still pending.`;
     const summary = await callAI('report', [{role:'user', content: prompt}], {temperature:0.4, max_tokens:1200});
     state.report.executiveSummary = summary;
     log('Executive summary drafted');
@@ -926,40 +1362,224 @@ Write 3-4 short paragraphs: overview of the evaluation, key differentiators betw
   render();
 }
 
+function setReportOrientation(o){
+  state.reportOrientation = o;
+  render();
+}
+
+// Builds the side-by-side eligibility compliance matrix exactly like the sample
+// report: rows = criteria, one column per bidder showing status + evidence.
+function buildComplianceMatrixRows(){
+  const rows = [['#','Eligibility Conditions', ...state.bidders.map(b=>b.name)]];
+  state.eligibility.forEach((crit, i) => {
+    const statusRow = [i+1, crit.description];
+    state.bidders.forEach(b => {
+      const r = (state.eligibilityCompliance[b.id] || []).find(c => c.criterionId === crit.id);
+      statusRow.push(r ? r.status : '—');
+    });
+    rows.push(statusRow);
+    const evidenceRow = ['', '(Evidence)', ...state.bidders.map(b => {
+      const r = (state.eligibilityCompliance[b.id] || []).find(c => c.criterionId === crit.id);
+      return r ? r.evidence : '';
+    })];
+    rows.push(evidenceRow);
+  });
+  return rows;
+}
+
 function exportExcel(){
   const wb = XLSX.utils.book_new();
+  const ranked = rankedBidders();
+  const landscape = state.reportOrientation === 'landscape';
 
   const summarySheet = XLSX.utils.aoa_to_sheet([
-    ['Tender Evaluation Report'],
+    ['Tender Evaluation Report — Presentation Invitation Stage'],
     ['NIT No', state.tender.nitNo],
     ['Department', state.tender.department],
     ['Closing Date', state.tender.closeDate],
+    ['Selection Method', state.selectionMethod.method || ''],
+    ['Min. % on Docs-Based Technical Criteria to Invite', state.selectionMethod.qualifyingThresholdPct || ''],
     [],
-    ['Rank','Bidder','Avg Score','Needs Review'],
-    ...rankedBidders().map((b,i)=>[i+1, b.name, b.avgScore.toFixed(1), b.needsReview ? 'YES' : 'No']),
+    ['Rank','Bidder','Eligibility','Docs Marks Awarded','Docs Max Marks','Docs %','Presentation Marks (Separate Stage)','Invite to Presentation?','Can Reach Financial-Opening Threshold?','Best Case % (Full Presentation Marks)','Needs Review'],
+    ...ranked.map((b,i)=>[i+1, b.name, b.allEligibleCompliant?'Compliant':'Flagged — verify', b.docsAwarded, b.docsMax, b.docsPct.toFixed(1), b.liveMax||0, b.invitedToPresentation===null?'N/A':(b.invitedToPresentation?'YES':'NO'), b.canMathematicallyReachThreshold===null?'N/A':(b.canMathematicallyReachThreshold?'YES':'NO'), b.bestCaseGrandPct!==null?b.bestCaseGrandPct.toFixed(1):'', b.needsReview?'YES':'No']),
   ]);
+  summarySheet['!pageSetup'] = { orientation: landscape ? 'landscape' : 'portrait', fitToPage: true };
   XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
 
+  // Side-by-side compliance matrix — mirrors the sample report's layout with
+  // bidders as columns. In landscape, columns get more room per bidder; in
+  // portrait, columns are narrower and text wraps.
+  const complianceSheet = XLSX.utils.aoa_to_sheet(buildComplianceMatrixRows());
+  const bidderColWidth = landscape ? 32 : 18;
+  complianceSheet['!cols'] = [{wch:4},{wch: landscape?45:28}, ...state.bidders.map(()=>({wch:bidderColWidth}))];
+  complianceSheet['!pageSetup'] = { orientation: landscape ? 'landscape' : 'portrait', fitToPage: true, fitToWidth: 1 };
+  XLSX.utils.book_append_sheet(wb, complianceSheet, 'Bidders Compliance Matrix');
+
   state.bidders.forEach(b=>{
-    const rows = state.evaluation[b.id] || [];
+    const scoring = state.scoringResults[b.id] || [];
     const sheet = XLSX.utils.aoa_to_sheet([
-      ['Criterion','Type','Score','Reasoning','Citation','Flags'],
-      ...rows.map(r=>{
-        const crit = state.eligibility.find(c=>c.id===r.criterionId) || {};
-        return [r.criterionDesc, crit.type||'', r.score, r.reasoning, r.citation||'', (r.flags||[]).join('; ')];
-      }),
+      ['Evaluation Criteria of e-bids (' + b.name + ')'],
+      ['#','Criteria','Max Marks','Details Submitted / Justification','Marks Proposed to be Awarded'],
+      ...scoring.map((r,i)=>[i+1, r.name, r.maxMarks, r.justification, r.requiresLiveAssessment ? 'PENDING (live only)' : r.marksAwarded]),
+      ['','','','TOTAL (docs-based)', scoring.filter(r=>!r.requiresLiveAssessment).reduce((s,r)=>s+(r.marksAwarded||0),0)],
     ]);
-    XLSX.utils.book_append_sheet(wb, sheet, (b.name || 'Bidder').slice(0,28));
+    sheet['!cols'] = landscape
+      ? [{wch:4},{wch:32},{wch:10},{wch:70},{wch:14}]
+      : [{wch:4},{wch:22},{wch:10},{wch:40},{wch:12}];
+    sheet['!pageSetup'] = { orientation: landscape ? 'landscape' : 'portrait', fitToPage: true, fitToWidth: 1 };
+    XLSX.utils.book_append_sheet(wb, sheet, ('Eval - ' + (b.name || 'Bidder')).slice(0,31));
   });
 
   const eligSheet = XLSX.utils.aoa_to_sheet([
     ['Description','Type','Threshold','Weight'],
     ...state.eligibility.map(c=>[c.description, c.type, c.threshold||'', c.weight||'']),
   ]);
+  eligSheet['!pageSetup'] = { orientation: landscape ? 'landscape' : 'portrait', fitToPage: true };
   XLSX.utils.book_append_sheet(wb, eligSheet, 'Eligibility Criteria');
 
-  XLSX.writeFile(wb, 'Bid_Evaluation_Report.xlsx');
-  log('Excel report exported');
+  const scoreCritSheet = XLSX.utils.aoa_to_sheet([
+    ['Criterion','Max Marks','Tiers','Sub-Weights','Requires Live Assessment','Notes'],
+    ...state.scoringCriteria.map(c=>[c.name, c.maxMarks||'', c.tiers||'', c.subWeights||'', c.requiresLiveAssessment?'Yes':'No', c.notes||'']),
+  ]);
+  scoreCritSheet['!pageSetup'] = { orientation: landscape ? 'landscape' : 'portrait', fitToPage: true };
+  XLSX.utils.book_append_sheet(wb, scoreCritSheet, 'Scoring Rubric');
+
+  XLSX.writeFile(wb, `Bid_Evaluation_Report_${state.reportOrientation}.xlsx`);
+  log(`Excel report exported (${state.reportOrientation})`);
+}
+
+/* ============================================================
+   WORD REPORT EXPORT (docx.js) — mirrors the same content as
+   Excel, styled like the sample report: side-by-side compliance
+   matrix, then one evaluation table per bidder. Orientation flips
+   page dimensions and widens/narrows columns to fit.
+   ============================================================ */
+async function exportWordReport(){
+  const btn = document.getElementById('wordBtn');
+  const orig = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Building…';
+  try{
+    const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, HeadingLevel,
+            WidthType, PageOrientation, ShadingType, BorderStyle, AlignmentType } = docx;
+
+    const landscape = state.reportOrientation === 'landscape';
+    // US Letter portrait dims in DXA; docx-js swaps these internally when LANDSCAPE is set.
+    const PAGE_W = 12240, PAGE_H = 15840, MARGIN = 1080;
+    const usableWidth = (landscape ? PAGE_H : PAGE_W) - MARGIN*2;
+
+    const HEADER_SHADE = 'D4D8E2';
+    function cell(text, {width, bold=false, shade=null, align=AlignmentType.LEFT} = {}){
+      return new TableCell({
+        width: { size: width, type: WidthType.DXA },
+        shading: shade ? { type: ShadingType.CLEAR, fill: shade } : undefined,
+        children: [new Paragraph({ alignment: align, children: [new TextRun({ text: String(text ?? ''), bold })] })],
+      });
+    }
+    function row(cells){ return new TableRow({ children: cells }); }
+    function heading(text){ return new Paragraph({ text, heading: HeadingLevel.HEADING_2, spacing: { before: 300, after: 150 } }); }
+    function para(text){ return new Paragraph({ text: text || '', spacing: { after: 150 } }); }
+
+    const children = [];
+    children.push(new Paragraph({ text: 'Bid Evaluation Report', heading: HeadingLevel.HEADING_1, spacing: { after: 100 } }));
+    children.push(para(`NIT No: ${state.tender.nitNo || 'n/a'}   |   Department: ${state.tender.department || 'n/a'}   |   Closing Date: ${state.tender.closeDate || 'n/a'}`));
+    if(state.selectionMethod.method){
+      children.push(para(`Selection Method: ${state.selectionMethod.method}${state.selectionMethod.qualifyingThresholdPct ? ` — minimum ${state.selectionMethod.qualifyingThresholdPct}% on docs-based technical criteria to be invited to present` : ''}`));
+    }
+
+    // --- Ranking table ---
+    children.push(heading('Ranking'));
+    const rankCols = [1000, landscape?3600:2400, 1400, landscape?2600:1800, landscape?2600:1800, 1400];
+    const rankTotal = rankCols.reduce((a,b)=>a+b,0);
+    const rankScale = usableWidth / rankTotal;
+    const rankW = rankCols.map(w => Math.round(w*rankScale));
+    const ranked = rankedBidders();
+    children.push(new Table({
+      width: { size: usableWidth, type: WidthType.DXA },
+      columnWidths: rankW,
+      rows: [
+        row(['Rank','Bidder','Eligibility','Technical (docs)','Invite to Presentation?','Needs Review'].map((h,i)=>cell(h,{width:rankW[i],bold:true,shade:HEADER_SHADE}))),
+        ...ranked.map((b,i)=>row([
+          cell(i+1,{width:rankW[0]}),
+          cell(b.name,{width:rankW[1]}),
+          cell(b.allEligibleCompliant?'Compliant':'Flagged — verify',{width:rankW[2]}),
+          cell(`${b.docsAwarded}/${b.docsMax} (${b.docsPct.toFixed(1)}%)`,{width:rankW[3]}),
+          cell(b.invitedToPresentation===null?'—':(b.invitedToPresentation?'Yes':'No'),{width:rankW[4]}),
+          cell(b.needsReview?'Yes':'No',{width:rankW[5]}),
+        ])),
+      ],
+    }));
+
+    // --- Side-by-side compliance matrix (mirrors sample report layout) ---
+    children.push(heading('Bidders Compliance to Eligibility Criteria'));
+    const nBidders = state.bidders.length || 1;
+    const numCol = 500, condCol = landscape ? 3200 : 2400;
+    const bidderColW = Math.round((usableWidth - numCol - condCol) / nBidders);
+    const compCols = [numCol, condCol, ...state.bidders.map(()=>bidderColW)];
+    const compRows = buildComplianceMatrixRows();
+    children.push(new Table({
+      width: { size: usableWidth, type: WidthType.DXA },
+      columnWidths: compCols,
+      rows: compRows.map((r, ri) => row(r.map((v,ci)=>cell(v, { width: compCols[ci], bold: ri===0, shade: ri===0?HEADER_SHADE:null })))),
+    }));
+
+    // --- One evaluation table per bidder ---
+    state.bidders.forEach(b=>{
+      const scoring = state.scoringResults[b.id] || [];
+      children.push(heading(`Evaluation Criteria of e-bids (${b.name})`));
+      const evalCols = [500, landscape?3400:2200, 1200, landscape?7500:4500, 1500];
+      const evalTotal = evalCols.reduce((a,b2)=>a+b2,0);
+      const evalScale = usableWidth / evalTotal;
+      const evalW = evalCols.map(w=>Math.round(w*evalScale));
+      const docsTotal = scoring.filter(r=>!r.requiresLiveAssessment).reduce((s,r)=>s+(r.marksAwarded||0),0);
+      children.push(new Table({
+        width: { size: usableWidth, type: WidthType.DXA },
+        columnWidths: evalW,
+        rows: [
+          row(['#','Criteria','Max Marks','Details Submitted / Justification','Marks Awarded'].map((h,i)=>cell(h,{width:evalW[i],bold:true,shade:HEADER_SHADE}))),
+          ...scoring.map((r,i)=>row([
+            cell(i+1,{width:evalW[0]}),
+            cell(r.name,{width:evalW[1]}),
+            cell(r.maxMarks ?? '—',{width:evalW[2]}),
+            cell(r.justification || '—',{width:evalW[3]}),
+            cell(r.requiresLiveAssessment ? 'PENDING (live only)' : (r.marksAwarded ?? '—'),{width:evalW[4]}),
+          ])),
+          row([
+            cell('',{width:evalW[0]}), cell('',{width:evalW[1]}), cell('',{width:evalW[2]}),
+            cell('TOTAL (docs-based)',{width:evalW[3],bold:true}), cell(docsTotal,{width:evalW[4],bold:true}),
+          ]),
+        ],
+      }));
+    });
+
+    if(state.report.executiveSummary){
+      children.push(heading('Executive Summary'));
+      state.report.executiveSummary.split('\n').filter(Boolean).forEach(p => children.push(para(p)));
+    }
+
+    const doc = new Document({
+      sections: [{
+        properties: {
+          page: {
+            size: { width: PAGE_W, height: PAGE_H, orientation: landscape ? PageOrientation.LANDSCAPE : undefined },
+            margin: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN },
+          },
+        },
+        children,
+      }],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `Bid_Evaluation_Report_${state.reportOrientation}.docx`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    log(`Word report exported (${state.reportOrientation})`);
+  } catch(err){
+    log('Word export failed: ' + err.message);
+    alert('Word export failed: ' + err.message);
+  }
+  btn.disabled = false; btn.innerHTML = orig;
 }
 
 /* ============================================================
