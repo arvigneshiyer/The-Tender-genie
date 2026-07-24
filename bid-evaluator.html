@@ -308,7 +308,8 @@ async function callAI(task, messages, opts={}){
   });
   const data = await res.json();
   if(!res.ok || !data.success){
-    throw new Error(data.error || 'AI call failed');
+    const detail = data.details ? (' — ' + data.details) : '';
+    throw new Error((data.error || 'AI call failed') + detail);
   }
   return data.content;
 }
@@ -1020,18 +1021,58 @@ function extractSelectionMethodFromDataSheet(fullText){
 // slice to the AI instead of chunking and scanning the entire 100+ page RFP.
 // Returns null if no confident anchor is found, so the caller can fall back
 // to the old full-document chunk scan.
+// PDF extraction inserts [PAGE N] / [CORR PAGE N] markers between text spans.
+// If a page break happens to fall mid-heading (e.g. between "4.1" and
+// "Eligibility Criteria"), a plain regex match on the raw text fails even
+// though the heading is clearly there. This builds a version of the text with
+// those markers stripped out, plus a position map back to the original
+// indices, so regex matching is robust to markers landing anywhere — while
+// slicing still happens on the ORIGINAL text (so downstream sourcePage
+// detection, which needs the markers, keeps working).
+function stripPageMarkersWithMap(text){
+  const re = /\[(?:CORR )?PAGE \d+\]/g;
+  let stripped = '';
+  const map = []; // map[strippedIndex] = originalIndex
+  let lastIndex = 0;
+  let m;
+  while((m = re.exec(text))){
+    for(let i=lastIndex; i<m.index; i++){ stripped += text[i]; map.push(i); }
+    lastIndex = m.index + m[0].length;
+  }
+  for(let i=lastIndex; i<text.length; i++){ stripped += text[i]; map.push(i); }
+  return { stripped, map };
+}
+
 function findEligibilitySection(fullText){
+  const { stripped, map } = stripPageMarkersWithMap(fullText);
+  const toOriginal = (strippedIdx) => {
+    if(strippedIdx <= 0) return 0;
+    if(strippedIdx >= map.length) return fullText.length;
+    return map[strippedIdx];
+  };
+
   const headingPatterns = [
     /\b\d{1,2}\.\d{1,2}\s*\.?\s*Eligibility\s*Criteria\b/i,
     /\bEligibility\s+Conditions\b/i,
     /\bEligibility\s+and\s+Evaluation\s+criteria\b/i,
+    /\bClause\s*\d{1,2}\.\d{1,2}\s*[:\-]?\s*Eligibility\b/i,
+    /\bELIGIBILITY\s*CRITERIA\b/,                    // all-caps heading, no numbering
+    /\bEligibility\s+Criteria\s+for\s+Bidders?\b/i,
+    /\bMinimum\s+Eligibility\s+Criteria\b/i,
+    /\bQualification\s+Criteria\b/i,
+    /\bPre[\s-]?Qualification\s+Criteria\b/i,
+    /\bBidder\s+Eligibility\b/i,
   ];
-  let startIdx = -1;
+  let startIdxStripped = -1;
   for(const re of headingPatterns){
-    const m = fullText.match(re);
-    if(m){ startIdx = m.index; break; }
+    const m = stripped.match(re);
+    if(m){ startIdxStripped = m.index; break; }
   }
-  if(startIdx === -1) return null;
+  if(startIdxStripped === -1){
+    log('Eligibility section anchor: no heading pattern matched — falling back to full scan');
+    return null;
+  }
+  const startIdx = toOriginal(startIdxStripped);
 
   // Find the next section-level heading after the start to use as the end
   // boundary (e.g. "4.1.1 Conditions for Consortium", "4.2 Evaluation...").
@@ -1040,25 +1081,36 @@ function findEligibilitySection(fullText){
     /\b\d{1,2}\.\d{1,2}\s+Evaluation\b/i,       // e.g. "4.2 Evaluation..."
     /\b\d{1,2}\.\d{1,2}\s+[A-Z][a-z]+\s+[A-Z]/, // generic next numbered heading
   ];
-  const after = fullText.slice(startIdx + 50); // skip past the heading itself
-  let endIdx = fullText.length;
+  const afterStripped = stripped.slice(startIdxStripped + 50); // skip past the heading itself
+  let endIdxStripped = stripped.length;
   for(const re of endPatterns){
-    const m = after.match(re);
+    const m = afterStripped.match(re);
     if(m){
-      const candidate = startIdx + 50 + m.index;
-      if(candidate < endIdx) endIdx = candidate;
+      const candidate = startIdxStripped + 50 + m.index;
+      if(candidate < endIdxStripped) endIdxStripped = candidate;
     }
   }
+  let endIdx = toOriginal(endIdxStripped);
   // Cap section length generously (eligibility tables are rarely >8000 chars);
   // if no end heading matched at all, don't send the whole rest of the document.
   const MAX_SECTION_LEN = 8000;
   if(endIdx - startIdx > MAX_SECTION_LEN) endIdx = startIdx + MAX_SECTION_LEN;
 
   const slice = fullText.slice(startIdx, endIdx).trim();
-  // Sanity check: a real eligibility section should contain several of these
-  // recognizable terms; if not, this was probably a false-positive heading match.
-  const signalTerms = /turnover|EMD|earnest money|GST|blacklist|debarr|ITR|net\s*worth|similar\s*project|documentary\s*proof/i;
-  if(!signalTerms.test(slice)) return null;
+  // Sanity check: a real eligibility section should contain at least ONE of
+  // these recognizable terms; if not, this was probably a false-positive
+  // heading match (e.g. a table of contents entry, not the actual section).
+  const signalTerms = /turnover|EMD|earnest\s*money|GST|blacklist|debarr|ITR|net\s*worth|similar\s*project|documentary\s*proof|registration|incorporat|experience|financial\s*capacity|technical\s*capacity/i;
+  if(!signalTerms.test(slice)){
+    log(`Eligibility section anchor: matched a heading but slice (${slice.length} chars) had no recognizable eligibility terms — likely a false positive (e.g. table of contents), falling back to full scan`);
+    return null;
+  }
+  // Guard against having anchored to a table-of-contents listing rather than
+  // the real section — TOC entries are short (just the heading + page number).
+  if(slice.length < 200){
+    log(`Eligibility section anchor: matched slice too short (${slice.length} chars) — likely a table-of-contents entry, falling back to full scan`);
+    return null;
+  }
 
   return slice;
 }
