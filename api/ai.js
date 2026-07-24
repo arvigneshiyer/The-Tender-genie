@@ -44,19 +44,19 @@ const KEYS = {
     'q4aMLfI87stAKGNWHGv4j8xYaQW698u7',
     'ulB3d0lOeYDlPzb1nmfrrDj1UoynJDlp',
   ],
+  // Cloudflare Workers AI: each token belongs to a DIFFERENT Cloudflare
+  // account, so each entry pairs its token with that account's own Account
+  // ID (Workers AI requires the account ID in the URL path, not just the
+  // bearer token — a shared ID won't work across tokens from different accounts).
   cloudflare: [
-    'cfat_ZIbWSZYxpraGDw8VAYJg4CelU4iwH9LRFbqmMftQ92858ae6',
-    'cfat_ZA16ggUANQceHLYVRyfGjg6d23hPDfat6xHejiYz2aaf2ca2',
-    'cfat_QMDzYxWC2IPVU04EwFmFWxDDGe7R86eSkTitq7eO62429a7a',
-    'cfat_Q4KMVm5oa0wM41pLjSKvXvioENveaG1u8tbXVUZ6b6602720',
-    'cfat_Qs3wlEnJsw0qW5DE1pke3xNLRgthHdH5WycK4HIu060a258d',
+    { accountId: 'c237b8d01fa80ea9633208181599b268', token: 'cfat_ZIbWSZYxpraGDw8VAYJg4CelU4iwH9LRFbqmMftQ92858ae6' },
+    { accountId: '94ad5bec08969d28156af6ad30d3385c', token: 'cfat_ZA16ggUANQceHLYVRyfGjg6d23hPDfat6xHejiYz2aaf2ca2' },
+    { accountId: '966f105d76c6adb4813e1c101646757b', token: 'cfat_QMDzYxWC2IPVU04EwFmFWxDDGe7R86eSkTitq7eO62429a7a' },
+    { accountId: '050aa91bfbeabf2d2c9184ce914b3e11', token: 'cfat_Q4KMVm5oa0wM41pLjSKvXvioENveaG1u8tbXVUZ6b6602720' },
+    { accountId: '87ca74fcc5be21666bc8018af3772a33', token: 'cfat_Qs3wlEnJsw0qW5DE1pke3xNLRgthHdH5WycK4HIu060a258d' },
   ],
 };
 
-// Cloudflare Workers AI requires an Account ID in the URL path, not just a
-// token. Fill this in — find it in the Cloudflare dashboard (top-right on
-// any page, or Workers & Pages -> Overview).
-const CLOUDFLARE_ACCOUNT_ID = 'PASTE_YOUR_CLOUDFLARE_ACCOUNT_ID_HERE';
 
 // ====== TASK CONFIGURATION WITH FALLBACKS ======
 // Each task has a primary provider and an ordered list of fallback providers.
@@ -382,18 +382,21 @@ async function callProvider(provider, key, model, messages, temperature, maxToke
   // Different shape from the others: model name goes in the URL path, and
   // the request body uses a "messages" field directly (no wrapping needed
   // for chat-style models), but the response shape is { result: { response } }
-  // rather than an OpenAI-style choices array.
+  // rather than an OpenAI-style choices array. Each key here is an object
+  // { accountId, token } since these came from 5 separate Cloudflare accounts —
+  // each token only works against its OWN account's ID in the URL path.
   if (provider === 'cloudflare') {
-    if (!CLOUDFLARE_ACCOUNT_ID || CLOUDFLARE_ACCOUNT_ID.startsWith('PASTE_')) {
-      throw new Error('Cloudflare account ID not configured — set CLOUDFLARE_ACCOUNT_ID in ai.js');
+    const { accountId, token } = key;
+    if (!accountId || !token) {
+      throw new Error('Cloudflare key missing accountId or token');
     }
     const modelPath = model || '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
-    const url = 'https://api.cloudflare.com/client/v4/accounts/' + CLOUDFLARE_ACCOUNT_ID + '/ai/run/' + modelPath;
+    const url = 'https://api.cloudflare.com/client/v4/accounts/' + accountId + '/ai/run/' + modelPath;
 
     const res = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer ' + key,
+        'Authorization': 'Bearer ' + token,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
