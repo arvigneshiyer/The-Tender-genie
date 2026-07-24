@@ -151,6 +151,7 @@ export default async function handler(req) {
 
 // ====== TRY PROVIDERS ONE BY ONE ======
 async function tryProviders(providers, messages, temperature, maxTokens) {
+  const allErrors = [];
   for (let i = 0; i < providers.length; i++) {
     const config = providers[i];
     const isFallback = i > 0;
@@ -173,14 +174,18 @@ async function tryProviders(providers, messages, temperature, maxTokens) {
           keyNumber: result.keyNumber,
           fallbackUsed: isFallback,
         };
+      } else {
+        allErrors.push(config.provider + ': ' + result.error);
       }
     } catch (err) {
-      console.log((isFallback ? 'Fallback' : 'Primary') + ' provider ' + config.provider + ' failed: ' + err.message);
+      const msg = (isFallback ? 'Fallback' : 'Primary') + ' provider ' + config.provider + ' threw: ' + err.message;
+      console.log(msg);
+      allErrors.push(config.provider + ': ' + err.message);
       // Continue to next provider
     }
   }
   
-  return { success: false, error: 'All providers and keys exhausted' };
+  return { success: false, error: allErrors.join(' | ') };
 }
 
 // ====== TRY KEYS ONE BY ONE (for a single provider) ======
@@ -191,6 +196,7 @@ async function tryWithFallback(provider, model, messages, temperature, maxTokens
     return { success: false, error: 'No keys found for provider: ' + provider };
   }
   
+  const keyErrors = [];
   for (let i = 0; i < keyList.length; i++) {
     // Pick next key in rotation
     const idx = keyIndex[provider] % keyList.length;
@@ -204,12 +210,14 @@ async function tryWithFallback(provider, model, messages, temperature, maxTokens
         return { success: true, content: result, keyNumber: idx + 1 };
       }
     } catch (err) {
+      const msg = 'key' + (idx + 1) + '=' + err.message;
       console.log('Key ' + (idx + 1) + ' failed for ' + provider + ': ' + err.message);
+      keyErrors.push(msg);
       // Try next key
     }
   }
   
-  return { success: false, error: 'All ' + keyList.length + ' keys exhausted for ' + provider };
+  return { success: false, error: '[' + keyErrors.join(', ') + ']' };
 }
 
 // ====== CALL THE ACTUAL AI PROVIDER ======
@@ -231,7 +239,10 @@ async function callProvider(provider, key, model, messages, temperature, maxToke
       }),
     });
     
-    if (!res.ok) throw new Error('Groq error ' + res.status);
+    if (!res.ok) {
+      const bodyText = await safeReadBody(res);
+      throw new Error('Groq HTTP ' + res.status + ' - ' + bodyText);
+    }
     const data = await res.json();
     return data.choices[0].message.content;
   }
@@ -255,7 +266,10 @@ async function callProvider(provider, key, model, messages, temperature, maxToke
       }),
     });
     
-    if (!res.ok) throw new Error('Gemini error ' + res.status);
+    if (!res.ok) {
+      const bodyText = await safeReadBody(res);
+      throw new Error('Gemini HTTP ' + res.status + ' - ' + bodyText);
+    }
     const data = await res.json();
     return data.candidates[0].content.parts[0].text;
   }
@@ -276,7 +290,10 @@ async function callProvider(provider, key, model, messages, temperature, maxToke
       }),
     });
     
-    if (!res.ok) throw new Error('Cerebras error ' + res.status);
+    if (!res.ok) {
+      const bodyText = await safeReadBody(res);
+      throw new Error('Cerebras HTTP ' + res.status + ' - ' + bodyText);
+    }
     const data = await res.json();
     return data.choices[0].message.content;
   }
@@ -299,12 +316,28 @@ async function callProvider(provider, key, model, messages, temperature, maxToke
       }),
     });
     
-    if (!res.ok) throw new Error('OpenRouter error ' + res.status);
+    if (!res.ok) {
+      const bodyText = await safeReadBody(res);
+      throw new Error('OpenRouter HTTP ' + res.status + ' - ' + bodyText);
+    }
     const data = await res.json();
     return data.choices[0].message.content;
   }
 
   throw new Error('Unknown provider: ' + provider);
+}
+
+// ====== HELPER: Safely read an error response body, truncated, without
+// throwing if it's not readable/JSON ======
+async function safeReadBody(res) {
+  try {
+    const text = await res.text();
+    // Truncate to keep responses compact; provider error bodies are usually
+    // short JSON like {"error":{"message":"...","code":429}}
+    return text.length > 300 ? text.slice(0, 300) + '...' : text;
+  } catch (e) {
+    return '(could not read response body)';
+  }
 }
 
 // ====== HELPER: Send JSON response ======
