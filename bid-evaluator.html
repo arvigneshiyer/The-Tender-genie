@@ -22,18 +22,106 @@
   header h1{font-size:19px;margin:0;font-weight:700;color:var(--white);letter-spacing:.02em}
   header h1 span{color:var(--goldL)}
   header .muted{color:#8FA8C8}
-  .layout{display:flex;min-height:calc(100vh - 68px)}
-  nav{width:240px;border-right:1px solid var(--border);padding:18px 10px;flex-shrink:0;background:var(--white)}
-  nav .step{padding:10px 12px;border-radius:6px;margin-bottom:4px;cursor:pointer;font-size:13px;color:var(--muted);display:flex;gap:10px;align-items:center;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
-  nav .step .num{width:22px;height:22px;border-radius:50%;background:var(--smoke);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;font-weight:700;color:var(--navyMid)}
-  nav .step.active{background:var(--smoke);color:var(--navy);font-weight:700}
-  nav .step.active .num{background:var(--blue);color:#fff;border-color:var(--blue)}
-  nav .step.done .num{background:var(--success);color:#fff;border-color:var(--success)}
-  main{flex:1;padding:28px;max-width:1000px}
+  main{padding:28px;max-width:1100px;margin:0 auto}
   .card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:22px;margin-bottom:18px;box-shadow:0 1px 3px rgba(11,31,58,.06)}
   .card h2{margin:0 0 4px;font-size:16px;color:var(--navy);font-weight:700}
+
+  /* Authority / project banner — appears once RFP is parsed */
+  .rfp-banner{
+    background:linear-gradient(135deg, var(--navy) 0%, var(--navyMid) 100%);
+    color:#fff;padding:14px 28px;display:flex;align-items:center;gap:14px;
+    border-bottom:2px solid var(--gold);
+  }
+  .rfp-banner .rb-icon{font-size:22px}
+  .rfp-banner .rb-authority{font-family:Georgia,serif;font-weight:700;font-size:15px}
+  .rfp-banner .rb-project{font-size:12.5px;color:#B9C7DC;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+
+  /* Game-like horizontal stage track, replacing the old sidebar list */
+  .stage-track{
+    display:flex;gap:12px;padding:20px 24px;overflow-x:auto;
+    background:var(--white);border-bottom:1px solid var(--border);
+  }
+  .stage-card{
+    flex:0 0 132px;border-radius:12px;padding:14px 10px 12px;text-align:center;cursor:pointer;
+    position:relative;transition:transform .18s ease, box-shadow .18s ease, background .25s ease;
+    background:var(--smoke);border:2px solid transparent;font-family:-apple-system,Segoe UI,Roboto,sans-serif;
+    user-select:none;
+  }
+  .stage-card:hover{transform:translateY(-3px)}
+  .stage-card .sc-icon{font-size:24px;display:block;margin-bottom:6px;transition:transform .2s}
+  .stage-card .sc-num{
+    position:absolute;top:8px;left:10px;font-size:10px;font-weight:800;color:var(--muted);
+    background:rgba(255,255,255,.6);border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;
+  }
+  .stage-card .sc-label{font-size:11px;font-weight:600;color:var(--navyMid);line-height:1.25}
+
+  /* Pending (default, untouched) */
+  .stage-card.pending{background:var(--smoke);color:var(--muted)}
+
+  /* Active / ready for action — solid blue, glowing, slightly scaled up */
+  .stage-card.active{
+    background:linear-gradient(135deg, var(--blue), var(--blueL));
+    border-color:var(--blueL);transform:scale(1.06);
+    box-shadow:0 6px 18px rgba(26,92,168,.35);
+  }
+  .stage-card.active .sc-label{color:#fff}
+  .stage-card.active .sc-num{background:rgba(255,255,255,.85);color:var(--navy)}
+
+  /* Processing — greyish-blue, breathing pulse animation */
+  .stage-card.processing{
+    background:linear-gradient(135deg, #6B7C93, #8695A8);
+    border-color:#6B7C93;animation:cardPulse 1.4s ease-in-out infinite;
+  }
+  .stage-card.processing .sc-label{color:#fff}
+  .stage-card.processing .sc-icon{animation:iconSpin 1.2s linear infinite}
+  @keyframes cardPulse{0%,100%{box-shadow:0 0 0 0 rgba(107,124,147,.45)}50%{box-shadow:0 0 0 8px rgba(107,124,147,0)}}
+  @keyframes iconSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+  /* Done — left accent bar + checkmark badge, independent of active/pending look */
+  .stage-card.done{border-left:5px solid var(--success)}
+  .stage-card.done .sc-check{
+    position:absolute;top:6px;right:8px;width:17px;height:17px;border-radius:50%;
+    background:var(--success);color:#fff;font-size:10px;font-weight:900;
+    display:flex;align-items:center;justify-content:center;animation:popIn .3s ease;
+  }
+  .stage-card.done.active{border-left:5px solid var(--goldL)}
+  .stage-card.done.active .sc-check{background:var(--goldL);color:var(--navy)}
   .card .sub{color:var(--muted);font-size:12.5px;margin-bottom:16px;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
   .drop{border:2px dashed var(--border);border-radius:6px;padding:28px;text-align:center;color:var(--muted);cursor:pointer;font-size:13px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:var(--smoke)}
+
+  /* Upload cards — interactive drag-and-drop tiles */
+  .upload-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:4px}
+  .upload-card{
+    position:relative;border:2px dashed var(--border);border-radius:12px;background:var(--white);
+    padding:22px 18px;text-align:center;cursor:pointer;transition:all .2s ease;
+    font-family:-apple-system,Segoe UI,Roboto,sans-serif;overflow:hidden;
+  }
+  .upload-card:hover{border-color:var(--blue);background:var(--smoke);transform:translateY(-2px);box-shadow:0 4px 14px rgba(11,31,58,.08)}
+  .upload-card.dragover{border-color:var(--gold);background:rgba(196,154,45,.08);transform:scale(1.02);box-shadow:0 6px 18px rgba(196,154,45,.18)}
+  .upload-card.done{border-style:solid;border-color:var(--success);background:rgba(26,122,74,.05)}
+  .upload-card .uc-icon{font-size:34px;margin-bottom:10px;display:block;transition:transform .2s}
+  .upload-card:hover .uc-icon{transform:scale(1.12) rotate(-3deg)}
+  .upload-card.done .uc-icon{transform:none}
+  .upload-card .uc-title{font-weight:700;color:var(--navy);font-size:13.5px;margin-bottom:4px}
+  .upload-card .uc-sub{color:var(--muted);font-size:11.5px;line-height:1.4}
+  .upload-card .uc-status{margin-top:10px;font-size:11px;font-weight:700;letter-spacing:.03em}
+  .upload-card .uc-status.pending{color:var(--muted)}
+  .upload-card .uc-status.parsing{color:var(--blue)}
+  .upload-card .uc-status.done{color:var(--success)}
+  .upload-card .uc-status.error{color:var(--danger)}
+  .upload-card .uc-check{
+    position:absolute;top:8px;right:10px;width:22px;height:22px;border-radius:50%;
+    background:var(--success);color:#fff;display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:900;animation:popIn .3s ease;
+  }
+  @keyframes popIn{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+  .upload-card .uc-filename{font-size:10.5px;color:var(--muted);margin-top:6px;word-break:break-all;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .upload-card .uc-spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(26,92,168,.25);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;margin-right:5px;vertical-align:middle}
+  .upload-card.small{padding:14px 12px;border-radius:8px}
+  .upload-card.small .uc-icon{font-size:22px;margin-bottom:4px}
+  .upload-card.small .uc-title{font-size:12px}
+  .upload-card.small .uc-sub{font-size:10.5px}
+  .upload-card.small .uc-check{width:18px;height:18px;font-size:10px}
   .drop:hover{border-color:var(--blue);color:var(--blue)}
   input[type=file]{display:none}
   button{background:var(--blue);color:#fff;border:none;padding:10px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:700;font-family:-apple-system,Segoe UI,Roboto,sans-serif;letter-spacing:.01em}
@@ -104,10 +192,9 @@
   </div>
 </header>
 
-<div class="layout">
-  <nav id="stepNav"></nav>
-  <main id="mainArea"></main>
-</div>
+<div id="rfpBannerHost"></div>
+<div class="stage-track" id="stepNav"></div>
+<main id="mainArea"></main>
 
 <script>
 window.addEventListener('load', () => {
@@ -125,7 +212,7 @@ window.addEventListener('load', () => {
 const state = {
   step: 1,
   api: { base: '' /* same-origin /api/ai.js by default */ },
-  tender: { nitNo:'', publishDate:'', closeDate:'', openDate:'', emd:'', department:'', extractedText:'' },
+  tender: { nitNo:'', publishDate:'', closeDate:'', openDate:'', emd:'', department:'', extractedText:'', authorityName:'', projectName:'' },
   rfpFiles: [],
   etenderFiles: [],
   prebidFiles: [],
@@ -134,7 +221,6 @@ const state = {
   eligibility: [], // {id, description, type, threshold, weight}
   scoringCriteria: [], // {id, name, maxMarks, tiers, subWeights, requiresLiveAssessment, notes}
   selectionMethod: { method: '', qualifyingThresholdPct: null }, // e.g. L1, 70%
-  referenceReport: { file: null, extractedText: '' },
   bidsPageFiles: [],
   bidders: [], // {id, name, files:[], technicalText:'', financialText:''}
   evaluation: {}, // legacy, unused now — kept for compatibility
@@ -144,16 +230,18 @@ const state = {
   report: { executiveSummary: '', recommendation: '' },
   reportOrientation: 'portrait', // 'portrait' | 'landscape' — applies to both Word and Excel exports
   log: [],
+  _processingStage: null, // stage number currently running an async task, or null
 };
 
 const STEPS = [
   'Upload RFP',
   'eTender Details',
   'Pre-Bid Queries',
-  'Corrigendum Compare',
-  'Eligibility (LLM)',
+  'Upload Corrigendum',
+  'Eligibility',
+  'Technical Scoring',
   'Bids Upload',
-  'Evaluate Bids (LLM)',
+  'Evaluate Bids',
   'Generate Report',
 ];
 
@@ -161,6 +249,53 @@ function log(msg){
   state.log.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
   const el = document.getElementById('logBox');
   if(el){ el.textContent = state.log.slice(-40).join('\n'); el.scrollTop = el.scrollHeight; }
+}
+
+/* ============================================================
+   UPLOAD CARDS — interactive drag-and-drop tiles used across all
+   upload stages. Renders the visual card; drag/drop and click both
+   feed the SAME hidden <input type=file> that already has its
+   onchange handler wired (e.g. handleRFPUpload) — so no parsing
+   logic is duplicated, only the presentation layer changes.
+   ============================================================ */
+function renderUploadCard({ inputId, icon, title, sub, status='pending', statusText='', fileName='', small=false }){
+  const statusLabel = {
+    pending: statusText || 'Click or drop file',
+    parsing: statusText || 'Parsing…',
+    done: statusText || 'Parsed',
+    error: statusText || 'Error',
+  }[status];
+  return `
+    <div class="upload-card ${status==='done'?'done':''} ${small?'small':''}"
+         onclick="document.getElementById('${inputId}').click()"
+         ondragover="event.preventDefault(); this.classList.add('dragover')"
+         ondragleave="this.classList.remove('dragover')"
+         ondrop="handleCardDrop(event, '${inputId}')">
+      ${status==='done' ? '<div class="uc-check">✓</div>' : ''}
+      <span class="uc-icon">${icon}</span>
+      <div class="uc-title">${escapeHtml(title)}</div>
+      <div class="uc-sub">${escapeHtml(sub)}</div>
+      <div class="uc-status ${status}">${status==='parsing' ? '<span class="uc-spinner"></span>' : ''}${escapeHtml(statusLabel)}</div>
+      ${fileName ? `<div class="uc-filename">${escapeHtml(fileName)}</div>` : ''}
+    </div>`;
+}
+
+// Dropping files onto a card assigns them to the underlying hidden input and
+// fires its existing change handler — same code path as clicking + browsing.
+function handleCardDrop(e, inputId){
+  e.preventDefault();
+  e.currentTarget.classList.remove('dragover');
+  const input = document.getElementById(inputId);
+  const files = e.dataTransfer && e.dataTransfer.files;
+  if(!input || !files || !files.length) return;
+  try{
+    const dt = new DataTransfer();
+    for(const f of files) dt.items.add(f);
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  } catch(err){
+    log('Drag-and-drop failed, please use click-to-browse instead: ' + err.message);
+  }
 }
 
 /* ============================================================
@@ -242,16 +377,39 @@ async function extractTextFromImage(file){
 /* ============================================================
    RENDER: NAV
    ============================================================ */
+const STAGE_ICONS = ['📄','🖥️','📝','📑','✅','🎯','📋','⚖️','🏆'];
+
+// Determines whether a stage's work is actually done, based on real state —
+// not just "have you visited this page" — so the checkmark reflects genuine progress.
+function isStageDone(n){
+  switch(n){
+    case 1: return !!state.tender.extractedText;
+    case 2: return !!(state.tender.nitNo || state.tender.closeDate || state.tender.department || state.etenderFiles.length);
+    case 3: return state.prebidFiles.length > 0;
+    case 4: return !!state.corrigendumDelta;
+    case 5: return state.eligibility.length > 0;
+    case 6: return state.scoringCriteria.length > 0;
+    case 7: return state.bidders.some(b => b.technicalText);
+    case 8: return Object.keys(state.consensus).length > 0;
+    case 9: return !!state.report.executiveSummary;
+    default: return false;
+  }
+}
+
 function renderNav(){
   const nav = document.getElementById('stepNav');
   nav.innerHTML = STEPS.map((s,i)=>{
     const n = i+1;
-    const cls = ['step'];
-    if(n === state.step) cls.push('active');
-    if(n < state.step) cls.push('done');
+    const done = isStageDone(n);
+    const processing = state._processingStage === n;
+    const active = n === state.step;
+    const cls = ['stage-card', processing ? 'processing' : (active ? 'active' : (done ? 'pending' : 'pending'))];
+    if(done) cls.push('done');
     return `<div class="${cls.join(' ')}" onclick="goToStep(${n})">
-      <div class="num">${n < state.step ? '✓' : n}</div>
-      <div>${s}</div>
+      <div class="sc-num">${n}</div>
+      ${done && !processing ? '<div class="sc-check">✓</div>' : ''}
+      <span class="sc-icon">${processing ? '⏳' : STAGE_ICONS[i]}</span>
+      <div class="sc-label">${s}</div>
     </div>`;
   }).join('');
 }
@@ -261,15 +419,19 @@ function goToStep(n){
   render();
 }
 
+function setProcessing(n){ state._processingStage = n; render(); }
+function clearProcessing(){ state._processingStage = null; render(); }
+
 /* ============================================================
    RENDER: MAIN — dispatches to stage renderers
    ============================================================ */
 function render(){
   renderNav();
+  renderRfpBanner();
   const main = document.getElementById('mainArea');
   const renderers = [
     renderStage1, renderStage2, renderStage3, renderStage4,
-    renderStage5, renderStage6, renderStage7, renderStage8,
+    renderStage5, renderStageTechnical, renderStage6, renderStage7, renderStage8,
   ];
   main.innerHTML = renderers[state.step-1]();
   main.insertAdjacentHTML('beforeend', `
@@ -278,10 +440,25 @@ function render(){
     </div>
     <footer class="stepnav">
       <button class="secondary" onclick="goToStep(${Math.max(1,state.step-1)})" ${state.step===1?'disabled':''}>← Back</button>
-      <button onclick="goToStep(${Math.min(8,state.step+1)})" ${state.step===8?'disabled':''}>Next →</button>
+      <button onclick="goToStep(${Math.min(9,state.step+1)})" ${state.step===9?'disabled':''}>Next →</button>
     </footer>
   `);
   renderPreviewPanel();
+}
+
+function renderRfpBanner(){
+  const host = document.getElementById('rfpBannerHost');
+  if(!host) return;
+  const { authorityName, projectName } = state.tender;
+  if(!authorityName && !projectName){ host.innerHTML = ''; return; }
+  host.innerHTML = `
+    <div class="rfp-banner">
+      <span class="rb-icon">🏛️</span>
+      <div>
+        ${authorityName ? `<div class="rb-authority">${escapeHtml(authorityName)}</div>` : ''}
+        ${projectName ? `<div class="rb-project">${escapeHtml(projectName)}</div>` : ''}
+      </div>
+    </div>`;
 }
 
 /* ============================================================
@@ -340,7 +517,7 @@ async function showScoringCriterionPreview(critIndex){
   await openPagePreview(file, crit.sourcePage, `${isCorr ? 'Corrigendum' : 'RFP'} — Page ${crit.sourcePage}`, crit.name);
 }
 
-// For Stage 7: preview the exact page in a BIDDER's technical bid where evidence
+// For Stage 8: preview the exact page in a BIDDER's technical bid where evidence
 // for a compliance check or a scoring award was found — so the user can visually
 // confirm the AI read the right section before trusting the result.
 async function showBidEvidencePreview(bidderIdx, kind, itemIndex){
@@ -418,19 +595,24 @@ function fileToDataUrl(file){
    STAGE 1 — Upload RFP
    ============================================================ */
 function renderStage1(){
+  const uploaded = state.rfpFiles[0];
+  const status = !uploaded ? 'pending' : (state.tender.extractedText ? 'done' : 'parsing');
   return `
   <div class="card">
     <h2>Stage 1 · Upload Tender RFP</h2>
-    <div class="sub">Ingest the original tender document (PDF / Word / Image). Parsed client-side — no LLM.</div>
-    <div class="drop" onclick="document.getElementById('rfpInput').click()">Click to upload RFP (PDF/Image)</div>
-    <input type="file" id="rfpInput" accept=".pdf,image/*" onchange="handleRFPUpload(event)">
-    ${state.rfpFiles.map((f,i)=>`
-      <div class="fileitem"><span>${f.name}</span><span class="x" onclick="removeRFP(${i})">✕</span></div>
-    `).join('')}
+    <div class="sub">Ingest the original tender document (PDF / Word / Image).</div>
+    <div class="upload-grid">
+      ${renderUploadCard({
+        inputId: 'rfpInput', icon: '📄', title: 'Tender RFP', sub: 'PDF or image, click or drag & drop',
+        status, fileName: uploaded ? uploaded.name : '',
+        statusText: status==='done' ? `Parsed ${state.tender.extractedText.length.toLocaleString()} chars` : undefined,
+      })}
+    </div>
+    <input type="file" id="rfpInput" accept=".pdf,image/*" style="display:none" onchange="handleRFPUpload(event)">
+    ${uploaded ? `<div class="fileitem"><span>${escapeHtml(uploaded.name)}</span><span class="x" onclick="removeRFP(0)">✕</span></div>` : ''}
     ${state.tender.extractedText ? `
       <div class="sub" style="margin-top:16px">Extracted text preview</div>
       <textarea readonly>${escapeHtml(state.tender.extractedText.slice(0,3000))}</textarea>
-      <span class="badge ok">Parsed ${state.tender.extractedText.length.toLocaleString()} chars</span>
     ` : ''}
   </div>`;
 }
@@ -439,37 +621,70 @@ async function handleRFPUpload(e){
   const file = e.target.files[0];
   if(!file) return;
   state.rfpFiles.push(file);
-  render();
+  setProcessing(1);
   log('Parsing RFP: ' + file.name);
   try{
     const text = await extractTextFromFile(file);
     state.tender.extractedText = text;
     log('RFP parsed OK');
+    detectAuthorityAndProject(text); // fire-and-forget, updates banner when ready
     maybeAutoRunEligibility();
   } catch(err){ log('RFP parse error: ' + err.message); }
-  render();
+  clearProcessing();
 }
 function removeRFP(i){ state.rfpFiles.splice(i,1); render(); }
+
+// Reads the RFP's opening pages to identify the issuing Authority/Client and
+// the project/assignment name, so it can be shown as a banner across every stage.
+async function detectAuthorityAndProject(fullText){
+  const excerpt = fullText.slice(0, 3500);
+  const prompt = `This is the opening excerpt of a government tender/RFP document. Identify:
+1. authorityName — the Authority/Client organization that issued this tender (not a consultant or bidder)
+2. projectName — the short name/title of the project or assignment being tendered
+
+Excerpt:
+"""${excerpt}"""
+
+Return ONLY valid JSON: {"authorityName": "..." or null, "projectName": "..." or null}`;
+  try{
+    const raw = await callAI('extract', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:150});
+    const parsed = safeParseJsonObject(raw);
+    if(parsed.authorityName) state.tender.authorityName = String(parsed.authorityName).trim().slice(0,150);
+    if(parsed.projectName) state.tender.projectName = String(parsed.projectName).trim().slice(0,200);
+    if(parsed.authorityName || parsed.projectName){
+      log(`Identified: ${parsed.authorityName || '(authority not found)'} — ${parsed.projectName || '(project not found)'}`);
+      render();
+    }
+  } catch(err){
+    log('Authority/project detection failed (non-fatal): ' + err.message);
+  }
+}
 
 /* ============================================================
    STAGE 2 — eTender Details
    ============================================================ */
 function renderStage2(){
   const t = state.tender;
+  const uploaded = state.etenderFiles[0];
   return `
   <div class="card">
     <h2>Stage 2 · Upload eTender Details</h2>
     <div class="sub">Screenshot or PDF of the eTender portal listing page. Auto-extracts metadata via OCR + regex.</div>
-    <div class="drop" onclick="document.getElementById('etInput').click()">Click to upload eTender screenshot/PDF</div>
+    <div class="upload-grid">
+      ${renderUploadCard({
+        inputId: 'etInput', icon: '🖥️', title: 'eTender Listing Page', sub: 'Screenshot or PDF, click or drag & drop',
+        status: uploaded ? 'done' : 'pending', fileName: uploaded ? uploaded.name : '',
+        statusText: uploaded ? 'Parsed — verify fields below' : undefined,
+      })}
+    </div>
     <input type="file" id="etInput" accept=".pdf,image/*" onchange="handleETenderUpload(event)">
-    ${state.etenderFiles.map(f=>`<div class="fileitem"><span>${f.name}</span></div>`).join('')}
     <div class="kv">
-      <div>Tender ID / NIT No</div><div><input type="text" value="${t.nitNo}" oninput="t2set('nitNo',this.value)"></div>
-      <div>Publish Date</div><div><input type="text" value="${t.publishDate}" oninput="t2set('publishDate',this.value)"></div>
-      <div>Closing Date</div><div><input type="text" value="${t.closeDate}" oninput="t2set('closeDate',this.value)"></div>
-      <div>Opening Date</div><div><input type="text" value="${t.openDate}" oninput="t2set('openDate',this.value)"></div>
-      <div>EMD Amount</div><div><input type="text" value="${t.emd}" oninput="t2set('emd',this.value)"></div>
-      <div>Department</div><div><input type="text" value="${t.department}" oninput="t2set('department',this.value)"></div>
+      <div>Tender ID / NIT No</div><div><input type="text" value="${escapeHtml(t.nitNo)}" oninput="t2set('nitNo',this.value)"></div>
+      <div>Publish Date</div><div><input type="text" value="${escapeHtml(t.publishDate)}" oninput="t2set('publishDate',this.value)"></div>
+      <div>Closing Date</div><div><input type="text" value="${escapeHtml(t.closeDate)}" oninput="t2set('closeDate',this.value)"></div>
+      <div>Opening Date</div><div><input type="text" value="${escapeHtml(t.openDate)}" oninput="t2set('openDate',this.value)"></div>
+      <div>EMD Amount</div><div><input type="text" value="${escapeHtml(t.emd)}" oninput="t2set('emd',this.value)"></div>
+      <div>Department</div><div><input type="text" value="${escapeHtml(t.department)}" oninput="t2set('department',this.value)"></div>
     </div>
   </div>`;
 }
@@ -479,14 +694,14 @@ async function handleETenderUpload(e){
   const file = e.target.files[0];
   if(!file) return;
   state.etenderFiles.push(file);
-  render();
+  setProcessing(2);
   log('OCR on eTender page: ' + file.name);
   try{
     const text = await extractTextFromFile(file);
     autoFillTenderMeta(text);
     log('eTender metadata extracted');
   } catch(err){ log('eTender parse error: ' + err.message); }
-  render();
+  clearProcessing();
 }
 
 // Basic regex extraction — refine against real portal formats later
@@ -512,22 +727,29 @@ function renderStage3(){
   return `
   <div class="card">
     <h2>Stage 3 · Upload Pre-Bid Queries & Corrigendum</h2>
-    <div class="sub">Query-response document and/or corrigendum PDF issued before submission deadline.</div>
-    <div class="drop" onclick="document.getElementById('prebidInput').click()">Click to upload pre-bid query / corrigendum doc</div>
+    <div class="sub">Query-response document and/or corrigendum PDF issued before submission deadline. Drop multiple files at once.</div>
+    <div class="upload-grid">
+      ${renderUploadCard({
+        inputId: 'prebidInput', icon: '📝', title: 'Pre-Bid Query Docs', sub: 'One or more PDFs/images, click or drag & drop',
+        status: state.prebidFiles.length ? 'done' : 'pending',
+        statusText: state.prebidFiles.length ? `${state.prebidFiles.length} file(s) uploaded` : undefined,
+      })}
+    </div>
     <input type="file" id="prebidInput" accept=".pdf,image/*" multiple onchange="handlePrebidUpload(event)">
     ${state.prebidFiles.map((f,i)=>`
-      <div class="fileitem"><span>${f.name} ${f._text ? `<span class="badge ok" style="margin-left:8px">parsed</span>`:''}</span><span class="x" onclick="removePrebid(${i})">✕</span></div>
+      <div class="fileitem"><span>${escapeHtml(f.name)} ${f._text ? `<span class="badge ok" style="margin-left:8px">parsed</span>`:''}</span><span class="x" onclick="removePrebid(${i})">✕</span></div>
     `).join('')}
   </div>`;
 }
 async function handlePrebidUpload(e){
+  setProcessing(3);
   for(const file of e.target.files){
     state.prebidFiles.push(file);
     render();
     try{ file._text = await extractTextFromFile(file); log('Parsed pre-bid doc: ' + file.name); }
     catch(err){ log('Parse error: ' + err.message); }
   }
-  render();
+  clearProcessing();
 }
 function removePrebid(i){ state.prebidFiles.splice(i,1); render(); }
 
@@ -535,13 +757,18 @@ function removePrebid(i){ state.prebidFiles.splice(i,1); render(); }
    STAGE 4 — Corrigendum vs Original: Delta report
    ============================================================ */
 function renderStage4(){
+  const uploaded = state.corrigendumFiles[0];
   return `
   <div class="card">
-    <h2>Stage 4 · Corrigendum eTender Page — Compare</h2>
-    <div class="sub">Diffs corrigendum text against Stage 1 (RFP) and Stage 2 (original dates/EMD). No LLM.</div>
-    <div class="drop" onclick="document.getElementById('corrInput').click()">Click to upload corrigendum eTender page</div>
+    <h2>Stage 4 · Upload Corrigendum</h2>
+    <div class="sub">Diffs corrigendum text against Stage 1 (RFP) and Stage 2 (original dates/EMD).</div>
+    <div class="upload-grid">
+      ${renderUploadCard({
+        inputId: 'corrInput', icon: '📑', title: 'Corrigendum', sub: 'PDF or image, click or drag & drop',
+        status: uploaded ? 'done' : 'pending', fileName: uploaded ? uploaded.name : '',
+      })}
+    </div>
     <input type="file" id="corrInput" accept=".pdf,image/*" onchange="handleCorrigendumUpload(event)">
-    ${state.corrigendumFiles.map(f=>`<div class="fileitem"><span>${f.name}</span></div>`).join('')}
     <div class="row">
       <button ${state.corrigendumFiles.length===0?'disabled':''} onclick="runDeltaCompare()">Run Delta Compare</button>
     </div>
@@ -555,7 +782,7 @@ async function handleCorrigendumUpload(e){
   const file = e.target.files[0];
   if(!file) return;
   state.corrigendumFiles.push(file);
-  render();
+  setProcessing(4);
   try{
     const raw = await extractTextFromFile(file);
     // Distinguish corrigendum pages from RFP pages so eligibility extraction
@@ -565,7 +792,7 @@ async function handleCorrigendumUpload(e){
     maybeAutoRunEligibility();
   }
   catch(err){ log('Parse error: ' + err.message); }
-  render();
+  clearProcessing();
 }
 
 function runDeltaCompare(){
@@ -602,19 +829,8 @@ function runDeltaCompare(){
 function renderStage5(){
   return `
   <div class="card">
-    <h2>Stage 5 · Check Eligibility <span class="badge info">LLM</span></h2>
-    <div class="sub">Runs automatically once the RFP (and corrigendum, if uploaded) are parsed — combines both, with corrigendum amendments taking precedence. Click any criterion's "View Page" to see the exact source page.</div>
-
-    <div class="sub" style="margin-top:0;font-weight:700;color:var(--navy)">Optional: Reference Template</div>
-    <div class="sub" style="margin-bottom:10px">Upload a past eligibility/evaluation report to guide the AI toward your organization's usual categories and scope — helps prevent over-extraction of unrelated requirements.</div>
-    <div class="drop" onclick="document.getElementById('refReportInput').click()">Click to upload a reference evaluation report (PDF/Image)</div>
-    <input type="file" id="refReportInput" accept=".pdf,image/*" onchange="handleReferenceReportUpload(event)">
-    ${state.referenceReport.file ? `
-      <div class="fileitem">
-        <span>${escapeHtml(state.referenceReport.file.name)} ${state.referenceReport.extractedText ? '<span class="badge ok" style="margin-left:8px">parsed — will guide extraction</span>' : ''}</span>
-        <span class="x" onclick="removeReferenceReport()">✕</span>
-      </div>
-    ` : ''}
+    <h2>Stage 5 · Check Eligibility</h2>
+    <div class="sub">Runs automatically once the RFP (and corrigendum, if uploaded) are parsed — combines both, with corrigendum amendments taking precedence. Click any criterion's "View Page" to see the exact source page. Criteria are listed in the same serial order they appear in the source document.</div>
 
     <div class="row">
       <button ${!state.tender.extractedText ? 'disabled':''} onclick="runEligibilityExtraction()" id="eligBtn">
@@ -623,9 +839,10 @@ function renderStage5(){
     </div>
     ${state.eligibility.length ? `
       <table>
-        <tr><th>Description</th><th>Type</th><th>Threshold</th><th>Weight</th><th>Source</th><th></th></tr>
+        <tr><th>#</th><th>Description</th><th>Type</th><th>Threshold</th><th>Weight</th><th>Source</th><th></th></tr>
         ${state.eligibility.map((c,ci)=>`
           <tr>
+            <td>${ci+1}</td>
             <td>${escapeHtml(c.description)}</td>
             <td><span class="badge ${c.type==='mandatory'?'err':'info'}">${c.type}</span></td>
             <td>${escapeHtml(c.threshold||'—')}</td>
@@ -636,14 +853,20 @@ function renderStage5(){
         `).join('')}
       </table>
     ` : `<div class="muted" style="margin-top:12px">No eligibility criteria extracted yet.</div>`}
-  </div>
+  </div>`;
+}
 
+/* ============================================================
+   STAGE 6 — Technical Scoring Rubric (its own page, always after Eligibility)
+   ============================================================ */
+function renderStageTechnical(){
+  return `
   <div class="card">
-    <h2>Technical Scoring Rubric <span class="badge info">LLM</span></h2>
-    <div class="sub">The marks-based evaluation table (separate from pass/fail eligibility) — used in Stage 7 to score bidders against fixed max marks instead of a generic 0–100 guess.</div>
+    <h2>Stage 6 · Technical Scoring Criteria</h2>
+    <div class="sub">The marks-based evaluation table (separate from pass/fail eligibility) — used in Stage 8 to score bidders against fixed max marks instead of a generic 0–100 guess. Criteria are listed in the same serial order they appear in the source document.</div>
     <div class="row">
-      <button ${!state.tender.extractedText ? 'disabled':''} onclick="runScoringCriteriaExtraction()" id="scoreCritBtn" class="secondary">
-        Re-extract Scoring Rubric
+      <button ${!state.tender.extractedText ? 'disabled':''} onclick="runScoringCriteriaExtraction()" id="scoreCritBtn">
+        Extract Technical Scoring Criteria
       </button>
     </div>
     ${state.selectionMethod.method ? `
@@ -654,9 +877,10 @@ function renderStage5(){
     ` : ''}
     ${state.scoringCriteria.length ? `
       <table>
-        <tr><th>Criterion</th><th>Max Marks</th><th>Tiers</th><th>Sub-Weights</th><th>Assessable from Docs?</th><th></th></tr>
+        <tr><th>#</th><th>Criterion</th><th>Max Marks</th><th>Tiers</th><th>Sub-Weights</th><th>Assessable from Docs?</th><th></th></tr>
         ${state.scoringCriteria.map((c,ci)=>`
           <tr>
+            <td>${ci+1}</td>
             <td>${escapeHtml(c.name)}</td>
             <td>${escapeHtml(String(c.maxMarks ?? '—'))}</td>
             <td>${escapeHtml(c.tiers || '—')}</td>
@@ -666,28 +890,9 @@ function renderStage5(){
           </tr>
         `).join('')}
       </table>
-      ${state.scoringCriteria.some(c=>c.requiresLiveAssessment) ? `<div class="sub" style="margin-top:10px">⚠ Criteria marked "live only" (e.g. presentations/interviews) can't be scored from documents — Stage 7 will flag these for manual entry.</div>` : ''}
+      ${state.scoringCriteria.some(c=>c.requiresLiveAssessment) ? `<div class="sub" style="margin-top:10px">⚠ Criteria marked "live only" (e.g. presentations/interviews) can't be scored from documents — Stage 8 will flag these for manual entry.</div>` : ''}
     ` : `<div class="muted" style="margin-top:12px">No scoring rubric extracted yet.</div>`}
   </div>`;
-}
-
-async function handleReferenceReportUpload(e){
-  const file = e.target.files[0];
-  if(!file) return;
-  state.referenceReport.file = file;
-  render();
-  log('Parsing reference template: ' + file.name);
-  try{
-    const text = await extractTextFromFile(file);
-    state.referenceReport.extractedText = text;
-    log('Reference template parsed — will guide eligibility extraction categories');
-  } catch(err){ log('Reference template parse error: ' + err.message); }
-  render();
-}
-
-function removeReferenceReport(){
-  state.referenceReport = { file: null, extractedText: '' };
-  render();
 }
 
 /* ============================================================
@@ -773,24 +978,15 @@ function combinedEligibilitySourceText(){
 async function runEligibilityExtraction(){
   const btn = document.getElementById('eligBtn');
   if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Extracting…'; }
+  setProcessing(5);
   try{
     const fullText = combinedEligibilitySourceText();
     const chunks = chunkText(fullText, 6000, 500);
     const hasCorr = !!(state.corrigendumFiles[0] && state.corrigendumFiles[0]._text);
-    log(`Document split into ${chunks.length} chunk(s) for eligibility scan${hasCorr ? ' (RFP + corrigendum)' : ' (RFP only)'}${state.referenceReport.extractedText ? ' — using reference template as guide' : ''}`);
+    log(`Document split into ${chunks.length} chunk(s) for eligibility scan${hasCorr ? ' (RFP + corrigendum)' : ' (RFP only)'}`);
 
     // Scan every chunk (eligibility clauses can appear anywhere in a 100+ page RFP),
     // merge results, then dedupe near-identical criteria.
-    // If a reference template (past eligibility/evaluation report) was uploaded,
-    // use it to anchor the model on this organization's actual criteria categories
-    // instead of guessing generically from RFP language.
-    const templateGuide = state.referenceReport.extractedText
-      ? `\n\nREFERENCE TEMPLATE — a past eligibility/evaluation report from this organization is provided below. Use it ONLY to understand the CATEGORIES and SCOPE of criteria this organization typically evaluates (e.g. "if they never track equipment ownership, don't invent an equipment criterion"). Do NOT copy its specific values/thresholds — those belong to a different tender. Match the new RFP's own stated criteria to these same categories where applicable, and stay within this same general scope.
-
-Reference template excerpt:
-"""${state.referenceReport.extractedText.slice(0, 6000)}"""`
-      : '';
-
     let merged = [];
     for(let i=0; i<chunks.length; i++){
       const prompt = `You are extracting BIDDER ELIGIBILITY / QUALIFICATION criteria only — the specific pass/fail or scoring conditions a bidder's firm must meet to be considered eligible to bid. This is chunk ${i+1} of ${chunks.length} of a tender document (which may include both the original RFP and a later corrigendum that can amend/override RFP clauses). Only extract what's actually present here, don't guess at missing chunks.
@@ -799,7 +995,7 @@ STRICT SCOPE — only include criteria that determine whether a BIDDER (the firm
 
 Do NOT include: general scope-of-work descriptions, technical specifications of the deliverable itself, submission format/procedure instructions, definitions, EMD/tender fee amounts (those aren't bidder qualifications), payment terms, or timeline/schedule details. If a sentence describes what the WORK involves rather than what the BIDDER must have/prove, exclude it.
 
-When genuinely unsure whether something is a qualification criterion, exclude it — under-extraction is preferred over over-extraction here.${templateGuide}
+When genuinely unsure whether something is a qualification criterion, exclude it — under-extraction is preferred over over-extraction here.
 
 Return ONLY valid JSON: an array of objects like
 {"description": "...", "type": "mandatory|qualifying", "threshold": "...", "weight": number|null, "sourcePage": "...", "sourceDoc": "RFP|Corrigendum"}
@@ -842,7 +1038,7 @@ Excerpt:
   } catch(err){
     log('Eligibility extraction failed: ' + err.message);
   }
-  render();
+  clearProcessing();
 }
 
 /* ============================================================
@@ -853,6 +1049,7 @@ Excerpt:
    qualifying threshold, and selection method like L1/QCBS.)
    ============================================================ */
 async function runScoringCriteriaExtraction(){
+  setProcessing(6);
   try{
     const fullText = combinedEligibilitySourceText();
     const chunks = chunkText(fullText, 6000, 500);
@@ -916,20 +1113,26 @@ Excerpt:
   } catch(err){
     log('Scoring rubric extraction failed: ' + err.message);
   }
-  render();
+  clearProcessing();
 }
 
 /* ============================================================
-   STAGE 6 — Bids Received & Submissions
+   STAGE 7 — Bids Received & Submissions
    ============================================================ */
 function renderStage6(){
   const hasETenderData = !!(state.tender.nitNo || state.tender.closeDate || state.tender.department || state.etenderFiles.length > 0);
+  const bidsPageUploaded = state.bidsPageFiles[0];
   return `
   <div class="card">
-    <h2>Stage 6 · Upload Bids-Received Page & Bid Submissions</h2>
+    <h2>Stage 7 · Upload Bids-Received Page & Bid Submissions</h2>
     <div class="sub">Extract bidder list, then attach technical bid files per bidder. Financial bids aren't collected at this stage.</div>
     ${hasETenderData ? `
-      <div class="drop" onclick="document.getElementById('bidsPageInput').click()">Click to upload bids-received page (screenshot/PDF)</div>
+      <div class="upload-grid">
+        ${renderUploadCard({
+          inputId: 'bidsPageInput', icon: '📋', title: 'Bids-Received Page', sub: 'Screenshot or PDF listing all bidders',
+          status: bidsPageUploaded ? 'done' : 'pending', fileName: bidsPageUploaded ? bidsPageUploaded.name : '',
+        })}
+      </div>
       <input type="file" id="bidsPageInput" accept=".pdf,image/*" onchange="handleBidsPageUpload(event)">
     ` : `
       <div class="sub" style="margin-top:0">No eTender details on file yet (Stage 2) — enter how many bidders submitted instead, and folders will be created for you to rename.</div>
@@ -945,19 +1148,18 @@ function renderStage6(){
   <div class="card">
     <h2>Bidders</h2>
     ${state.bidders.length === 0 ? `<div class="muted">No bidders yet.</div>` : state.bidders.map((b,bi)=>`
-      <div class="card" style="background:var(--panel2);margin-bottom:10px">
+      <div class="card" style="background:var(--smoke);margin-bottom:10px">
         <div class="row" style="justify-content:space-between;align-items:center;margin-top:0">
           <input type="text" value="${escapeHtml(b.name)}" oninput="renameBidder(${bi},this.value)" style="max-width:260px">
           <button class="secondary small" onclick="removeBidder(${bi})">Remove</button>
         </div>
-        <div class="row">
-          <div>
-            <div class="muted" style="margin-bottom:4px">Technical Bid</div>
-            <button class="secondary small" onclick="document.getElementById('techInput${bi}').click()">Upload</button>
-            <input type="file" id="techInput${bi}" style="display:none" accept=".pdf,image/*" onchange="handleBidFile(event,${bi},'technicalText')">
-            ${b.technicalText ? '<span class="badge ok" style="margin-left:8px">parsed</span>' : ''}
-          </div>
+        <div class="upload-grid" style="margin-top:10px;max-width:220px">
+          ${renderUploadCard({
+            inputId: `techInput${bi}`, icon: '📁', title: 'Technical Bid', sub: 'PDF or image',
+            status: b.technicalText ? 'done' : 'pending', small: true,
+          })}
         </div>
+        <input type="file" id="techInput${bi}" accept=".pdf,image/*" onchange="handleBidFile(event,${bi},'technicalText')">
       </div>
     `).join('')}
   </div>`;
@@ -982,7 +1184,7 @@ async function handleBidsPageUpload(e){
   const file = e.target.files[0];
   if(!file) return;
   state.bidsPageFiles.push(file);
-  render();
+  setProcessing(7);
   log('OCR on bids-received page: ' + file.name);
   try{
     const text = await extractTextFromFile(file);
@@ -994,7 +1196,7 @@ async function handleBidsPageUpload(e){
     names.forEach(n => addBidder(n));
     log('Detected ' + names.length + ' bidder name(s) — verify and edit as needed');
   } catch(err){ log('Bids page parse error: ' + err.message); }
-  render();
+  clearProcessing();
 }
 
 function addBidder(name, isPlaceholder){
@@ -1015,7 +1217,7 @@ function removeBidder(i){ state.bidders.splice(i,1); render(); }
 async function handleBidFile(e, bidderIdx, field){
   const file = e.target.files[0];
   if(!file) return;
-  render();
+  setProcessing(7);
   const bidder = state.bidders[bidderIdx];
   const subfolder = field === 'technicalText' ? 'Technical' : 'Financial';
   log(`Parsing ${field} for ${bidder.name}: ${file.name}`);
@@ -1028,7 +1230,7 @@ async function handleBidFile(e, bidderIdx, field){
       detectBidderNameFromCoverPage(bidderIdx, text);
     }
   } catch(err){ log('Parse error: ' + err.message); }
-  render();
+  clearProcessing();
 }
 
 // Reads the cover page of a technical bid (first page, where the bidder's firm
@@ -1066,16 +1268,16 @@ Return ONLY valid JSON: {"bidderName": "..." or null if not confidently identifi
 }
 
 /* ============================================================
-   STAGE 7 — Evaluate Bids (LLM, heavy, per bidder x criterion)
+   STAGE 8 — Evaluate Bids (LLM, heavy, per bidder x criterion)
    ============================================================ */
 function renderStage7(){
   const ready = (state.eligibility.length > 0 || state.scoringCriteria.length > 0) && state.bidders.length > 0;
   return `
   <div class="card">
-    <h2>Stage 7 · Evaluate Bids <span class="badge info">LLM · Heavy</span></h2>
+    <h2>Stage 8 · Evaluate Bids</h2>
     <div class="row">
       <button ${!ready?'disabled':''} onclick="runEvaluation()" id="evalBtn">Run Evaluation</button>
-      ${!ready ? '<span class="muted">Need eligibility/scoring criteria (Stage 5) and at least one bidder with bid text (Stage 6)</span>' : ''}
+      ${!ready ? '<span class="muted">Need eligibility (Stage 5) and technical scoring criteria (Stage 6), plus at least one bidder with bid text (Stage 7)</span>' : ''}
     </div>
   </div>
   ${state.bidders.length ? `
@@ -1146,6 +1348,7 @@ function renderEvalTable(idx){
 async function runEvaluation(){
   const btn = document.getElementById('evalBtn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Evaluating…';
+  setProcessing(8);
   try{
     for(const bidder of state.bidders){
       const bidText = (bidder.technicalText || '') + '\n\n' + (bidder.financialText || '');
@@ -1276,17 +1479,17 @@ Return ONLY valid JSON: {"marksAwarded": number, "justification": "...", "eviden
   } catch(err){
     log('Evaluation run failed: ' + err.message);
   }
-  render();
+  clearProcessing();
 }
 
 /* ============================================================
-   STAGE 8 — Generate Report (LLM light + Excel export)
+   STAGE 9 — Generate Report (LLM light + Excel export)
    ============================================================ */
 function renderStage8(){
   const hasEval = Object.keys(state.consensus).length > 0;
   return `
   <div class="card">
-    <h2>Stage 8 · Generate Bid Evaluation Report <span class="badge info">LLM · Light</span></h2>
+    <h2>Stage 9 · Generate Bid Evaluation Report</h2>
     <div class="sub">Compiles rankings, compliance matrix, and an AI-drafted executive summary + recommendation.</div>
 
     <div class="sub" style="margin-top:0;font-weight:700;color:var(--navy)">Report Orientation</div>
@@ -1342,6 +1545,7 @@ function rankedBidders(){
 async function runReportGeneration(){
   const btn = document.getElementById('reportBtn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Drafting…';
+  setProcessing(9);
   try{
     const ranked = rankedBidders();
     const prompt = `Draft an executive summary and presentation-invitation recommendation from this bid evaluation. This evaluation happens BEFORE any presentation — it determines which bidders get invited to present, using only document-assessable technical criteria.
@@ -1359,7 +1563,7 @@ Write 3-4 short paragraphs: overview of the evaluation, key differentiators betw
     log('Report generation failed: ' + err.message);
     alert('Report generation failed: ' + err.message);
   }
-  render();
+  clearProcessing();
 }
 
 function setReportOrientation(o){
@@ -1458,6 +1662,7 @@ async function exportWordReport(){
   const btn = document.getElementById('wordBtn');
   const orig = btn.innerHTML;
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Building…';
+  setProcessing(9);
   try{
     const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, HeadingLevel,
             WidthType, PageOrientation, ShadingType, BorderStyle, AlignmentType } = docx;
@@ -1580,6 +1785,7 @@ async function exportWordReport(){
     alert('Word export failed: ' + err.message);
   }
   btn.disabled = false; btn.innerHTML = orig;
+  clearProcessing();
 }
 
 /* ============================================================
