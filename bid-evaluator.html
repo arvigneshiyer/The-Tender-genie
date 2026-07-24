@@ -215,7 +215,6 @@ const state = {
   tender: { nitNo:'', publishDate:'', closeDate:'', openDate:'', emd:'', department:'', extractedText:'', authorityName:'', projectName:'' },
   rfpFiles: [],
   etenderFiles: [],
-  prebidFiles: [],
   corrigendumFiles: [],
   corrigendumDelta: '',
   eligibility: [], // {id, description, type, threshold, weight}
@@ -236,7 +235,6 @@ const state = {
 const STEPS = [
   'Upload RFP',
   'eTender Details',
-  'Pre-Bid Queries',
   'Upload Corrigendum',
   'Eligibility',
   'Technical Scoring',
@@ -377,7 +375,7 @@ async function extractTextFromImage(file){
 /* ============================================================
    RENDER: NAV
    ============================================================ */
-const STAGE_ICONS = ['📄','🖥️','📝','📑','✅','🎯','📋','⚖️','🏆'];
+const STAGE_ICONS = ['📄','🖥️','📑','✅','🎯','📋','⚖️','🏆'];
 
 // Determines whether a stage's work is actually done, based on real state —
 // not just "have you visited this page" — so the checkmark reflects genuine progress.
@@ -385,13 +383,12 @@ function isStageDone(n){
   switch(n){
     case 1: return !!state.tender.extractedText;
     case 2: return !!(state.tender.nitNo || state.tender.closeDate || state.tender.department || state.etenderFiles.length);
-    case 3: return state.prebidFiles.length > 0;
-    case 4: return !!state.corrigendumDelta;
-    case 5: return state.eligibility.length > 0;
-    case 6: return state.scoringCriteria.length > 0;
-    case 7: return state.bidders.some(b => b.technicalText);
-    case 8: return Object.keys(state.consensus).length > 0;
-    case 9: return !!state.report.executiveSummary;
+    case 3: return !!state.corrigendumDelta;
+    case 4: return state.eligibility.length > 0;
+    case 5: return state.scoringCriteria.length > 0;
+    case 6: return state.bidders.some(b => b.technicalText);
+    case 7: return Object.keys(state.consensus).length > 0;
+    case 8: return !!state.report.executiveSummary;
     default: return false;
   }
 }
@@ -430,7 +427,7 @@ function render(){
   renderRfpBanner();
   const main = document.getElementById('mainArea');
   const renderers = [
-    renderStage1, renderStage2, renderStage3, renderStage4,
+    renderStage1, renderStage2, renderStage4,
     renderStage5, renderStageTechnical, renderStage6, renderStage7, renderStage8,
   ];
   main.innerHTML = renderers[state.step-1]();
@@ -440,7 +437,7 @@ function render(){
     </div>
     <footer class="stepnav">
       <button class="secondary" onclick="goToStep(${Math.max(1,state.step-1)})" ${state.step===1?'disabled':''}>← Back</button>
-      <button onclick="goToStep(${Math.min(9,state.step+1)})" ${state.step===9?'disabled':''}>Next →</button>
+      <button onclick="goToStep(${Math.min(8,state.step+1)})" ${state.step===8?'disabled':''}>Next →</button>
     </footer>
   `);
   renderPreviewPanel();
@@ -517,7 +514,7 @@ async function showScoringCriterionPreview(critIndex){
   await openPagePreview(file, crit.sourcePage, `${isCorr ? 'Corrigendum' : 'RFP'} — Page ${crit.sourcePage}`, crit.name);
 }
 
-// For Stage 8: preview the exact page in a BIDDER's technical bid where evidence
+// For Stage 7: preview the exact page in a BIDDER's technical bid where evidence
 // for a compliance check or a scoring award was found — so the user can visually
 // confirm the AI read the right section before trusting the result.
 async function showBidEvidencePreview(bidderIdx, kind, itemIndex){
@@ -721,46 +718,15 @@ function autoFillTenderMeta(text){
 }
 
 /* ============================================================
-   STAGE 3 — Pre-Bid Queries & Corrigendum
-   ============================================================ */
-function renderStage3(){
-  return `
-  <div class="card">
-    <h2>Stage 3 · Upload Pre-Bid Queries & Corrigendum</h2>
-    <div class="sub">Query-response document and/or corrigendum PDF issued before submission deadline. Drop multiple files at once.</div>
-    <div class="upload-grid">
-      ${renderUploadCard({
-        inputId: 'prebidInput', icon: '📝', title: 'Pre-Bid Query Docs', sub: 'One or more PDFs/images, click or drag & drop',
-        status: state.prebidFiles.length ? 'done' : 'pending',
-        statusText: state.prebidFiles.length ? `${state.prebidFiles.length} file(s) uploaded` : undefined,
-      })}
-    </div>
-    <input type="file" id="prebidInput" accept=".pdf,image/*" multiple onchange="handlePrebidUpload(event)">
-    ${state.prebidFiles.map((f,i)=>`
-      <div class="fileitem"><span>${escapeHtml(f.name)} ${f._text ? `<span class="badge ok" style="margin-left:8px">parsed</span>`:''}</span><span class="x" onclick="removePrebid(${i})">✕</span></div>
-    `).join('')}
-  </div>`;
-}
-async function handlePrebidUpload(e){
-  setProcessing(3);
-  for(const file of e.target.files){
-    state.prebidFiles.push(file);
-    render();
-    try{ file._text = await extractTextFromFile(file); log('Parsed pre-bid doc: ' + file.name); }
-    catch(err){ log('Parse error: ' + err.message); }
-  }
-  clearProcessing();
-}
-function removePrebid(i){ state.prebidFiles.splice(i,1); render(); }
 
 /* ============================================================
-   STAGE 4 — Corrigendum vs Original: Delta report
+   STAGE 3 — Corrigendum vs Original: Delta report
    ============================================================ */
 function renderStage4(){
   const uploaded = state.corrigendumFiles[0];
   return `
   <div class="card">
-    <h2>Stage 4 · Upload Corrigendum</h2>
+    <h2>Stage 3 · Upload Corrigendum</h2>
     <div class="sub">Diffs corrigendum text against Stage 1 (RFP) and Stage 2 (original dates/EMD).</div>
     <div class="upload-grid">
       ${renderUploadCard({
@@ -824,12 +790,12 @@ function runDeltaCompare(){
 }
 
 /* ============================================================
-   STAGE 5 — Eligibility (LLM)
+   STAGE 4 — Eligibility
    ============================================================ */
 function renderStage5(){
   return `
   <div class="card">
-    <h2>Stage 5 · Check Eligibility</h2>
+    <h2>Stage 4 · Check Eligibility</h2>
     <div class="sub">Runs automatically once the RFP (and corrigendum, if uploaded) are parsed — combines both, with corrigendum amendments taking precedence. Click any criterion's "View Page" to see the exact source page. Criteria are listed in the same serial order they appear in the source document.</div>
 
     <div class="row">
@@ -842,7 +808,7 @@ function renderStage5(){
         <tr><th>#</th><th>Description</th><th>Type</th><th>Threshold</th><th>Weight</th><th>Source</th><th></th></tr>
         ${state.eligibility.map((c,ci)=>`
           <tr>
-            <td>${ci+1}</td>
+            <td>${escapeHtml(c.originalNo != null ? String(c.originalNo) : String(ci+1))}</td>
             <td>${escapeHtml(c.description)}</td>
             <td><span class="badge ${c.type==='mandatory'?'err':'info'}">${c.type}</span></td>
             <td>${escapeHtml(c.threshold||'—')}</td>
@@ -857,13 +823,13 @@ function renderStage5(){
 }
 
 /* ============================================================
-   STAGE 6 — Technical Scoring Rubric (its own page, always after Eligibility)
+   STAGE 5 — Technical Scoring Rubric (its own page, always after Eligibility)
    ============================================================ */
 function renderStageTechnical(){
   return `
   <div class="card">
-    <h2>Stage 6 · Technical Scoring Criteria</h2>
-    <div class="sub">The marks-based evaluation table (separate from pass/fail eligibility) — used in Stage 8 to score bidders against fixed max marks instead of a generic 0–100 guess. Criteria are listed in the same serial order they appear in the source document.</div>
+    <h2>Stage 5 · Technical Scoring Criteria</h2>
+    <div class="sub">The marks-based evaluation table (separate from pass/fail eligibility) — used in Stage 7 to score bidders against fixed max marks instead of a generic 0–100 guess. Criteria are listed in the same serial order they appear in the source document.</div>
     <div class="row">
       <button ${!state.tender.extractedText ? 'disabled':''} onclick="runScoringCriteriaExtraction()" id="scoreCritBtn">
         Extract Technical Scoring Criteria
@@ -989,18 +955,24 @@ async function runEligibilityExtraction(){
     // merge results, then dedupe near-identical criteria.
     let merged = [];
     for(let i=0; i<chunks.length; i++){
-      const prompt = `You are extracting BIDDER ELIGIBILITY / QUALIFICATION criteria only — the specific pass/fail or scoring conditions a bidder's firm must meet to be considered eligible to bid. This is chunk ${i+1} of ${chunks.length} of a tender document (which may include both the original RFP and a later corrigendum that can amend/override RFP clauses). Only extract what's actually present here, don't guess at missing chunks.
+      const prompt = `You are extracting rows from a tender document's ELIGIBILITY CRITERIA TABLE. This is chunk ${i+1} of ${chunks.length} of a tender document (which may include both the original RFP and a later corrigendum that can amend/override RFP clauses). Only extract what's actually present here, don't guess at missing chunks.
 
-STRICT SCOPE — only include criteria that determine whether a BIDDER (the firm/entity) qualifies, typically found under headings like "Eligibility Criteria", "Qualification Requirements", "Pre-Qualification Criteria", "Technical Qualification", "Financial Qualification". Examples of what COUNTS: minimum annual turnover, years of experience, similar past project count/value, minimum net worth, registration/certification requirements (e.g. GST, PAN, incorporation), litigation/blacklisting declarations, manpower/equipment minimums specifically required for qualification.
+MOST IMPORTANT RULE: Most tenders present eligibility criteria as ONE literal table or numbered list under a heading like "Eligibility Criteria", "Eligibility Conditions", "Qualification Requirements", or "Pre-Qualification Criteria" — usually with its own "#"/Sr. No. column and often a "Documentary proof to be submitted" column alongside it. If this excerpt contains such a table, extract ONLY the rows that are literally printed in that table, in the exact order they appear, and CAPTURE THE TABLE'S OWN PRINTED SERIAL NUMBER for each row exactly as shown — even if the table's own numbering repeats a number (e.g. two rows both numbered "1") or skips numbers (e.g. jumps from 3 straight to 6). Do not renumber, deduplicate by number, or "fix" the table's own numbering — reproduce it exactly as printed, since that is how it will be referenced later.
 
-Do NOT include: general scope-of-work descriptions, technical specifications of the deliverable itself, submission format/procedure instructions, definitions, EMD/tender fee amounts (those aren't bidder qualifications), payment terms, or timeline/schedule details. If a sentence describes what the WORK involves rather than what the BIDDER must have/prove, exclude it.
+Do NOT invent or add criteria from other parts of the document (scope of work, general instructions, definitions, submission procedure) that are not literal rows of this table, even if they sound like qualifications. If no such table appears in this excerpt, return [].
 
-When genuinely unsure whether something is a qualification criterion, exclude it — under-extraction is preferred over over-extraction here.
+Note: a row for "Bid Processing Fee & EMD Deposit" (or similar tender-fee/EMD submission compliance) commonly appears AS ITS OWN ROW in this table — if the table includes it, extract it like any other row; do not skip it as "not a real qualification."
 
-Return ONLY valid JSON: an array of objects like
-{"description": "...", "type": "mandatory|qualifying", "threshold": "...", "weight": number|null, "sourcePage": "...", "sourceDoc": "RFP|Corrigendum"}
-Set "sourcePage" to the number from the nearest [PAGE N] or [CORR PAGE N] marker in the excerpt this criterion came from, if present (just the number). Set "sourceDoc" to "Corrigendum" if it came from a [CORR PAGE N] marker, otherwise "RFP".
-If no genuine bidder-eligibility criteria appear in this excerpt, return [].
+For each row, capture:
+- description: the condition text as printed (may reference a documentary proof column too — include that briefly if present)
+- type: "mandatory" or "qualifying" — use "mandatory" unless the table itself distinguishes tiers/scoring
+- threshold: any numeric threshold stated (amount, years, count), or null
+- weight: a numeric weight only if the table states one, else null
+- originalNo: the table's own printed serial number for this row, as a string, exactly as shown (e.g. "1", "6", "10") — this may repeat or skip, that's expected and correct
+- sourcePage: the number from the nearest [PAGE N] or [CORR PAGE N] marker in the excerpt this row came from, if present (just the number)
+- sourceDoc: "Corrigendum" if it came from a [CORR PAGE N] marker, otherwise "RFP"
+
+Return ONLY valid JSON: an array of objects as described above.
 
 Excerpt:
 """${chunks[i]}"""`;
@@ -1057,7 +1029,7 @@ async function runScoringCriteriaExtraction(){
 
     let merged = [];
     for(let i=0; i<chunks.length; i++){
-      const prompt = `You are extracting the MARKS-BASED TECHNICAL SCORING RUBRIC from a tender document — NOT the pass/fail eligibility criteria, but the table that assigns maximum marks per criterion for ranking qualified bidders (often titled "Evaluation Criteria", "Technical Evaluation", "Marking Scheme"). This is chunk ${i+1} of ${chunks.length}. Only extract what's actually present here.
+      const prompt = `You are extracting the MARKS-BASED TECHNICAL SCORING RUBRIC from a tender document — NOT the pass/fail eligibility criteria, but the table that assigns maximum marks per criterion for ranking qualified bidders (often titled "Evaluation Criteria", "Technical Evaluation", "Marking Scheme"). This is chunk ${i+1} of ${chunks.length} of a tender document (which may include both the original RFP and a later corrigendum that can amend/override RFP scoring rules — e.g. a revised max-marks value, changed tier thresholds, or an added/removed criterion). Only extract what's actually present here.
 
 For each scoring criterion found, capture:
 - name: short label (e.g. "Firm's Relevant Experience", "Team Leader", "Technical Presentation")
@@ -1096,16 +1068,23 @@ Excerpt:
       };
     }
 
-    // Dedupe actual scoring criteria (excluding the selection-method marker)
+    // Dedupe actual scoring criteria (excluding the selection-method marker).
+    // Same precedence rule as eligibility: if a corrigendum version and an RFP
+    // version of the same criterion both appear, the corrigendum wins — it's
+    // the later, binding amendment.
     const criteriaOnly = merged.filter(m => m.name !== 'SELECTION_METHOD' && m.name);
     const deduped = [];
     for(const c of criteriaOnly){
-      const isDupe = deduped.some(d => {
+      const dupeIdx = deduped.findIndex(d => {
         const a = new Set(tokenize(c.name)), b = new Set(tokenize(d.name));
         const overlap = [...a].filter(t => b.has(t)).length;
         return overlap / Math.max(a.size, b.size, 1) > 0.6;
       });
-      if(!isDupe) deduped.push(c);
+      if(dupeIdx === -1){
+        deduped.push(c);
+      } else if(c.sourceDoc === 'Corrigendum' && deduped[dupeIdx].sourceDoc !== 'Corrigendum'){
+        deduped[dupeIdx] = c; // corrigendum supersedes the RFP version
+      }
     }
 
     state.scoringCriteria = deduped.map((c,i)=>({ id: 'score_'+(i+1), ...c }));
@@ -1117,14 +1096,14 @@ Excerpt:
 }
 
 /* ============================================================
-   STAGE 7 — Bids Received & Submissions
+   STAGE 6 — Bids Received & Submissions
    ============================================================ */
 function renderStage6(){
   const hasETenderData = !!(state.tender.nitNo || state.tender.closeDate || state.tender.department || state.etenderFiles.length > 0);
   const bidsPageUploaded = state.bidsPageFiles[0];
   return `
   <div class="card">
-    <h2>Stage 7 · Upload Bids-Received Page & Bid Submissions</h2>
+    <h2>Stage 6 · Upload Bids-Received Page & Bid Submissions</h2>
     <div class="sub">Extract bidder list, then attach technical bid files per bidder. Financial bids aren't collected at this stage.</div>
     ${hasETenderData ? `
       <div class="upload-grid">
@@ -1268,16 +1247,16 @@ Return ONLY valid JSON: {"bidderName": "..." or null if not confidently identifi
 }
 
 /* ============================================================
-   STAGE 8 — Evaluate Bids (LLM, heavy, per bidder x criterion)
+   STAGE 7 — Evaluate Bids (LLM, heavy, per bidder x criterion)
    ============================================================ */
 function renderStage7(){
   const ready = (state.eligibility.length > 0 || state.scoringCriteria.length > 0) && state.bidders.length > 0;
   return `
   <div class="card">
-    <h2>Stage 8 · Evaluate Bids</h2>
+    <h2>Stage 7 · Evaluate Bids</h2>
     <div class="row">
       <button ${!ready?'disabled':''} onclick="runEvaluation()" id="evalBtn">Run Evaluation</button>
-      ${!ready ? '<span class="muted">Need eligibility (Stage 5) and technical scoring criteria (Stage 6), plus at least one bidder with bid text (Stage 7)</span>' : ''}
+      ${!ready ? '<span class="muted">Need eligibility (Stage 4) and technical scoring criteria (Stage 5), plus at least one bidder with bid text (Stage 6)</span>' : ''}
     </div>
   </div>
   ${state.bidders.length ? `
@@ -1483,13 +1462,13 @@ Return ONLY valid JSON: {"marksAwarded": number, "justification": "...", "eviden
 }
 
 /* ============================================================
-   STAGE 9 — Generate Report (LLM light + Excel export)
+   STAGE 8 — Generate Report (LLM light + Excel export)
    ============================================================ */
 function renderStage8(){
   const hasEval = Object.keys(state.consensus).length > 0;
   return `
   <div class="card">
-    <h2>Stage 9 · Generate Bid Evaluation Report</h2>
+    <h2>Stage 8 · Generate Bid Evaluation Report</h2>
     <div class="sub">Compiles rankings, compliance matrix, and an AI-drafted executive summary + recommendation.</div>
 
     <div class="sub" style="margin-top:0;font-weight:700;color:var(--navy)">Report Orientation</div>
