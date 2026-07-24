@@ -1,6 +1,8 @@
 // /api/ai.js
 // AI API for The Tender Genie
-// Handles Groq, Gemini, Cerebras, OpenRouter with 5 keys each
+// Handles Groq, Gemini, Cerebras, OpenRouter with 5 keys each,
+// and now falls back ACROSS providers too — not just across keys
+// within one provider — before ever giving up.
 
 export const config = {
   runtime: 'edge',
@@ -38,23 +40,40 @@ const KEYS = {
   ],
 };
 
-// ====== WHICH PROVIDER TO USE FOR EACH TASK ======
+// ====== DEFAULT MODEL PER PROVIDER (used when falling back to a provider
+// that isn't the task's preferred one) ======
+const PROVIDER_DEFAULT_MODEL = {
+  groq: 'llama-3.3-70b-versatile',
+  gemini: 'gemini-2.0-flash',
+  cerebras: 'llama-3.3-70b',
+  openrouter: 'deepseek/deepseek-r1:free',
+};
+
+// ====== WHICH PROVIDER TO TRY FIRST FOR EACH TASK ======
+// (fallback across the OTHER providers happens automatically if this one's
+// keys are all exhausted — see FALLBACK_ORDER below)
 const TASKS = {
   ocr:           { provider: 'gemini',   model: 'gemini-2.0-flash' },
   extract:       { provider: 'gemini',   model: 'gemini-2.0-flash' },
-  chat:          { provider: 'groq',     model: 'llama-3.3-70b-versatile' },
-  eligibility:   { provider: 'groq',     model: 'llama-3.3-70b-versatile' },
+  chat:          { provider: 'gemini',   model: 'gemini-2.0-flash' },
+  eligibility:   { provider: 'gemini',   model: 'gemini-2.0-flash' },
   compare:       { provider: 'gemini',   model: 'gemini-2.0-flash' },
   evaluate:      { provider: 'gemini',   model: 'gemini-2.0-flash' },
-  report:        { provider: 'groq',     model: 'llama-3.3-70b-versatile' },
+  report:        { provider: 'gemini',   model: 'gemini-2.0-flash' },
 };
 
-// Track which key to use next (round-robin)
+// The order to try OTHER providers in, if the task's preferred provider
+// exhausts all 5 of its own keys without success. Gemini first since it's
+// been the most reliable provider in practice; Groq kept as a fallback
+// rather than removed entirely, in case it's just transiently rate-limited.
+const FALLBACK_ORDER = ['gemini', 'groq', 'cerebras', 'openrouter'];
+
+// Track which key to use next per provider (round-robin)
 let keyIndex = { groq: 0, gemini: 0, cerebras: 0, openrouter: 0 };
 
 // ====== MAIN FUNCTION ======
 export default async function handler(req) {
-  
+
   // Allow browser to call this API
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*' } });
@@ -80,26 +99,23 @@ export default async function handler(req) {
       return json({ error: 'Please send messages array' }, 400);
     }
 
-    // Get provider settings for this task
-    const taskConfig = TASKS[task];
-    const provider = taskConfig.provider;
-    const model = taskConfig.model;
-
-    // Try each key until one works
-    const result = await tryWithFallback(provider, model, messages, body.temperature, body.max_tokens);
+    // Try the task's preferred provider first, then fall back ACROSS
+    // providers (not just across keys within one provider) before giving up.
+    const result = await callWithFullFallback(task, messages, body.temperature, body.max_tokens);
 
     if (!result.success) {
-      return json({ error: 'All keys failed for ' + provider, details: result.error }, 503);
+      return json({ error: 'All providers and keys failed', details: result.error }, 503);
     }
 
     // Return success
     return json({
       success: true,
       task: task,
-      provider: provider,
-      model: model,
+      provider: result.provider,
+      model: result.model,
       content: result.content,
       key_used: result.keyNumber,
+      fell_back: result.fellBack,
       time: new Date().toISOString(),
     });
 
@@ -108,34 +124,62 @@ export default async function handler(req) {
   }
 }
 
-// ====== TRY KEYS ONE BY ONE ======
+// ====== FULL FALLBACK: try preferred provider's 5 keys, then each other
+// provider's 5 keys in turn, until one succeeds or everything is exhausted ======
+async function callWithFullFallback(task, messages, temperature, maxTokens) {
+  const preferred = TASKS[task].provider;
+  const providerOrder = [preferred, ...FALLBACK_ORDER.filter(p => p !== preferred)];
+
+  const errors = [];
+  for (let i = 0; i < providerOrder.length; i++) {
+    const provider = providerOrder[i];
+    const model = provider === preferred ? TASKS[task].model : PROVIDER_DEFAULT_MODEL[provider];
+
+    const result = await tryWithFallback(provider, model, messages, temperature, maxTokens);
+    if (result.success) {
+      return {
+        success: true,
+        content: result.content,
+        provider,
+        model,
+        keyNumber: result.keyNumber,
+        fellBack: provider !== preferred,
+      };
+    }
+    errors.push(provider + ': ' + result.error);
+  }
+
+  return { success: false, error: errors.join(' | ') };
+}
+
+// ====== TRY ALL 5 KEYS OF A SINGLE PROVIDER ======
 async function tryWithFallback(provider, model, messages, temperature, maxTokens) {
   const keyList = KEYS[provider];
-  
+
   for (let i = 0; i < keyList.length; i++) {
     // Pick next key in rotation
     const idx = keyIndex[provider] % keyList.length;
     keyIndex[provider] = (keyIndex[provider] + 1) % keyList.length;
-    
+
     const key = keyList[idx];
-    
+
     try {
       const result = await callProvider(provider, key, model, messages, temperature, maxTokens);
       if (result) {
         return { success: true, content: result, keyNumber: idx + 1 };
       }
     } catch (err) {
-      console.log('Key ' + (idx + 1) + ' failed: ' + err.message);
+      console.log(provider + ' key ' + (idx + 1) + ' failed: ' + err.message);
       // Try next key
     }
   }
-  
-  return { success: false, error: 'All 5 keys exhausted' };
+
+  return { success: false, error: 'all ' + keyList.length + ' keys exhausted' };
 }
 
 // ====== CALL THE ACTUAL AI PROVIDER ======
 async function callProvider(provider, key, model, messages, temperature, maxTokens) {
-  
+
   // --- GROQ ---
   if (provider === 'groq') {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -151,7 +195,7 @@ async function callProvider(provider, key, model, messages, temperature, maxToke
         max_tokens: maxTokens || 4096,
       }),
     });
-    
+
     if (!res.ok) throw new Error('Groq error ' + res.status);
     const data = await res.json();
     return data.choices[0].message.content;
@@ -160,7 +204,7 @@ async function callProvider(provider, key, model, messages, temperature, maxToke
   // --- GEMINI ---
   if (provider === 'gemini') {
     const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + key;
-    
+
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -175,7 +219,7 @@ async function callProvider(provider, key, model, messages, temperature, maxToke
         },
       }),
     });
-    
+
     if (!res.ok) throw new Error('Gemini error ' + res.status);
     const data = await res.json();
     return data.candidates[0].content.parts[0].text;
@@ -196,7 +240,7 @@ async function callProvider(provider, key, model, messages, temperature, maxToke
         max_tokens: maxTokens || 4096,
       }),
     });
-    
+
     if (!res.ok) throw new Error('Cerebras error ' + res.status);
     const data = await res.json();
     return data.choices[0].message.content;
@@ -219,7 +263,7 @@ async function callProvider(provider, key, model, messages, temperature, maxToke
         max_tokens: maxTokens || 4096,
       }),
     });
-    
+
     if (!res.ok) throw new Error('OpenRouter error ' + res.status);
     const data = await res.json();
     return data.choices[0].message.content;
