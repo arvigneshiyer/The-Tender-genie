@@ -1623,13 +1623,18 @@ Return ONLY valid JSON: {"bidderName": "..." or null if not confidently identifi
    STAGE 7 — Evaluate Bids (LLM, heavy, per bidder x criterion)
    ============================================================ */
 function renderStage7(){
-  const ready = (state.eligibility.length > 0 || state.scoringCriteria.length > 0) && state.bidders.length > 0;
+  const eligReady = state.eligibility.length > 0 && state.bidders.length > 0;
+  const techReady = state.scoringCriteria.length > 0 && state.bidders.length > 0;
   return `
   <div class="card">
     <h2>Stage 7 · Evaluate Bids</h2>
     <div class="row">
-      <button ${!ready?'disabled':''} onclick="runEvaluation()" id="evalBtn">Run Evaluation</button>
-      ${!ready ? '<span class="muted">Need eligibility (Stage 4) and technical scoring criteria (Stage 5), plus at least one bidder with bid text (Stage 6)</span>' : ''}
+      <button ${!eligReady?'disabled':''} onclick="runEligibilityCheck()" id="eligCheckBtn">Check Eligibility</button>
+      ${!eligReady ? '<span class="muted">Need eligibility criteria (Stage 4) plus at least one bidder with bid text (Stage 6)</span>' : `<span class="muted">Checks each bidder against the ${state.eligibility.length} eligibility condition(s) from Stage 4</span>`}
+    </div>
+    <div class="row">
+      <button ${!techReady?'disabled':''} onclick="runTechnicalScoring()" id="techScoreBtn">Check Technical Score</button>
+      ${!techReady ? '<span class="muted">Need technical scoring criteria (Stage 5) plus at least one bidder with bid text (Stage 6)</span>' : `<span class="muted">Scores each bidder against the ${state.scoringCriteria.length} technical criteria from Stage 5</span>`}
     </div>
   </div>
   ${state.bidders.length ? `
@@ -1697,16 +1702,57 @@ function renderEvalTable(idx){
   `;
 }
 
-async function runEvaluation(){
-  const btn = document.getElementById('evalBtn');
-  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Evaluating…';
+// Shared consensus-building logic, used by both the standalone eligibility
+// check and the full evaluation run — computes the summary panel from
+// whatever compliance/scoring results exist so far (scoring may be empty if
+// only the eligibility check has been run yet).
+function updateConsensus(bidder, complianceResults, scoringResults){
+  const allEligibleCompliant = complianceResults.length ? complianceResults.every(r => r.status === 'Compliant') : null;
+  const eligibilityFlagged = complianceResults.some(r => r.status !== 'Compliant');
+  const docsAssessable = scoringResults.filter(r => !r.requiresLiveAssessment);
+  const liveOnly = scoringResults.filter(r => r.requiresLiveAssessment);
+  const docsAwarded = docsAssessable.reduce((s,r)=>s+(r.marksAwarded||0),0);
+  const docsMax = docsAssessable.reduce((s,r)=>s+(r.maxMarks||0),0) || 1;
+  const liveMax = liveOnly.reduce((s,r)=>s+(r.maxMarks||0),0);
+  const grandMax = docsMax + liveMax;
+  const docsPct = scoringResults.length ? (docsAwarded/docsMax)*100 : 0;
+  const invitedToPresentation = (scoringResults.length && state.selectionMethod.qualifyingThresholdPct)
+    ? docsPct >= state.selectionMethod.qualifyingThresholdPct
+    : null;
+
+  let canMathematicallyReachThreshold = null;
+  let bestCaseGrandPct = null;
+  let marksShortEvenWithFullPresentation = null;
+  if(scoringResults.length && state.selectionMethod.qualifyingThresholdPct){
+    const thresholdMarksNeeded = (state.selectionMethod.qualifyingThresholdPct/100) * grandMax;
+    const bestCaseTotal = docsAwarded + liveMax; // assuming full marks in presentation
+    bestCaseGrandPct = (bestCaseTotal/grandMax)*100;
+    canMathematicallyReachThreshold = bestCaseTotal >= thresholdMarksNeeded;
+    if(!canMathematicallyReachThreshold){
+      marksShortEvenWithFullPresentation = (thresholdMarksNeeded - bestCaseTotal);
+    }
+  }
+
+  state.consensus[bidder.id] = {
+    allEligibleCompliant, eligibilityFlagged, docsAwarded, docsMax, docsPct, liveMax, grandMax,
+    invitedToPresentation, canMathematicallyReachThreshold, bestCaseGrandPct, marksShortEvenWithFullPresentation,
+    needsReview: eligibilityFlagged || canMathematicallyReachThreshold === false,
+  };
+}
+
+// Standalone eligibility check — uses the exact eligibility criteria
+// extracted in Stage 4 (state.eligibility) against each bidder's submitted
+// text, independent of technical scoring. Faster than the full evaluation
+// since it only makes one AI call per eligibility criterion per bidder.
+async function runEligibilityCheck(){
+  const btn = document.getElementById('eligCheckBtn');
+  if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Checking…'; }
   setProcessing(7);
   try{
     for(const bidder of state.bidders){
       const bidText = (bidder.technicalText || '') + '\n\n' + (bidder.financialText || '');
-      log(`${bidder.name}: bid text is ${bidText.length.toLocaleString()} chars — evaluating`);
+      log(`${bidder.name}: checking against ${state.eligibility.length} eligibility condition(s) from Stage 4`);
 
-      // --- Part A: Eligibility compliance (pass/fail, not a score) ---
       const complianceResults = [];
       for(const crit of state.eligibility){
         const excerpt = getRelevantExcerpt(bidText, crit.description, { topK: 3, maxChars: 10000 });
@@ -1732,9 +1778,37 @@ Return ONLY valid JSON: {"status": "Compliant"|"Non-Compliant"|"Needs Clarificat
         }
       }
       state.eligibilityCompliance[bidder.id] = complianceResults;
-      render();
 
-      // --- Part B: Marks-based technical scoring against the real rubric ---
+      // Recompute consensus using whatever technical scoring already exists
+      // (may be empty if technical scoring hasn't been run yet) so the
+      // summary panel reflects the eligibility result immediately.
+      const existingScoring = state.scoringResults[bidder.id] || [];
+      updateConsensus(bidder, complianceResults, existingScoring);
+
+      const allCompliant = complianceResults.every(r => r.status === 'Compliant');
+      log(`${bidder.name}: eligibility ${allCompliant ? 'all compliant' : 'flagged for manual check (may be OCR error)'}`);
+      render();
+    }
+  } catch(err){
+    log('Eligibility check failed: ' + err.message);
+  }
+  clearProcessing();
+}
+
+// Standalone technical scoring — uses the exact scoring criteria extracted
+// in Stage 5 (state.scoringCriteria) against each bidder's submitted text,
+// independent of the eligibility check. Can be run before, after, or without
+// ever running the eligibility check; the consensus panel reflects whatever
+// combination of the two has been run so far.
+async function runTechnicalScoring(){
+  const btn = document.getElementById('techScoreBtn');
+  if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Scoring…'; }
+  setProcessing(7);
+  try{
+    for(const bidder of state.bidders){
+      const bidText = (bidder.technicalText || '') + '\n\n' + (bidder.financialText || '');
+      log(`${bidder.name}: scoring against ${state.scoringCriteria.length} technical criteria from Stage 5`);
+
       const scoringResults = [];
       for(const crit of state.scoringCriteria){
         if(crit.requiresLiveAssessment){
@@ -1771,65 +1845,22 @@ Return ONLY valid JSON: {"marksAwarded": number, "justification": "...", "eviden
       }
       state.scoringResults[bidder.id] = scoringResults;
 
-      // --- Consensus summary ---
-      // This evaluation stage happens BEFORE the presentation, so the invitation
-      // decision can only be based on what's actually scoreable right now — the
-      // docs-based technical criteria (e.g. 70 of the 100 grand-total marks).
-      // Percentage is therefore against docs-only max, matching the real gate:
-      // "does this bidder clear the minimum % on document-assessable technical
-      // criteria to be invited to present?" — not the full 100 (which doesn't
-      // exist yet since presentation hasn't happened).
-      //
-      // Eligibility is informational, NOT a gate: technical scoring always runs
-      // regardless of eligibility outcome, since an eligibility "Non-Compliant"
-      // reading can itself be an OCR/extraction misread rather than a genuine
-      // disqualification — it's flagged for manual verification, never used to
-      // block or skip the technical pass.
-      const allEligibleCompliant = complianceResults.every(r => r.status === 'Compliant');
-      const eligibilityFlagged = complianceResults.some(r => r.status !== 'Compliant');
-      const docsAssessable = scoringResults.filter(r => !r.requiresLiveAssessment);
-      const liveOnly = scoringResults.filter(r => r.requiresLiveAssessment);
-      const docsAwarded = docsAssessable.reduce((s,r)=>s+(r.marksAwarded||0),0);
-      const docsMax = docsAssessable.reduce((s,r)=>s+(r.maxMarks||0),0) || 1;
-      const liveMax = liveOnly.reduce((s,r)=>s+(r.maxMarks||0),0);
-      const grandMax = docsMax + liveMax;
-      const docsPct = (docsAwarded/docsMax)*100; // % of docs-only max — the actual presentation-invitation gate
-      const invitedToPresentation = state.selectionMethod.qualifyingThresholdPct
-        ? docsPct >= state.selectionMethod.qualifyingThresholdPct
-        : null; // unknown if no threshold was extracted
+      // Recompute consensus using whatever eligibility compliance already
+      // exists (may be empty if the eligibility check hasn't been run yet).
+      const existingCompliance = state.eligibilityCompliance[bidder.id] || [];
+      updateConsensus(bidder, existingCompliance, scoringResults);
 
-      // Separate, stricter check: the qualifying threshold for financial bid opening
-      // is applied to the FULL grand total (docs + presentation). Even a bidder who
-      // clears the docs-based invitation gate could still be mathematically unable
-      // to reach that final threshold — if their docs score is low enough that even
-      // a perfect presentation score wouldn't make up the gap, it's worth flagging
-      // now rather than discovering it only after the presentation is held.
-      let canMathematicallyReachThreshold = null;
-      let bestCaseGrandPct = null;
-      let marksShortEvenWithFullPresentation = null;
-      if(state.selectionMethod.qualifyingThresholdPct){
-        const thresholdMarksNeeded = (state.selectionMethod.qualifyingThresholdPct/100) * grandMax;
-        const bestCaseTotal = docsAwarded + liveMax; // assuming full marks in presentation
-        bestCaseGrandPct = (bestCaseTotal/grandMax)*100;
-        canMathematicallyReachThreshold = bestCaseTotal >= thresholdMarksNeeded;
-        if(!canMathematicallyReachThreshold){
-          marksShortEvenWithFullPresentation = (thresholdMarksNeeded - bestCaseTotal);
-        }
-      }
-
-      state.consensus[bidder.id] = {
-        allEligibleCompliant, eligibilityFlagged, docsAwarded, docsMax, docsPct, liveMax, grandMax,
-        invitedToPresentation, canMathematicallyReachThreshold, bestCaseGrandPct, marksShortEvenWithFullPresentation,
-        needsReview: eligibilityFlagged || canMathematicallyReachThreshold === false,
-      };
-      log(`Evaluated ${bidder.name}: eligibility ${allEligibleCompliant?'compliant':'flagged for manual check (may be OCR error)'}, docs-based technical ${docsAwarded}/${docsMax} (${docsPct.toFixed(1)}%)${invitedToPresentation!==null ? ` — ${invitedToPresentation ? 'CLEARS' : 'does not clear'} presentation threshold` : ''}${canMathematicallyReachThreshold === false ? ` — CANNOT reach financial-opening threshold even with full presentation marks (short by ${marksShortEvenWithFullPresentation.toFixed(1)})` : ''}`);
+      const consensusNow = state.consensus[bidder.id];
+      log(`${bidder.name}: docs-based technical ${consensusNow.docsAwarded}/${consensusNow.docsMax} (${consensusNow.docsPct.toFixed(1)}%)${consensusNow.invitedToPresentation!==null ? ` — ${consensusNow.invitedToPresentation ? 'CLEARS' : 'does not clear'} presentation threshold` : ''}`);
       render();
     }
   } catch(err){
-    log('Evaluation run failed: ' + err.message);
+    log('Technical scoring failed: ' + err.message);
   }
   clearProcessing();
 }
+
+
 
 /* ============================================================
    STAGE 8 — Generate Report (LLM light + Excel export)
