@@ -55,11 +55,11 @@ const PROVIDER_DEFAULT_MODEL = {
 const TASKS = {
   ocr:           { provider: 'gemini',   model: 'gemini-2.0-flash' },
   extract:       { provider: 'gemini',   model: 'gemini-2.0-flash' },
-  chat:          { provider: 'gemini',   model: 'gemini-2.0-flash' },
-  eligibility:   { provider: 'gemini',   model: 'gemini-2.0-flash' },
+  chat:          { provider: 'groq',     model: 'llama-3.3-70b-versatile' },
+  eligibility:   { provider: 'groq',     model: 'llama-3.3-70b-versatile' },
   compare:       { provider: 'gemini',   model: 'gemini-2.0-flash' },
   evaluate:      { provider: 'gemini',   model: 'gemini-2.0-flash' },
-  report:        { provider: 'gemini',   model: 'gemini-2.0-flash' },
+  report:        { provider: 'groq',     model: 'llama-3.3-70b-versatile' },
 };
 
 // The order to try OTHER providers in, if the task's preferred provider
