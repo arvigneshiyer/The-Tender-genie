@@ -1,13 +1,13 @@
 // /api/ai.js
 // AI API for The Tender Genie
-// Handles Groq, Gemini, Cerebras, OpenRouter with 5 keys each
-// NOW WITH CROSS-PROVIDER FALLBACKS
+// Handles Groq, Gemini, Cerebras, OpenRouter, Mistral, Cloudflare Workers AI
+// — each with multiple keys, cross-provider fallback chains.
 
 export const config = {
   runtime: 'edge',
 };
 
-// ====== YOUR API KEYS (5 per provider) ======
+// ====== YOUR API KEYS (multiple per provider, round-robin) ======
 const KEYS = {
   groq: [
     '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',
@@ -37,11 +37,31 @@ const KEYS = {
     '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',
     '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',
   ],
+  mistral: [
+    'gzF3MyqrkjTIQUbNZ5ux6BaYcES9iG8h',
+    'rjYDJoOyAZCFbZybirKfx3rDqFksqnYG',
+    '431qLJk4lwQYSxLQ6qnNxCZBmnD3bR3g',
+    'q4aMLfI87stAKGNWHGv4j8xYaQW698u7',
+    'ulB3d0lOeYDlPzb1nmfrrDj1UoynJDlp',
+  ],
+  cloudflare: [
+    'cfat_ZIbWSZYxpraGDw8VAYJg4CelU4iwH9LRFbqmMftQ92858ae6',
+    'cfat_ZA16ggUANQceHLYVRyfGjg6d23hPDfat6xHejiYz2aaf2ca2',
+    'cfat_QMDzYxWC2IPVU04EwFmFWxDDGe7R86eSkTitq7eO62429a7a',
+    'cfat_Q4KMVm5oa0wM41pLjSKvXvioENveaG1u8tbXVUZ6b6602720',
+    'cfat_Qs3wlEnJsw0qW5DE1pke3xNLRgthHdH5WycK4HIu060a258d',
+  ],
 };
 
+// Cloudflare Workers AI requires an Account ID in the URL path, not just a
+// token. Fill this in — find it in the Cloudflare dashboard (top-right on
+// any page, or Workers & Pages -> Overview).
+const CLOUDFLARE_ACCOUNT_ID = 'PASTE_YOUR_CLOUDFLARE_ACCOUNT_ID_HERE';
+
 // ====== TASK CONFIGURATION WITH FALLBACKS ======
-// Each task has a primary provider and an optional list of fallback providers.
-// If the primary fails (all 5 keys exhausted), it tries fallbacks in order.
+// Each task has a primary provider and an ordered list of fallback providers.
+// If the primary fails (all keys exhausted / rate-limited), it tries
+// fallbacks in order until one succeeds or all are exhausted.
 const TASKS = {
   ocr: {
     primary:   { provider: 'gemini',   model: 'gemini-2.0-flash' },
@@ -52,45 +72,55 @@ const TASKS = {
     fallbacks: [],
   },
   chat: {
-    primary:   { provider: 'groq',     model: 'llama-3.3-70b-versatile' },
+    primary:   { provider: 'groq',       model: 'llama-3.3-70b-versatile' },
     fallbacks: [
       { provider: 'cerebras',   model: 'llama-3.3-70b' },
+      { provider: 'mistral',    model: 'mistral-small-latest' },
       { provider: 'openrouter', model: 'deepseek/deepseek-r1:free' },
+      { provider: 'cloudflare', model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast' },
       { provider: 'gemini',     model: 'gemini-2.0-flash' },
     ],
   },
   eligibility: {
-    primary:   { provider: 'groq',     model: 'llama-3.3-70b-versatile' },
+    primary:   { provider: 'groq',       model: 'llama-3.3-70b-versatile' },
     fallbacks: [
       { provider: 'cerebras',   model: 'llama-3.3-70b' },
+      { provider: 'mistral',    model: 'mistral-small-latest' },
       { provider: 'openrouter', model: 'deepseek/deepseek-r1:free' },
+      { provider: 'cloudflare', model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast' },
       { provider: 'gemini',     model: 'gemini-2.0-flash' },
     ],
   },
   compare: {
     primary:   { provider: 'gemini',   model: 'gemini-2.0-flash' },
-    fallbacks: [],
+    fallbacks: [
+      { provider: 'mistral', model: 'mistral-small-latest' },
+    ],
   },
   evaluate: {
     primary:   { provider: 'gemini',   model: 'gemini-2.0-flash' },
-    fallbacks: [],
+    fallbacks: [
+      { provider: 'mistral', model: 'mistral-small-latest' },
+    ],
   },
   report: {
-    primary:   { provider: 'groq',     model: 'llama-3.3-70b-versatile' },
+    primary:   { provider: 'groq',       model: 'llama-3.3-70b-versatile' },
     fallbacks: [
       { provider: 'cerebras',   model: 'llama-3.3-70b' },
+      { provider: 'mistral',    model: 'mistral-small-latest' },
       { provider: 'openrouter', model: 'deepseek/deepseek-r1:free' },
+      { provider: 'cloudflare', model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast' },
       { provider: 'gemini',     model: 'gemini-2.0-flash' },
     ],
   },
 };
 
-// Track which key to use next (round-robin)
-let keyIndex = { groq: 0, gemini: 0, cerebras: 0, openrouter: 0 };
+// Track which key to use next per provider (round-robin)
+let keyIndex = { groq: 0, gemini: 0, cerebras: 0, openrouter: 0, mistral: 0, cloudflare: 0 };
 
 // ====== MAIN FUNCTION ======
 export default async function handler(req) {
-  
+
   // Allow browser to call this API
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*' } });
@@ -118,7 +148,7 @@ export default async function handler(req) {
 
     // Get task configuration
     const taskConfig = TASKS[task];
-    
+
     // Build list of providers to try: primary + fallbacks
     const providersToTry = [taskConfig.primary, ...(taskConfig.fallbacks || [])];
 
@@ -126,9 +156,9 @@ export default async function handler(req) {
     const result = await tryProviders(providersToTry, messages, body.temperature, body.max_tokens);
 
     if (!result.success) {
-      return json({ 
-        error: 'All providers failed for task: ' + task, 
-        details: result.error 
+      return json({
+        error: 'All providers failed for task: ' + task,
+        details: result.error
       }, 503);
     }
 
@@ -155,16 +185,16 @@ async function tryProviders(providers, messages, temperature, maxTokens) {
   for (let i = 0; i < providers.length; i++) {
     const config = providers[i];
     const isFallback = i > 0;
-    
+
     try {
       const result = await tryWithFallback(
-        config.provider, 
-        config.model, 
-        messages, 
-        temperature, 
+        config.provider,
+        config.model,
+        messages,
+        temperature,
         maxTokens
       );
-      
+
       if (result.success) {
         return {
           success: true,
@@ -184,26 +214,26 @@ async function tryProviders(providers, messages, temperature, maxTokens) {
       // Continue to next provider
     }
   }
-  
+
   return { success: false, error: allErrors.join(' | ') };
 }
 
 // ====== TRY KEYS ONE BY ONE (for a single provider) ======
 async function tryWithFallback(provider, model, messages, temperature, maxTokens) {
   const keyList = KEYS[provider];
-  
+
   if (!keyList || keyList.length === 0) {
     return { success: false, error: 'No keys found for provider: ' + provider };
   }
-  
+
   const keyErrors = [];
   for (let i = 0; i < keyList.length; i++) {
     // Pick next key in rotation
     const idx = keyIndex[provider] % keyList.length;
     keyIndex[provider] = (keyIndex[provider] + 1) % keyList.length;
-    
+
     const key = keyList[idx];
-    
+
     try {
       const result = await callProvider(provider, key, model, messages, temperature, maxTokens);
       if (result) {
@@ -216,13 +246,13 @@ async function tryWithFallback(provider, model, messages, temperature, maxTokens
       // Try next key
     }
   }
-  
+
   return { success: false, error: '[' + keyErrors.join(', ') + ']' };
 }
 
 // ====== CALL THE ACTUAL AI PROVIDER ======
 async function callProvider(provider, key, model, messages, temperature, maxTokens) {
-  
+
   // --- GROQ ---
   if (provider === 'groq') {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -238,7 +268,7 @@ async function callProvider(provider, key, model, messages, temperature, maxToke
         max_tokens: maxTokens || 4096,
       }),
     });
-    
+
     if (!res.ok) {
       const bodyText = await safeReadBody(res);
       throw new Error('Groq HTTP ' + res.status + ' - ' + bodyText);
@@ -250,7 +280,7 @@ async function callProvider(provider, key, model, messages, temperature, maxToke
   // --- GEMINI ---
   if (provider === 'gemini') {
     const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + key;
-    
+
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -265,7 +295,7 @@ async function callProvider(provider, key, model, messages, temperature, maxToke
         },
       }),
     });
-    
+
     if (!res.ok) {
       const bodyText = await safeReadBody(res);
       throw new Error('Gemini HTTP ' + res.status + ' - ' + bodyText);
@@ -289,7 +319,7 @@ async function callProvider(provider, key, model, messages, temperature, maxToke
         max_tokens: maxTokens || 4096,
       }),
     });
-    
+
     if (!res.ok) {
       const bodyText = await safeReadBody(res);
       throw new Error('Cerebras HTTP ' + res.status + ' - ' + bodyText);
@@ -315,13 +345,73 @@ async function callProvider(provider, key, model, messages, temperature, maxToke
         max_tokens: maxTokens || 4096,
       }),
     });
-    
+
     if (!res.ok) {
       const bodyText = await safeReadBody(res);
       throw new Error('OpenRouter HTTP ' + res.status + ' - ' + bodyText);
     }
     const data = await res.json();
     return data.choices[0].message.content;
+  }
+
+  // --- MISTRAL --- (OpenAI-compatible chat completions shape)
+  if (provider === 'mistral') {
+    const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + key,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: model || 'mistral-small-latest',
+        messages: messages,
+        temperature: temperature || 0.3,
+        max_tokens: maxTokens || 4096,
+      }),
+    });
+
+    if (!res.ok) {
+      const bodyText = await safeReadBody(res);
+      throw new Error('Mistral HTTP ' + res.status + ' - ' + bodyText);
+    }
+    const data = await res.json();
+    return data.choices[0].message.content;
+  }
+
+  // --- CLOUDFLARE WORKERS AI ---
+  // Different shape from the others: model name goes in the URL path, and
+  // the request body uses a "messages" field directly (no wrapping needed
+  // for chat-style models), but the response shape is { result: { response } }
+  // rather than an OpenAI-style choices array.
+  if (provider === 'cloudflare') {
+    if (!CLOUDFLARE_ACCOUNT_ID || CLOUDFLARE_ACCOUNT_ID.startsWith('PASTE_')) {
+      throw new Error('Cloudflare account ID not configured — set CLOUDFLARE_ACCOUNT_ID in ai.js');
+    }
+    const modelPath = model || '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+    const url = 'https://api.cloudflare.com/client/v4/accounts/' + CLOUDFLARE_ACCOUNT_ID + '/ai/run/' + modelPath;
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + key,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messages: messages,
+        temperature: temperature || 0.3,
+        max_tokens: maxTokens || 4096,
+      }),
+    });
+
+    if (!res.ok) {
+      const bodyText = await safeReadBody(res);
+      throw new Error('Cloudflare HTTP ' + res.status + ' - ' + bodyText);
+    }
+    const data = await res.json();
+    if (!data.success) {
+      throw new Error('Cloudflare error: ' + JSON.stringify(data.errors || data));
+    }
+    return data.result.response;
   }
 
   throw new Error('Unknown provider: ' + provider);
@@ -332,8 +422,6 @@ async function callProvider(provider, key, model, messages, temperature, maxToke
 async function safeReadBody(res) {
   try {
     const text = await res.text();
-    // Truncate to keep responses compact; provider error bodies are usually
-    // short JSON like {"error":{"message":"...","code":429}}
     return text.length > 300 ? text.slice(0, 300) + '...' : text;
   } catch (e) {
     return '(could not read response body)';
