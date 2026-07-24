@@ -1020,7 +1020,7 @@ async function runEligibilityExtraction(){
   setProcessing(4);
   try{
     const fullText = combinedEligibilitySourceText();
-    const chunks = chunkText(fullText, 6000, 500);
+    const chunks = chunkText(fullText, 4000, 400);
     const hasCorr = !!(state.corrigendumFiles[0] && state.corrigendumFiles[0]._text);
     log(`Document split into ${chunks.length} chunk(s) for eligibility scan${hasCorr ? ' (RFP + corrigendum)' : ' (RFP only)'}`);
 
@@ -1056,7 +1056,7 @@ Return ONLY valid JSON: an array of objects as described above.
 Excerpt:
 """${chunks[i]}"""`;
       try{
-        const raw = await callAI('eligibility', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:2000});
+        const raw = await callAI('eligibility', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:4000});
         const parsed = safeParseJsonArray(raw);
         merged = merged.concat(parsed);
         log(`Chunk ${i+1}/${chunks.length}: ${parsed.length} criteria found`);
@@ -1139,7 +1139,7 @@ async function runScoringCriteriaExtraction(){
   setProcessing(5);
   try{
     const fullText = combinedEligibilitySourceText();
-    const chunks = chunkText(fullText, 6000, 500);
+    const chunks = chunkText(fullText, 4000, 400);
     log(`Scanning ${chunks.length} chunk(s) for the marks-based evaluation/scoring rubric`);
 
     let merged = [];
@@ -1168,7 +1168,7 @@ Return ONLY valid JSON: an array of objects as described. If neither a genuine t
 Excerpt:
 """${chunks[i]}"""`;
       try{
-        const raw = await callAI('eligibility', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:2000});
+        const raw = await callAI('eligibility', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:4000});
         const parsed = safeParseJsonArray(raw);
         merged = merged.concat(parsed);
         log(`Chunk ${i+1}/${chunks.length}: ${parsed.length} scoring item(s) found`);
@@ -1918,7 +1918,36 @@ function safeParseJsonArray(raw){
     // try to find a JSON array substring
     const m = cleaned.match(/\[[\s\S]*\]/);
     if(m){ try{ return JSON.parse(m[0]); } catch(e2){} }
-    throw new Error('Could not parse LLM JSON response');
+
+    // Response was likely truncated mid-array (hit the token limit) — rather
+    // than lose every row in this chunk, salvage whichever leading objects are
+    // complete by progressively trimming back to the last balanced "},ZERO_OR_MORE_WHITESPACE"
+    // boundary and closing the array there.
+    const arrayStart = cleaned.indexOf('[');
+    if(arrayStart !== -1){
+      let candidate = cleaned.slice(arrayStart);
+      // Strip a trailing partial object (no closing brace) if present
+      let lastGoodEnd = -1;
+      let depth = 0;
+      for(let i = 0; i < candidate.length; i++){
+        if(candidate[i] === '{') depth++;
+        else if(candidate[i] === '}'){
+          depth--;
+          if(depth === 0) lastGoodEnd = i; // end of a complete top-level object
+        }
+      }
+      if(lastGoodEnd !== -1){
+        const salvaged = candidate.slice(0, lastGoodEnd + 1) + ']';
+        try{
+          const parsed = JSON.parse(salvaged);
+          if(Array.isArray(parsed) && parsed.length){
+            log(`Response appears truncated — salvaged ${parsed.length} complete row(s) instead of losing the whole chunk`);
+            return parsed; // partial recovery — better than losing the whole chunk
+          }
+        } catch(e3){}
+      }
+    }
+    throw new Error('Could not parse LLM JSON response (possibly truncated)');
   }
 }
 
