@@ -1020,7 +1020,7 @@ async function runEligibilityExtraction(){
   setProcessing(4);
   try{
     const fullText = combinedEligibilitySourceText();
-    const chunks = chunkText(fullText, 4000, 400);
+    const chunks = chunkText(fullText, 6000, 500);
     const hasCorr = !!(state.corrigendumFiles[0] && state.corrigendumFiles[0]._text);
     log(`Document split into ${chunks.length} chunk(s) for eligibility scan${hasCorr ? ' (RFP + corrigendum)' : ' (RFP only)'}`);
 
@@ -1028,30 +1028,24 @@ async function runEligibilityExtraction(){
     // merge results, then dedupe near-identical criteria.
     let merged = [];
     for(let i=0; i<chunks.length; i++){
-      const prompt = `You are extracting rows from a tender document's ELIGIBILITY CRITERIA TABLE. This is chunk ${i+1} of ${chunks.length} of a tender document (which may include both the original RFP and a later corrigendum that can amend/override RFP clauses). Only extract what's actually present here, don't guess at missing chunks.
+      const prompt = `You are extracting BIDDER ELIGIBILITY / QUALIFICATION criteria from a tender document — the specific pass/fail conditions a bidder's firm must meet to be considered eligible to bid. This is chunk ${i+1} of ${chunks.length} of a tender document (which may include both the original RFP and a later corrigendum that can amend/override RFP clauses). Only extract what's actually present here, don't guess at missing chunks.
 
-MOST IMPORTANT RULE: Most tenders present eligibility criteria as ONE literal table or numbered list under a heading that literally contains the word "Eligibility" — e.g. "Eligibility Criteria", "Eligibility Conditions", "Eligibility and Evaluation criteria" (the eligibility PART of it). It usually has its own "#"/Sr. No. column and often a "Documentary proof to be submitted" column alongside it, and lists conditions the BIDDER'S FIRM must meet (turnover, registration, past project value, blacklisting declaration, etc.).
+STRICT SCOPE — only include criteria that determine whether a BIDDER (the firm/entity) qualifies: minimum annual turnover, years of experience, similar past project count/value, minimum net worth, registration/certification requirements (e.g. GST, PAN, incorporation), litigation/blacklisting/debarment declarations, non-performance declarations, ITR/tax filings, ESI/EPF compliance, bid processing fee and EMD submission. These commonly appear as a numbered table or list, often (but not always) under a heading containing "Eligibility" — but also extract them if they appear as a continuation of such a list without a repeated heading in this particular excerpt, as long as the content itself is clearly a bidder-firm qualification condition.
 
-CHUNK CONTINUITY — IMPORTANT: this document has been split into sequential overlapping chunks, and a long eligibility table can easily span two or more chunks. The heading itself ("Eligibility Criteria" etc.) may appear ONLY in an earlier chunk, not this one. If this excerpt does NOT show that heading but contains what looks like a CONTINUATION of a numbered eligibility list — rows about the bidder firm's turnover, past projects, legal registration, blacklisting/debarment declarations, non-performance declarations, ITR/tax filings, ESI/EPF, GST registration, or similar firm-level compliance items, especially if they carry serial numbers that continue a sequence (e.g. starting at 6, 7, 8...) — still extract them as eligibility criteria. Do not require the heading to be visible in every chunk; judge by whether the row's CONTENT matches genuine bidder-firm eligibility criteria, the same way it would if the heading were present.
+HARD EXCLUSION — DO NOT extract from a "Team", "Key Personnel", "Key Professionals", "Staffing", or similar section, even though it lists things like "minimum 10 years experience" or "Bachelor's Degree in Civil Engineering." That section describes the REQUIRED PROJECT TEAM/PERSONNEL the winning bidder must deploy for the assignment — it is part of the Terms of Reference / Scope of Work, not bidder eligibility. A row like "Team Leader — minimum 10 years, Bachelor's + Master's degree" is about a PERSON'S qualifications for a job role, not the BIDDER FIRM's eligibility to bid — always exclude it. Eligibility criteria describe the FIRM's turnover, registration, past projects, legal standing, tax compliance — not a named role's individual CV requirements.
 
-HARD EXCLUSION — DO NOT extract from a "Team", "Key Personnel", "Key Professionals", "Staffing", or similar section, even though it lists things like "minimum 10 years experience" or "Bachelor's Degree in Civil Engineering." That section describes the REQUIRED PROJECT TEAM/PERSONNEL the winning bidder must deploy for the assignment — it is part of the Terms of Reference / Scope of Work, not bidder eligibility. A row like "Team Leader — minimum 10 years, Bachelor's + Master's degree" is about a PERSON'S qualifications for a job role, not the BIDDER FIRM's eligibility to bid — always exclude it, even if it appears numbered or tabular. Eligibility criteria describe the FIRM's turnover, registration, past projects, legal standing, tax compliance — not a named role's individual CV requirements.
+Do NOT include: general scope-of-work descriptions, technical specifications of the deliverable itself, submission format/procedure instructions, definitions, payment terms, or timeline/schedule details. If a sentence describes what the WORK involves rather than what the BIDDER must have/prove, exclude it.
 
-If this excerpt contains a genuine eligibility table or a continuation of one (per the CHUNK CONTINUITY rule above), extract ONLY the rows literally printed, in the exact order they appear, and CAPTURE THE TABLE'S OWN PRINTED SERIAL NUMBER for each row exactly as shown — even if the table's own numbering repeats a number (e.g. two rows both numbered "1") or skips numbers (e.g. jumps from 3 straight to 6). Do not renumber, deduplicate by number, or "fix" the table's own numbering — reproduce it exactly as printed, since that is how it will be referenced later.
-
-Do NOT invent or add criteria from other parts of the document (scope of work, general instructions, definitions, submission procedure, team/staffing requirements) that are not literal rows of the eligibility table, even if they sound like qualifications. If neither a genuine eligibility table nor a plausible continuation of one appears in this excerpt, return [].
-
-Note: a row for "Bid Processing Fee & EMD Deposit" (or similar tender-fee/EMD submission compliance) commonly appears AS ITS OWN ROW inside the eligibility table itself — if the eligibility table includes it, extract it like any other row; do not skip it as "not a real qualification."
-
-For each row, capture:
+For each criterion found, capture:
 - description: the condition text as printed (may reference a documentary proof column too — include that briefly if present)
-- type: "mandatory" or "qualifying" — use "mandatory" unless the table itself distinguishes tiers/scoring
+- type: "mandatory" or "qualifying" — use "mandatory" unless the source itself distinguishes tiers/scoring
 - threshold: any numeric threshold stated (amount, years, count), or null
-- weight: a numeric weight only if the table states one, else null
-- originalNo: the table's own printed serial number for this row, as a string, exactly as shown (e.g. "1", "6", "10") — this may repeat or skip, that's expected and correct
+- weight: a numeric weight only if stated, else null
+- originalNo: the source's own printed serial number for this row, as a string, exactly as shown, if present (e.g. "1", "6", "10") — this may repeat or skip across rows, that's expected and correct; use null if the source has no numbering
 - sourcePage: the number from the nearest [PAGE N] or [CORR PAGE N] marker in the excerpt this row came from, if present (just the number)
 - sourceDoc: "Corrigendum" if it came from a [CORR PAGE N] marker, otherwise "RFP"
 
-Return ONLY valid JSON: an array of objects as described above.
+Return ONLY valid JSON: an array of objects as described. If no genuine bidder-eligibility criteria appear in this excerpt, return [].
 
 Excerpt:
 """${chunks[i]}"""`;
@@ -1139,7 +1133,7 @@ async function runScoringCriteriaExtraction(){
   setProcessing(5);
   try{
     const fullText = combinedEligibilitySourceText();
-    const chunks = chunkText(fullText, 4000, 400);
+    const chunks = chunkText(fullText, 6000, 500);
     log(`Scanning ${chunks.length} chunk(s) for the marks-based evaluation/scoring rubric`);
 
     let merged = [];
