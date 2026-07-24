@@ -794,8 +794,13 @@ function renderStage5(){
   const waiting = !state.tender.extractedText;
   return `
   <div class="card">
-    <h2>Stage 4 · Check Eligibility</h2>
-    <div class="sub">Runs automatically once the RFP (and corrigendum, if uploaded) are parsed — combines both, with corrigendum amendments taking precedence. Click any criterion's "View Page" to see the exact source page. Criteria are listed in the same serial order they appear in the source document.</div>
+    <div class="row" style="justify-content:space-between;align-items:flex-start;margin-top:0">
+      <div>
+        <h2>Stage 4 · Check Eligibility</h2>
+        <div class="sub">Runs automatically once the RFP (and corrigendum, if uploaded) are parsed — combines both, with corrigendum amendments taking precedence. Click any criterion's "View Page" to see the exact source page. Criteria are listed in the same serial order they appear in the source document.</div>
+      </div>
+      ${!waiting ? `<button class="secondary small" onclick="runEligibilityExtraction()" id="eligBtn" title="Run again if some criteria seem missing">🔄 Re-extract</button>` : ''}
+    </div>
 
     ${waiting ? `<div class="muted" style="margin-top:6px">Waiting for RFP upload (Stage 1)…</div>` : ''}
     ${state.eligibility.length ? `
@@ -821,8 +826,13 @@ function renderStageTechnical(){
   const waiting = !state.tender.extractedText;
   return `
   <div class="card">
-    <h2>Stage 5 · Technical Scoring Criteria</h2>
-    <div class="sub">The marks-based evaluation table (separate from pass/fail eligibility) — used in Stage 7 to score bidders against fixed max marks instead of a generic 0–100 guess. Criteria are listed in the same serial order they appear in the source document.</div>
+    <div class="row" style="justify-content:space-between;align-items:flex-start;margin-top:0">
+      <div>
+        <h2>Stage 5 · Technical Scoring Criteria</h2>
+        <div class="sub">The marks-based evaluation table (separate from pass/fail eligibility) — used in Stage 7 to score bidders against fixed max marks instead of a generic 0–100 guess. Criteria are listed in the same serial order they appear in the source document.</div>
+      </div>
+      ${!waiting ? `<button class="secondary small" onclick="runScoringCriteriaExtraction()" id="scoreCritBtn" title="Run again if some criteria seem missing">🔄 Re-extract</button>` : ''}
+    </div>
     ${waiting ? `<div class="muted" style="margin-top:6px">Waiting for RFP upload (Stage 1)…</div>` : ''}
     ${state.selectionMethod.method ? `
       <div class="kv">
@@ -962,17 +972,21 @@ function findNearestPageMarker(text, matchIndex){
 // via regex so the eligibility rows show actual numbers instead of a vague
 // "Form 6" reference.
 function extractFeeAndEmdFromDataSheet(fullText){
+  // PDF text extraction sometimes inserts stray whitespace inside a number when
+  // it crosses a table-cell boundary (e.g. "1,00,000" comes out as "1,0 0,000").
+  // Allow optional whitespace between digit groups, then strip it from the result.
+  const NUM = '([\\d](?:[\\d,]|\\s(?=[\\d,]))*\\d)';
   const feePatterns = [
-    /(?:Tender|Bid)\s*Processing\s*Fee\s*[:\-]?\s*(?:Rs\.?|INR|₹)\s*([\d,]+(?:\.\d+)?)/i,
-    /Processing\s*Fee\s*[:\-]?\s*(?:Rs\.?|INR|₹)\s*([\d,]+(?:\.\d+)?)/i,
+    new RegExp(`(?:Tender|Bid)\\s*Processing\\s*Fee\\s*[:\\-]?\\s*(?:Rs\\.?|INR|₹)\\s*${NUM}`, 'i'),
+    new RegExp(`Processing\\s*Fee\\s*[:\\-]?\\s*(?:Rs\\.?|INR|₹)\\s*${NUM}`, 'i'),
   ];
   const emdPatterns = [
-    /Earnest\s*Money\s*Deposit\s*[:\-]?\s*(?:Rs\.?|INR|₹)\s*([\d,]+(?:\.\d+)?)/i,
-    /\bEMD\b\s*[:\-]?\s*(?:Rs\.?|INR|₹)\s*([\d,]+(?:\.\d+)?)/i,
+    new RegExp(`Earnest\\s*Money\\s*Deposit\\s*[:\\-]?\\s*(?:Rs\\.?|INR|₹)\\s*${NUM}`, 'i'),
+    new RegExp(`\\bEMD\\b\\s*[:\\-]?\\s*(?:Rs\\.?|INR|₹)\\s*${NUM}`, 'i'),
   ];
   let fee = null, feeIdx = -1, emd = null, emdIdx = -1;
-  for(const re of feePatterns){ const m = fullText.match(re); if(m){ fee = m[1]; feeIdx = m.index; break; } }
-  for(const re of emdPatterns){ const m = fullText.match(re); if(m){ emd = m[1]; emdIdx = m.index; break; } }
+  for(const re of feePatterns){ const m = fullText.match(re); if(m){ fee = m[1].replace(/\s+/g,''); feeIdx = m.index; break; } }
+  for(const re of emdPatterns){ const m = fullText.match(re); if(m){ emd = m[1].replace(/\s+/g,''); emdIdx = m.index; break; } }
   return {
     fee, feeSource: feeIdx >= 0 ? findNearestPageMarker(fullText, feeIdx) : null,
     emd, emdSource: emdIdx >= 0 ? findNearestPageMarker(fullText, emdIdx) : null,
@@ -1018,11 +1032,13 @@ async function runEligibilityExtraction(){
 
 MOST IMPORTANT RULE: Most tenders present eligibility criteria as ONE literal table or numbered list under a heading that literally contains the word "Eligibility" — e.g. "Eligibility Criteria", "Eligibility Conditions", "Eligibility and Evaluation criteria" (the eligibility PART of it). It usually has its own "#"/Sr. No. column and often a "Documentary proof to be submitted" column alongside it, and lists conditions the BIDDER'S FIRM must meet (turnover, registration, past project value, blacklisting declaration, etc.).
 
+CHUNK CONTINUITY — IMPORTANT: this document has been split into sequential overlapping chunks, and a long eligibility table can easily span two or more chunks. The heading itself ("Eligibility Criteria" etc.) may appear ONLY in an earlier chunk, not this one. If this excerpt does NOT show that heading but contains what looks like a CONTINUATION of a numbered eligibility list — rows about the bidder firm's turnover, past projects, legal registration, blacklisting/debarment declarations, non-performance declarations, ITR/tax filings, ESI/EPF, GST registration, or similar firm-level compliance items, especially if they carry serial numbers that continue a sequence (e.g. starting at 6, 7, 8...) — still extract them as eligibility criteria. Do not require the heading to be visible in every chunk; judge by whether the row's CONTENT matches genuine bidder-firm eligibility criteria, the same way it would if the heading were present.
+
 HARD EXCLUSION — DO NOT extract from a "Team", "Key Personnel", "Key Professionals", "Staffing", or similar section, even though it lists things like "minimum 10 years experience" or "Bachelor's Degree in Civil Engineering." That section describes the REQUIRED PROJECT TEAM/PERSONNEL the winning bidder must deploy for the assignment — it is part of the Terms of Reference / Scope of Work, not bidder eligibility. A row like "Team Leader — minimum 10 years, Bachelor's + Master's degree" is about a PERSON'S qualifications for a job role, not the BIDDER FIRM's eligibility to bid — always exclude it, even if it appears numbered or tabular. Eligibility criteria describe the FIRM's turnover, registration, past projects, legal standing, tax compliance — not a named role's individual CV requirements.
 
-If this excerpt contains a genuine eligibility-heading table, extract ONLY the rows literally printed in that table, in the exact order they appear, and CAPTURE THE TABLE'S OWN PRINTED SERIAL NUMBER for each row exactly as shown — even if the table's own numbering repeats a number (e.g. two rows both numbered "1") or skips numbers (e.g. jumps from 3 straight to 6). Do not renumber, deduplicate by number, or "fix" the table's own numbering — reproduce it exactly as printed, since that is how it will be referenced later.
+If this excerpt contains a genuine eligibility table or a continuation of one (per the CHUNK CONTINUITY rule above), extract ONLY the rows literally printed, in the exact order they appear, and CAPTURE THE TABLE'S OWN PRINTED SERIAL NUMBER for each row exactly as shown — even if the table's own numbering repeats a number (e.g. two rows both numbered "1") or skips numbers (e.g. jumps from 3 straight to 6). Do not renumber, deduplicate by number, or "fix" the table's own numbering — reproduce it exactly as printed, since that is how it will be referenced later.
 
-Do NOT invent or add criteria from other parts of the document (scope of work, general instructions, definitions, submission procedure, team/staffing requirements) that are not literal rows of the eligibility-heading table, even if they sound like qualifications. If no genuine eligibility-heading table appears in this excerpt, return [].
+Do NOT invent or add criteria from other parts of the document (scope of work, general instructions, definitions, submission procedure, team/staffing requirements) that are not literal rows of the eligibility table, even if they sound like qualifications. If neither a genuine eligibility table nor a plausible continuation of one appears in this excerpt, return [].
 
 Note: a row for "Bid Processing Fee & EMD Deposit" (or similar tender-fee/EMD submission compliance) commonly appears AS ITS OWN ROW inside the eligibility table itself — if the eligibility table includes it, extract it like any other row; do not skip it as "not a real qualification."
 
@@ -1132,6 +1148,8 @@ async function runScoringCriteriaExtraction(){
 
 MOST IMPORTANT RULE: mirror the table exactly as printed. Each row typically has: a serial number, a "Criteria" cell (which itself contains the criterion name PLUS its full scoring rule — tiered marks, sub-weighted components, definitions like "Similar Projects shall mean...", all as one block of text, exactly like the source), a "Maximum Marks" cell, and a "Documents to be Submitted" cell. Reproduce the Criteria cell's full text faithfully — do not split tiers/sub-weights out into separate structured fields; keep them inline as the source presents them, since that is how this will be compared against a real filled-in evaluation report.
 
+CHUNK CONTINUITY — IMPORTANT: this document has been split into sequential overlapping chunks, and a long technical evaluation table can easily span two or more chunks. The table's heading may appear ONLY in an earlier chunk, not this one. If this excerpt does NOT show that heading but contains what looks like a CONTINUATION of the scoring table — rows with a criterion description, a marks value, and often a documents-to-submit reference, especially if serial numbers continue a sequence — still extract them. Do not require the heading to be visible in every chunk; judge by whether the row's shape and content matches a genuine scoring-table row.
+
 For each row found, capture:
 - description: the FULL "Criteria" cell text as printed — criterion name + its complete scoring rule (tiers, sub-weights, definitions) all together, exactly as the source presents it
 - maxMarks: the maximum marks/points for this row
@@ -1145,7 +1163,7 @@ HARD EXCLUSION — do not extract anything from a "Team", "Key Personnel", "Key 
 
 Also, if this chunk states the overall qualifying/minimum technical score (e.g. "minimum technical score of 70%") or the selection method (e.g. "L1", "QCBS 70:30", "80:20"), include ONE extra object: {"description": "SELECTION_METHOD", "maxMarks": null, "documentsRequired": null, "requiresLiveAssessment": false, "notes": "method=... ; qualifyingThresholdPct=..."}.
 
-Return ONLY valid JSON: an array of objects as described. If no genuine technical-evaluation-criteria table appears in this excerpt, return [].
+Return ONLY valid JSON: an array of objects as described. If neither a genuine technical-evaluation-criteria table nor a plausible continuation of one appears in this excerpt, return [].
 
 Excerpt:
 """${chunks[i]}"""`;
