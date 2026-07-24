@@ -1439,13 +1439,25 @@ async function runScoringCriteriaExtraction(){
     }
 
     // Same deterministic safety net as eligibility — strip anything that's really
-    // a Team/Key Personnel staffing row, not a genuine technical scoring criterion,
-    // regardless of what the model returned.
+    // a Team/Key Personnel STAFFING LIST leaking in (from the separate "Team"
+    // section elsewhere in the RFP), not a genuine technical scoring criterion.
+    // IMPORTANT: only apply this to rows with NO maxMarks value. A genuine
+    // scoring row like "Relevant Experience of the Key Personnel — 40 marks"
+    // legitimately lists role names (Team Leader, Structural Designer, etc.)
+    // as its own sub-marks breakdown, and always carries a real maxMarks value
+    // — the standalone Team/Personnel section table has no marks column at
+    // all, so a role name leaking from THAT table will have maxMarks null.
+    // Filtering on role-title text alone (regardless of maxMarks) wrongly
+    // strips legitimate scoring rows that merely mention role titles.
     const ROLE_TITLE_PATTERN_TECH = /\b(team leader|resident engineer|structural designer|construction (project )?management expert|site engineer|deputy team leader|assistant engineer)\b/i;
-    const filteredTech = deduped.filter(c => !ROLE_TITLE_PATTERN_TECH.test(c.description || ''));
+    const filteredTech = deduped.filter(c => {
+      const hasMarks = c.maxMarks !== null && c.maxMarks !== undefined && c.maxMarks !== '';
+      if(hasMarks) return true; // genuine scoring row — keep regardless of role-title mentions
+      return !ROLE_TITLE_PATTERN_TECH.test(c.description || '');
+    });
     const removedTechCount = deduped.length - filteredTech.length;
     if(removedTechCount > 0){
-      log(`Filtered out ${removedTechCount} row(s) that matched standalone Team/Key Personnel role-title patterns`);
+      log(`Filtered out ${removedTechCount} row(s) with no marks value that matched standalone Team/Key Personnel role-title patterns`);
     }
 
     state.scoringCriteria = filteredTech.map((c,i)=>({ id: 'score_'+(i+1), ...c }));
