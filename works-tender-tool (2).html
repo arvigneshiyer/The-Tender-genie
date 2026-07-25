@@ -40,7 +40,6 @@
 <div id="boot">
   <div class="boot-logo">🏗</div>
   <div class="boot-title">CIVIL WORKS<br>TENDER TOOL</div>
-  <div class="boot-sub">CPWD SBD · G.P.W. FORM-9</div>
   <div class="boot-bar"><div class="boot-fill"></div></div>
 </div>
 
@@ -5701,17 +5700,17 @@ var __async = (__this, __arguments, generator) => {
     function utf8CheckExtraBytes(self2, buf, p) {
       if ((buf[0] & 192) !== 128) {
         self2.lastNeed = 0;
-        return "�";
+        return " ";
       }
       if (self2.lastNeed > 1 && buf.length > 1) {
         if ((buf[1] & 192) !== 128) {
           self2.lastNeed = 1;
-          return "�";
+          return " ";
         }
         if (self2.lastNeed > 2 && buf.length > 2) {
           if ((buf[2] & 192) !== 128) {
             self2.lastNeed = 2;
-            return "�";
+            return " ";
           }
         }
       }
@@ -5740,7 +5739,7 @@ var __async = (__this, __arguments, generator) => {
     function utf8End(buf) {
       var r = buf && buf.length ? this.write(buf) : "";
       if (this.lastNeed)
-        return r + "�";
+        return r + " ";
       return r;
     }
     function utf16Text(buf, i) {
@@ -20196,6 +20195,7 @@ const SECTIONS = [
     title: "Issuing Authority",
     icon: "🏛",
     fields: [
+      { id: "orgProfilePicker",   label: "Saved Organization Profile",                  type: "orgprofilepicker", fullWidth: true },
       { id: "authorityName",      label: "Name of Authority / Department",              type: "text",     placeholder: "e.g. Public Works Department, Uttar Pradesh" },
       { id: "bidInvitingOfficer", label: "Designation of Bid Inviting Officer",         type: "text",     placeholder: "e.g. Senior Manager (Projects)" },
       { id: "authorityAddress",   label: "Full Address",                                type: "textarea", placeholder: "Plot No. 1, Knowledge Park IV, Greater Noida, Gautam Budh Nagar, Uttar Pradesh – 201308" },
@@ -20203,6 +20203,9 @@ const SECTIONS = [
       { id: "contactOfficer",     label: "Name & Designation of Contact Officer for Queries", type: "text", placeholder: "Shri ___, Senior Manager (Projects)" },
       { id: "contactEmail",       label: "Official Email for Queries",                  type: "text",     placeholder: "ee.pwd1@nashikkumbh.gov.in" },
       { id: "portalWebsite",      label: "e-Procurement Portal Website",                type: "text",     placeholder: "https://etender.up.nic.in" },
+      { id: "bankAccountNo",      label: "Bank Account No. (for EMD / Fee payment)",    type: "text",     placeholder: "XXXXXXXXXXXXXXXX" },
+      { id: "ifscCode",           label: "IFSC Code",                                   type: "text",     placeholder: "SBIN0XXXXXX" },
+      { id: "bankName",           label: "Bank Name & Branch",                          type: "text",     placeholder: "State Bank of India, Nashik Main Branch" },
     ],
   },
 
@@ -20234,9 +20237,6 @@ const SECTIONS = [
       { id: "asdThreshold",       label: "Additional Security Deposit — Trigger (quoted % below estimated cost)", type: "select", options: ["5% below","10% below","15% below","20% below"] },
       { id: "asdAmount",          label: "Additional Security Deposit — BG Amount", type: "select", options: ["5% of Contract Value","10% of Contract Value","50% of the differential amount","As assessed by Engineer-in-Charge"] },
       { id: "mseExemption",       label: "MSE / Startup Exemption on EMD & Fee",        type: "select",   options: ["Not allowed","Allowed as per Govt. of Maharashtra policy"] },
-      { id: "bankAccountNo",      label: "Bank Account No. (for EMD / Fee payment)",   type: "text",     placeholder: "XXXXXXXXXXXXXXXX" },
-      { id: "ifscCode",           label: "IFSC Code",                                   type: "text",     placeholder: "SBIN0XXXXXX" },
-      { id: "bankName",           label: "Bank Name & Branch",                          type: "text",     placeholder: "State Bank of India, Nashik Main Branch" },
     ],
   },
 
@@ -20284,6 +20284,9 @@ const SECTIONS = [
     title: "Bidding Schedule",
     icon: "📅",
     fields: [
+      { id: "tenderState",          label: "State (for Sunday / Holiday check)",        type: "select", options: ["Maharashtra", "Uttar Pradesh"] },
+      { id: "callSelection",        label: "Call",                                      type: "select", options: ["First Call", "Second Call", "Third Call"] },
+      { id: "preBidConferenceHeld", label: "Pre-Bid Conference Held? (First Call only — 21 days without, 28 days with)", type: "select", options: ["Yes", "No"] },
       { id: "tenderUploadDate",  label: "Tender Upload / Release Date",                 type: "datepicker" },
       { id: "queryLastDate",     label: "Last Date for Receiving Pre-bid Queries",      type: "datepicker" },
       { id: "preBidDate",        label: "Pre-Bid Conference Date",                      type: "datepicker" },
@@ -20768,91 +20771,184 @@ function EligibilityPreviewPanel({ estimatedCost, solvencyRequired, netWorthRequ
   );
 }
 
-// ── UP Public Holidays 2026 ──────────────────────────────────────────────────
+// ── Public Holidays 2026 — Uttar Pradesh & Maharashtra ──────────────────────
 const UP_HOLIDAYS_2026 = new Set([
-  "2026-01-01", // New Year's Day
-  "2026-01-03", // Hazrat Ali Jayanti
-  "2026-01-26", // Republic Day
-  "2026-02-15", // Maha Shivratri
-  "2026-03-03", // Holi
-  "2026-03-21", // Id-ul-Fitr
-  "2026-03-27", // Ram Navami
-  "2026-03-31", // Mahavir Jayanti
-  "2026-04-01", // Annual Closing of Accounts
-  "2026-04-03", // Good Friday
-  "2026-04-14", // Dr. B.R. Ambedkar Jayanti
-  "2026-05-01", // Buddha Purnima
-  "2026-05-27", // Bakrid / Eid al-Adha
-  "2026-06-26", // Muharram
-  "2026-08-15", // Independence Day
-  "2026-08-25", // Eid-e-Milad
-  "2026-08-28", // Raksha Bandhan
-  "2026-09-04", // Janmashtami
-  "2026-10-02", // Mahatma Gandhi Jayanti
-  "2026-10-20", // Maha Navami
-  "2026-10-21", // Vijaya Dashami / Dussehra
-  "2026-11-08", // Diwali
-  "2026-11-09", // Govardhan Puja / Deepavali Holiday
-  "2026-11-11", // Bhai Dooj
-  "2026-11-24", // Guru Nanak Jayanti
-  "2026-12-23", // Hazrat Ali Jayanti
-  "2026-12-25", // Christmas Day
+  "2026-01-01", "2026-01-03", "2026-01-26", "2026-02-15", "2026-03-03",
+  "2026-03-21", "2026-03-27", "2026-03-31", "2026-04-01", "2026-04-03",
+  "2026-04-14", "2026-05-01", "2026-05-27", "2026-06-26", "2026-08-15",
+  "2026-08-25", "2026-08-28", "2026-09-04", "2026-10-02", "2026-10-20",
+  "2026-10-21", "2026-11-08", "2026-11-09", "2026-11-11", "2026-11-24",
+  "2026-12-23", "2026-12-25",
 ]);
 
 const UP_HOLIDAY_NAMES = {
-  "2026-01-01": "New Year's Day",
-  "2026-01-03": "Hazrat Ali Jayanti",
-  "2026-01-26": "Republic Day",
-  "2026-02-15": "Maha Shivratri",
-  "2026-03-03": "Holi",
-  "2026-03-21": "Id-ul-Fitr",
-  "2026-03-27": "Ram Navami",
-  "2026-03-31": "Mahavir Jayanti",
-  "2026-04-01": "Annual Closing of Accounts",
-  "2026-04-03": "Good Friday",
-  "2026-04-14": "Dr. B.R. Ambedkar Jayanti",
-  "2026-05-01": "Buddha Purnima",
-  "2026-05-27": "Bakrid / Eid al-Adha",
-  "2026-06-26": "Muharram",
-  "2026-08-15": "Independence Day",
-  "2026-08-25": "Eid-e-Milad (Tentative)",
-  "2026-08-28": "Raksha Bandhan",
-  "2026-09-04": "Janmashtami",
-  "2026-10-02": "Mahatma Gandhi Jayanti",
-  "2026-10-20": "Maha Navami",
-  "2026-10-21": "Dussehra",
-  "2026-11-08": "Diwali",
-  "2026-11-09": "Govardhan Puja / Deepavali Holiday",
-  "2026-11-11": "Bhai Dooj",
-  "2026-11-24": "Guru Nanak Jayanti",
-  "2026-12-23": "Hazrat Ali Jayanti",
+  "2026-01-01": "New Year's Day", "2026-01-03": "Hazrat Ali Jayanti",
+  "2026-01-26": "Republic Day", "2026-02-15": "Maha Shivratri",
+  "2026-03-03": "Holi", "2026-03-21": "Id-ul-Fitr", "2026-03-27": "Ram Navami",
+  "2026-03-31": "Mahavir Jayanti", "2026-04-01": "Annual Closing of Accounts",
+  "2026-04-03": "Good Friday", "2026-04-14": "Dr. B.R. Ambedkar Jayanti",
+  "2026-05-01": "Buddha Purnima", "2026-05-27": "Bakrid / Eid al-Adha",
+  "2026-06-26": "Muharram", "2026-08-15": "Independence Day",
+  "2026-08-25": "Eid-e-Milad (Tentative)", "2026-08-28": "Raksha Bandhan",
+  "2026-09-04": "Janmashtami", "2026-10-02": "Mahatma Gandhi Jayanti",
+  "2026-10-20": "Maha Navami", "2026-10-21": "Dussehra", "2026-11-08": "Diwali",
+  "2026-11-09": "Govardhan Puja / Deepavali Holiday", "2026-11-11": "Bhai Dooj",
+  "2026-11-24": "Guru Nanak Jayanti", "2026-12-23": "Hazrat Ali Jayanti",
   "2026-12-25": "Christmas Day",
 };
+
+const MH_HOLIDAYS_2026 = new Set([
+  "2026-01-01", "2026-01-26", "2026-02-15", "2026-02-19", "2026-03-03",
+  "2026-03-19", "2026-03-21", "2026-03-26", "2026-03-31", "2026-04-03",
+  "2026-04-14", "2026-05-01", "2026-05-28", "2026-06-26", "2026-08-15",
+  "2026-08-26", "2026-09-14", "2026-10-02", "2026-10-20", "2026-11-09",
+  "2026-11-10", "2026-11-24", "2026-12-25",
+]);
+
+const MH_HOLIDAY_NAMES = {
+  "2026-01-01": "New Year's Day", "2026-01-26": "Republic Day",
+  "2026-02-15": "Mahashivratri", "2026-02-19": "Chhatrapati Shivaji Maharaj Jayanti",
+  "2026-03-03": "Holi (Second Day)", "2026-03-19": "Gudhi Padwa",
+  "2026-03-21": "Eid-ul-Fitr (Tentative)", "2026-03-26": "Ram Navami",
+  "2026-03-31": "Mahavir Janma Kalyanak", "2026-04-03": "Good Friday",
+  "2026-04-14": "Dr. B.R. Ambedkar Jayanti", "2026-05-01": "Maharashtra Din",
+  "2026-05-28": "Eid-ul-Adha / Bakri Eid (Tentative)", "2026-06-26": "Muharram (Tentative)",
+  "2026-08-15": "Independence Day", "2026-08-26": "Eid-e-Milad (Tentative)",
+  "2026-09-14": "Ganesh Chaturthi", "2026-10-02": "Mahatma Gandhi Jayanti",
+  "2026-10-20": "Dussehra (Vijayadashami)", "2026-11-09": "Diwali Amavasya (Lakshmi Pujan)",
+  "2026-11-10": "Diwali (Balipratipada)", "2026-11-24": "Guru Nanak Jayanti",
+  "2026-12-25": "Christmas Day",
+};
+
+const STATE_HOLIDAYS = { "Uttar Pradesh": UP_HOLIDAYS_2026, "Maharashtra": MH_HOLIDAYS_2026 };
+const STATE_HOLIDAY_NAMES = { "Uttar Pradesh": UP_HOLIDAY_NAMES, "Maharashtra": MH_HOLIDAY_NAMES };
 
 function toKey(y, m, d) {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
-function isBlocked(y, m, d) {
+function isBlocked(y, m, d, state) {
+  const st = state || "Uttar Pradesh";
+  const set = STATE_HOLIDAYS[st] || UP_HOLIDAYS_2026;
   const key = toKey(y, m, d);
   const dow = new Date(y, m, d).getDay();
-  return dow === 0 || UP_HOLIDAYS_2026.has(key);
+  return dow === 0 || set.has(key);
 }
-function blockReason(y, m, d) {
+function blockReason(y, m, d, state) {
+  const st = state || "Uttar Pradesh";
+  const set = STATE_HOLIDAYS[st] || UP_HOLIDAYS_2026;
+  const names = STATE_HOLIDAY_NAMES[st] || UP_HOLIDAY_NAMES;
   const key = toKey(y, m, d);
   const dow = new Date(y, m, d).getDay();
   if (dow === 0) return "Sunday";
-  if (UP_HOLIDAYS_2026.has(key)) return UP_HOLIDAY_NAMES[key];
+  if (set.has(key)) return names[key];
   return null;
+}
+function nextWorkingDay(y, m, d, state) {
+  let dt = new Date(y, m, d);
+  while (isBlocked(dt.getFullYear(), dt.getMonth(), dt.getDate(), state)) {
+    dt.setDate(dt.getDate() + 1);
+  }
+  return dt;
+}
+function previousWorkingDay(y, m, d, state) {
+  let dt = new Date(y, m, d);
+  while (isBlocked(dt.getFullYear(), dt.getMonth(), dt.getDate(), state)) {
+    dt.setDate(dt.getDate() - 1);
+  }
+  return dt;
+}
+function addDaysWorking(baseDt, days, state) {
+  const dt = new Date(baseDt.getTime());
+  dt.setDate(dt.getDate() + days);
+  return nextWorkingDay(dt.getFullYear(), dt.getMonth(), dt.getDate(), state);
+}
+function dateToISO(dt) {
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+}
+function isoToDate(s) {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// ── Saved Organization Profiles (multiple, keyed by Authority Name) ─────────
+const ORG_PROFILES_KEY = "worksTenderTool.orgProfiles.v1";
+const ORG_PROFILE_FIELDS = [
+  "authorityName", "bidInvitingOfficer", "authorityAddress", "authorityPhone",
+  "contactOfficer", "contactEmail", "portalWebsite",
+  "bankAccountNo", "ifscCode", "bankName",
+];
+function loadOrgProfiles() {
+  try {
+    const raw = localStorage.getItem(ORG_PROFILES_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) { return {}; }
+}
+function saveOrgProfiles(profiles) {
+  try { localStorage.setItem(ORG_PROFILES_KEY, JSON.stringify(profiles)); }
+  catch (e) { /* localStorage unavailable */ }
+}
+function upsertOrgProfile(data) {
+  const name = (data.authorityName || "").trim();
+  if (!name) return;
+  const profiles = loadOrgProfiles();
+  const profile = {};
+  ORG_PROFILE_FIELDS.forEach(k => { if (data[k]) profile[k] = data[k]; });
+  profiles[name] = profile;
+  saveOrgProfiles(profiles);
+}
+function deleteOrgProfile(name) {
+  const profiles = loadOrgProfiles();
+  delete profiles[name];
+  saveOrgProfiles(profiles);
+}
+
+// ── Call-based Bidding Schedule Auto-Computation ─────────────────────────────
+// First Call: 21 days (no pre-bid) / 28 days (with pre-bid). Second/Third Call: 15 days each.
+function computeBidSchedule(uploadISO, call, preBidHeld, state) {
+  if (!uploadISO) return {};
+  const upload = isoToDate(uploadISO);
+  const st = state || "Uttar Pradesh";
+  const isFirstCall = (call || "First Call") === "First Call";
+  const includePreBid = isFirstCall && (preBidHeld !== "No");
+  const days = isFirstCall ? (includePreBid ? 28 : 21) : 15;
+
+  const bidStart = nextWorkingDay(upload.getFullYear(), upload.getMonth(), upload.getDate(), st);
+  const pdd = addDaysWorking(upload, days, st);
+  const techOpen = addDaysWorking(pdd, 1, st);
+
+  let preBidISO = "";
+  let queryLastISO;
+  if (includePreBid) {
+    const preBid = addDaysWorking(upload, 7, st);
+    const dayBefore = new Date(preBid.getTime());
+    dayBefore.setDate(dayBefore.getDate() - 1);
+    let queryLast = previousWorkingDay(dayBefore.getFullYear(), dayBefore.getMonth(), dayBefore.getDate(), st);
+    if (queryLast.getTime() < upload.getTime()) queryLast = nextWorkingDay(upload.getFullYear(), upload.getMonth(), upload.getDate(), st);
+    preBidISO = dateToISO(preBid);
+    queryLastISO = dateToISO(queryLast);
+  } else {
+    const queryLast = addDaysWorking(upload, Math.max(3, Math.floor(days / 3)), st);
+    queryLastISO = dateToISO(queryLast);
+  }
+
+  return {
+    bidStartDate: dateToISO(bidStart),
+    preBidDate: preBidISO,
+    queryLastDate: queryLastISO,
+    bidEndDate: dateToISO(pdd),
+    techOpenDate: dateToISO(techOpen),
+  };
 }
 
 // ── Date + Time Picker ────────────────────────────────────────────────────────
-function DatePickerField({ value, onChange }) {
+function DatePickerField({ value, onChange, state }) {
   const [open, setOpen] = useState(false);
   const [viewYear, setViewYear] = useState(2026);
   const [viewMonth, setViewMonth] = useState(5); // 0-indexed; default June 2026
   const [hour, setHour] = useState("11");
   const [minute, setMinute] = useState("00");
   const [selectedKey, setSelectedKey] = useState(null);
+  const [pendingConfirm, setPendingConfirm] = useState(null); // key awaiting override confirmation
   const wrapRef = useRef();
 
   // Parse existing value back into state on mount
@@ -20892,7 +20988,22 @@ function DatePickerField({ value, onChange }) {
 
   function selectDate(d) {
     const key = toKey(viewYear, viewMonth, d);
-    if (isBlocked(viewYear, viewMonth, d)) return;
+    if (isBlocked(viewYear, viewMonth, d, state)) {
+      if (pendingConfirm === key) {
+        // second click on the same blocked date = confirmed override
+        setPendingConfirm(null);
+        setSelectedKey(key);
+        const dd = String(d).padStart(2, "0");
+        const mo = String(viewMonth + 1).padStart(2, "0");
+        onChange(`${dd}/${mo}/${viewYear}, ${hour}:${minute} hrs IST`);
+        setOpen(false);
+      } else {
+        // first click = show warning, wait for confirmation
+        setPendingConfirm(key);
+      }
+      return;
+    }
+    setPendingConfirm(null);
     setSelectedKey(key);
     const dd = String(d).padStart(2, "0");
     const mo = String(viewMonth + 1).padStart(2, "0");
@@ -20970,8 +21081,9 @@ function DatePickerField({ value, onChange }) {
             {cells.map((d, i) => {
               if (!d) return <div key={`e${i}`} />;
               const key = toKey(viewYear, viewMonth, d);
-              const blocked = isBlocked(viewYear, viewMonth, d);
-              const reason = blockReason(viewYear, viewMonth, d);
+              const blocked = isBlocked(viewYear, viewMonth, d, state);
+              const reason = blockReason(viewYear, viewMonth, d, state);
+              const isPending = pendingConfirm === key;
               const isSelected = key === selectedKey;
               const isToday = key === todayKey;
               const isSunday = new Date(viewYear, viewMonth, d).getDay() === 0;
@@ -20979,17 +21091,17 @@ function DatePickerField({ value, onChange }) {
               return (
                 <div
                   key={d}
-                  title={blocked ? `Blocked: ${reason}` : ""}
+                  title={blocked ? (isPending ? `Click again to confirm: ${reason}` : `${reason} — click to override`) : ""}
                   onClick={() => selectDate(d)}
                   style={{
                     textAlign: "center", fontSize: 12, padding: "5px 2px",
-                    borderRadius: 6, cursor: blocked ? "not-allowed" : "pointer",
-                    fontWeight: isSelected || isToday ? 700 : 400,
-                    background: isSelected ? C.blue : blocked ? (isSunday ? "#FFF0F0" : "#FFF8F0") : "transparent",
-                    color: isSelected ? C.white : blocked ? (isSunday ? "#C0392B" : "#C49A2D") : C.text,
-                    border: isToday && !isSelected ? `1px solid ${C.blue}` : "1px solid transparent",
-                    textDecoration: blocked ? "line-through" : "none",
-                    opacity: blocked ? 0.6 : 1,
+                    borderRadius: 6, cursor: "pointer",
+                    fontWeight: isSelected || isToday || isPending ? 700 : 400,
+                    background: isSelected ? C.blue : isPending ? "#FDE8E8" : blocked ? (isSunday ? "#FFF0F0" : "#FFF8F0") : "transparent",
+                    color: isSelected ? C.white : isPending ? C.danger : blocked ? (isSunday ? "#C0392B" : "#C49A2D") : C.text,
+                    border: isPending ? `1.5px solid ${C.danger}` : (isToday && !isSelected ? `1px solid ${C.blue}` : "1px solid transparent"),
+                    textDecoration: blocked && !isPending ? "line-through" : "none",
+                    opacity: blocked && !isPending ? 0.6 : 1,
                     transition: "background .12s",
                   }}
                 >{d}</div>
@@ -20997,6 +21109,13 @@ function DatePickerField({ value, onChange }) {
             })}
           </div>
 
+          {pendingConfirm && (
+            <div style={{ marginTop: 8, padding: "8px 10px", background: "#FDE8E8", border: `1px solid ${C.danger}55`, borderRadius: 7, fontSize: 11, color: C.danger }}>
+              ⚠ This date is a {blockReason(
+                parseInt(pendingConfirm.split("-")[0]), parseInt(pendingConfirm.split("-")[1]) - 1, parseInt(pendingConfirm.split("-")[2]), state
+              )}. Click it once more to select it anyway.
+            </div>
+          )}
           {/* Legend */}
           <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10 }}>
@@ -21005,11 +21124,15 @@ function DatePickerField({ value, onChange }) {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10 }}>
               <div style={{ width: 10, height: 10, borderRadius: 2, background: "#FFF8F0", border: "1px solid #C49A2D44" }} />
-              <span style={{ color: C.muted }}>UP Holiday</span>
+              <span style={{ color: C.muted }}>Holiday</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10 }}>
               <div style={{ width: 10, height: 10, borderRadius: 2, background: C.blue }} />
               <span style={{ color: C.muted }}>Selected</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10 }}>
+              <div style={{ width: 10, height: 10, borderRadius: 2, background: "#FDE8E8", border: `1.5px solid ${C.danger}` }} />
+              <span style={{ color: C.muted }}>Click twice to override</span>
             </div>
           </div>
 
@@ -21053,6 +21176,63 @@ function DatePickerField({ value, onChange }) {
   );
 }
 
+function OrgProfilePickerField({ allData, onChangeField }) {
+  const [profiles, setProfiles] = useState(() => loadOrgProfiles());
+  const [selected, setSelected] = useState("");
+  const names = Object.keys(profiles).sort();
+  const base = {
+    width: "100%", padding: "9px 12px", fontSize: 13,
+    border: `1.5px solid ${C.border}`, borderRadius: 7,
+    background: C.white, color: C.text, fontFamily: "inherit",
+    outline: "none", boxSizing: "border-box",
+  };
+
+  function handleSelect(name) {
+    setSelected(name);
+    if (name && profiles[name]) {
+      const p = profiles[name];
+      ORG_PROFILE_FIELDS.forEach(k => {
+        if (p[k] !== undefined) onChangeField(k, p[k]);
+      });
+    }
+  }
+  function handleDelete() {
+    if (!selected) return;
+    deleteOrgProfile(selected);
+    setProfiles(loadOrgProfiles());
+    setSelected("");
+  }
+
+  const currentName = (allData.authorityName || "").trim();
+  const currentIsSaved = currentName && profiles[currentName];
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <select style={{ ...base, flex: 1, cursor: "pointer" }} value={selected}
+          onChange={e => handleSelect(e.target.value)}>
+          <option value="">{names.length ? "— Select a saved organization —" : "No saved organizations yet"}</option>
+          {names.map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+        {selected && (
+          <button onClick={handleDelete} style={{
+            fontSize: 12, padding: "0 12px", borderRadius: 7,
+            border: `1.5px solid ${C.danger}`, background: "transparent",
+            color: C.danger, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+          }}>Delete</button>
+        )}
+      </div>
+      <div style={{ marginTop: 6, fontSize: 11, color: C.muted }}>
+        {currentIsSaved
+          ? `✓ "${currentName}" is saved — editing the fields below updates this saved profile.`
+          : currentName
+            ? `"${currentName}" isn't saved yet — fill in the fields below and it will be saved automatically for next time.`
+            : "Pick a saved organization above, or type a new Authority Name below to start a new saved profile."}
+      </div>
+    </div>
+  );
+}
+
 function Field({ field, value, onChange, estimatedCost, allData, globalOnChange }) {
   const base = {
     width: "100%", padding: "9px 12px", fontSize: 13,
@@ -21064,7 +21244,10 @@ function Field({ field, value, onChange, estimatedCost, allData, globalOnChange 
   const focus = { borderColor: C.blue, boxShadow: `0 0 0 3px ${C.blue}22` };
 
   if (field.type === "datepicker")
-    return <DatePickerField value={value} onChange={onChange} />;
+    return <DatePickerField value={value} onChange={onChange} state={allData && allData.tenderState} />;
+
+  if (field.type === "orgprofilepicker")
+    return <OrgProfilePickerField allData={allData || {}} onChangeField={globalOnChange || onChange} />;
 
   if (field.type === "emd")
     return <EmdField value={value} onChange={onChange} estimatedCost={estimatedCost} />;
@@ -21309,7 +21492,7 @@ function SectionCard({ section, data, onChange, index }) {
             gap: "16px 20px",
           }}>
             {section.fields.map((f) => (
-              <div key={f.id} style={{ gridColumn: (f.type === "textarea" || f.type === "simwork" || f.type === "eligpreview" || f.type === "emd" || f.type === "tenderfee" || f.type === "turnover" || f.fullWidth) ? "1 / -1" : "auto" }}>
+              <div key={f.id} style={{ gridColumn: (f.type === "textarea" || f.type === "simwork" || f.type === "eligpreview" || f.type === "emd" || f.type === "tenderfee" || f.type === "turnover" || f.type === "orgprofilepicker" || f.fullWidth) ? "1 / -1" : "auto" }}>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600,
                   color: C.navyMid, marginBottom: 5, letterSpacing: ".02em" }}>
                   {f.label}
@@ -21341,7 +21524,22 @@ function TenderTool() {
   const overallPct = pct(filledFields, totalFields);
 
   function handleChange(fieldId, value) {
-    setData((d) => ({ ...d, [fieldId]: value }));
+    setData((d) => {
+      const next = { ...d, [fieldId]: value };
+      if (["tenderUploadDate", "callSelection", "preBidConferenceHeld", "tenderState"].includes(fieldId)) {
+        const sched = computeBidSchedule(
+          next.tenderUploadDate,
+          next.callSelection || "First Call",
+          next.preBidConferenceHeld || "Yes",
+          next.tenderState || "Uttar Pradesh"
+        );
+        Object.assign(next, sched);
+      }
+      if (ORG_PROFILE_FIELDS.includes(fieldId)) {
+        upsertOrgProfile(next);
+      }
+      return next;
+    });
   }
 
   async function handleGenerate() {
@@ -22492,7 +22690,6 @@ function TenderTool() {
       <div style={headerStyle}>
         <span style={{ fontSize: 22 }}>📄</span>
         <span style={{ color: C.white, fontWeight: 700, fontSize: 17, letterSpacing: ".04em" }}>{deptDisplay}</span>
-        <span style={{ color: C.goldL, fontSize: 12, marginLeft: "auto", letterSpacing: ".06em" }}>CIVIL WORKS TENDER TOOL · CPWD SBD / GPW-9</span>
       </div>
       <div style={{ background: C.white, borderRadius: 12, boxShadow: "0 2px 16px rgba(11,31,58,0.08)", padding: "32px 36px", maxWidth: 740, margin: "32px auto 0" }}>
         <div style={{ display: "flex", gap: 16, alignItems: "flex-start", marginBottom: 28 }}>
