@@ -931,6 +931,57 @@ function getRelevantExcerpt(text, query, {chunkSize=3500, overlap=400, topK=4, m
   return picked.map(p => p.text).join('\n\n[...]\n\n').slice(0, maxChars);
 }
 
+// Splits text into page-aligned segments using [PAGE N] / [CORR PAGE N]
+// markers (any content before the first marker becomes an unlabeled leading
+// segment). Used by getRelevantPagesExcerpt so retrieval can return WHOLE
+// pages instead of arbitrary character-window chunks — important because a
+// fixed-size chunk can slice a page in half, separating two pieces of
+// information (e.g. Bid Processing Fee and EMD amount) that actually sit on
+// the same physical page together.
+function splitIntoPages(text){
+  const re = /\[(?:CORR )?PAGE \d+\]/g;
+  const matches = [...text.matchAll(re)];
+  if(matches.length === 0) return [{ text }];
+  const pages = [];
+  if(matches[0].index > 0){
+    pages.push({ text: text.slice(0, matches[0].index) });
+  }
+  for(let i=0; i<matches.length; i++){
+    const start = matches[i].index;
+    const end = i+1 < matches.length ? matches[i+1].index : text.length;
+    pages.push({ text: text.slice(start, end) });
+  }
+  return pages;
+}
+
+// Page-aware alternative to getRelevantExcerpt: scores whole pages (not
+// arbitrary chunks) by keyword overlap with the query, then returns the
+// top-scoring pages PLUS their immediate neighbor pages (so a criterion whose
+// evidence spans a multi-page list, or sits just before/after the page that
+// happened to score highest, isn't cut off). Preferred over getRelevantExcerpt
+// for eligibility checks, where "everything relevant to this exact criterion
+// might be scattered across one page or a short run of pages" matters more
+// than raw keyword density.
+function getRelevantPagesExcerpt(text, query, { topKPages=3, maxChars=16000, includeNeighbors=true } = {}){
+  const pages = splitIntoPages(text);
+  if(pages.length === 0) return '';
+  if(pages.length <= topKPages) return pages.map(p=>p.text).join('\n\n').slice(0, maxChars);
+
+  const queryTokens = tokenize(query);
+  const scored = pages.map((p,i) => ({ i, score: scoreChunk(new Set(tokenize(p.text)), queryTokens) }));
+  scored.sort((a,b) => b.score - a.score);
+
+  const pickedIdx = new Set(scored.slice(0, topKPages).map(s => s.i));
+  if(includeNeighbors){
+    for(const idx of [...pickedIdx]){
+      if(idx > 0) pickedIdx.add(idx - 1);
+      if(idx < pages.length - 1) pickedIdx.add(idx + 1);
+    }
+  }
+  const orderedIdx = [...pickedIdx].sort((a,b) => a - b);
+  return orderedIdx.map(i => pages[i].text).join('\n\n[...]\n\n').slice(0, maxChars);
+}
+
 /* ============================================================
    ELIGIBILITY EXTRACTION LOGIC
    ============================================================ */
@@ -1188,7 +1239,8 @@ HARD EXCLUSION — DO NOT extract from a "Team", "Key Personnel", "Key Professio
 Do NOT include: general scope-of-work descriptions, technical specifications of the deliverable itself, submission format/procedure instructions, definitions, payment terms, or timeline/schedule details. If a sentence describes what the WORK involves rather than what the BIDDER must have/prove, exclude it.
 
 For each criterion found, capture:
-- description: the condition text as printed (may reference a documentary proof column too — include that briefly if present)
+- description: the condition text as printed (the eligibility CONDITION itself only — do not fold the documentary-proof column into this field)
+- documentaryProof: the exact text from the "Documentary proof to be submitted" column for this row, as printed (e.g. "Company Registration certificate", "Form 3 and Audited Financial statements"), or null if the source has no such column / this row lists none
 - type: "mandatory" or "qualifying" — use "mandatory" unless the source itself distinguishes tiers/scoring
 - threshold: any numeric threshold stated (amount, years, count), or null
 - weight: a numeric weight only if stated, else null
@@ -1226,7 +1278,8 @@ HARD EXCLUSION — DO NOT extract from a "Team", "Key Personnel", "Key Professio
 Do NOT include: general scope-of-work descriptions, technical specifications of the deliverable itself, submission format/procedure instructions, definitions, payment terms, or timeline/schedule details. If a sentence describes what the WORK involves rather than what the BIDDER must have/prove, exclude it.
 
 For each criterion found, capture:
-- description: the condition text as printed (may reference a documentary proof column too — include that briefly if present)
+- description: the condition text as printed (the eligibility CONDITION itself only — do not fold the documentary-proof column into this field)
+- documentaryProof: the exact text from the "Documentary proof to be submitted" column for this row, as printed (e.g. "Company Registration certificate", "Form 3 and Audited Financial statements"), or null if the source has no such column / this row lists none
 - type: "mandatory" or "qualifying" — use "mandatory" unless the source itself distinguishes tiers/scoring
 - threshold: any numeric threshold stated (amount, years, count), or null
 - weight: a numeric weight only if stated, else null
@@ -1655,6 +1708,7 @@ function renderEvalTable(idx){
   const compliance = state.eligibilityCompliance[b.id] || [];
   const scoring = state.scoringResults[b.id] || [];
   const consensus = state.consensus[b.id];
+  const search = (state._bidSearchResults || {})[idx];
   return `
     ${consensus ? `
       <div class="kv" style="margin-bottom:14px">
@@ -1667,6 +1721,27 @@ function renderEvalTable(idx){
       </div>
     ` : ''}
 
+    <div class="card" style="margin-bottom:14px;padding:10px 12px">
+      <div class="row" style="align-items:center">
+        <input id="bidSearch-${idx}" type="text" placeholder="Search this bidder's submitted document (e.g. 'turnover', 'GST', a certificate number)…" style="flex:1;min-width:220px" onkeydown="if(event.key==='Enter')searchBidText(${idx})">
+        <button class="secondary small" onclick="searchBidText(${idx})">🔍 Search</button>
+        ${search ? `<button class="secondary small" onclick="clearBidSearch(${idx})">Clear</button>` : ''}
+      </div>
+      <div class="muted" style="font-size:11px;margin-top:4px">Use this to locate a missing credential yourself, then use "✏️ Override" on the relevant row below to set it — with a note on what you verified and where.</div>
+      ${search ? `
+        <div style="margin-top:8px">
+          ${search.results.length === 0
+            ? `<div class="muted">No matches for "${escapeHtml(search.query)}"</div>`
+            : search.results.map((r, ri) => `
+              <div style="padding:6px 0;border-top:1px solid #eee;font-size:12px">
+                <b>Page ${r.page ?? '?'}:</b> …${escapeHtml(r.snippet)}…
+                ${r.page ? `<button class="secondary small" onclick="previewBidSearchResult(${idx},${ri})">👁 View Page</button>` : ''}
+              </div>
+            `).join('')}
+        </div>
+      ` : ''}
+    </div>
+
     ${compliance.length ? `
       <h2 style="font-size:14px;margin-bottom:8px">Eligibility Compliance <span class="muted" style="font-weight:400">— informational only, does not block technical scoring below</span></h2>
       <table style="margin-bottom:18px">
@@ -1674,9 +1749,16 @@ function renderEvalTable(idx){
         ${compliance.map((r,ci)=>`
           <tr>
             <td>${escapeHtml(r.description)}</td>
-            <td><span class="badge ${r.status==='Compliant'?'ok':(r.status==='Needs Clarification'?'warn':'err')}">${escapeHtml(r.status)}</span>${r.status!=='Compliant' ? ' <span class="muted" style="font-size:11px">(verify — could be OCR misread)</span>' : ''}</td>
-            <td>${escapeHtml(r.evidence)}</td>
-            <td>${r.evidencePage ? `<button class="secondary small" onclick="showBidEvidencePreview(${idx},'compliance',${ci})">👁 View Page</button>` : ''}</td>
+            <td>
+              <span class="badge ${r.status==='Compliant'?'ok':(r.status==='Needs Clarification'?'warn':'err')}">${escapeHtml(r.status)}</span>
+              ${r.status!=='Compliant' ? ' <span class="muted" style="font-size:11px">(verify — could be OCR misread)</span>' : ''}
+              ${r.manualOverride ? `<div class="badge warn" style="margin-top:4px" title="${escapeHtml(r.overrideNote||'')}">✏️ Manually overridden</div>` : ''}
+            </td>
+            <td>${escapeHtml(r.evidence)}${r.manualOverride && r.overrideNote ? `<div class="muted" style="font-size:11px;margin-top:4px">Override note: ${escapeHtml(r.overrideNote)}</div>` : ''}</td>
+            <td>
+              ${r.evidencePage ? `<button class="secondary small" onclick="showBidEvidencePreview(${idx},'compliance',${ci})">👁 View Page</button>` : ''}
+              <button class="secondary small" onclick="overrideEligibilityStatus(${idx},${ci})">✏️ Override</button>
+            </td>
           </tr>
         `).join('')}
       </table>
@@ -1690,16 +1772,142 @@ function renderEvalTable(idx){
           <tr>
             <td>${escapeHtml(r.name)}</td>
             <td>${escapeHtml(String(r.maxMarks ?? '—'))}</td>
-            <td>${r.requiresLiveAssessment ? '<span class="badge warn">Pending — live only</span>' : escapeHtml(String(r.marksAwarded ?? '—'))}</td>
-            <td>${escapeHtml(r.justification || '—')}</td>
-            <td>${r.evidencePage ? `<button class="secondary small" onclick="showBidEvidencePreview(${idx},'scoring',${ci})">👁 View Page</button>` : ''}</td>
+            <td>
+              ${r.requiresLiveAssessment ? '<span class="badge warn">Pending — live only</span>' : escapeHtml(String(r.marksAwarded ?? '—'))}
+              ${r.manualOverride ? `<div class="badge warn" style="margin-top:4px" title="${escapeHtml(r.overrideNote||'')}">✏️ Manually overridden</div>` : ''}
+            </td>
+            <td>${escapeHtml(r.justification || '—')}${r.manualOverride && r.overrideNote ? `<div class="muted" style="font-size:11px;margin-top:4px">Override note: ${escapeHtml(r.overrideNote)}</div>` : ''}</td>
+            <td>
+              ${r.evidencePage ? `<button class="secondary small" onclick="showBidEvidencePreview(${idx},'scoring',${ci})">👁 View Page</button>` : ''}
+              ${!r.requiresLiveAssessment ? `<button class="secondary small" onclick="overrideTechnicalMarks(${idx},${ci})">✏️ Override</button>` : ''}
+            </td>
           </tr>
+          ${r.breakdown && r.breakdown.length ? `
+          <tr>
+            <td colspan="5" style="padding:0 0 8px 20px;border-top:none">
+              <table style="margin:0;font-size:12px">
+                <tr><th style="font-size:11px">Item</th><th style="font-size:11px">Detail</th><th style="font-size:11px">Marks</th><th style="font-size:11px"></th></tr>
+                ${r.breakdown.map((item, bi) => `
+                  <tr>
+                    <td>${escapeHtml(item.label)}</td>
+                    <td>${escapeHtml(item.detail)}</td>
+                    <td>${item.marksForThis === null ? '—' : escapeHtml(String(item.marksForThis))}</td>
+                    <td>${item.evidencePage ? `<button class="secondary small" onclick="showBidBreakdownPreview(${idx},${ci},${bi})">👁 View Page</button>` : ''}</td>
+                  </tr>
+                `).join('')}
+              </table>
+            </td>
+          </tr>
+          ` : ''}
         `).join('')}
       </table>
     ` : ''}
 
     ${!compliance.length && !scoring.length ? `<div class="muted">Not evaluated yet.</div>` : ''}
   `;
+}
+
+// Preview a specific breakdown item's evidence page (e.g. one project's page,
+// or one key-personnel role's CV page), distinct from the top-level criterion
+// evidence page which just falls back to the first breakdown item found.
+async function showBidBreakdownPreview(bidderIdx, criterionIndex, breakdownIndex){
+  const bidder = state.bidders[bidderIdx];
+  if(!bidder || !bidder.technicalFile) { log('Preview unavailable — no technical bid file on record for this bidder'); return; }
+  const scoring = state.scoringResults[bidder.id] || [];
+  const item = (scoring[criterionIndex] && scoring[criterionIndex].breakdown) ? scoring[criterionIndex].breakdown[breakdownIndex] : null;
+  if(!item || !item.evidencePage) { log('Preview unavailable — no page reference for this item'); return; }
+  await openPagePreview(bidder.technicalFile, item.evidencePage, `${bidder.name} — Technical Bid, Page ${item.evidencePage}`, item.label);
+}
+
+// Simple substring search across a bidder's whole submitted document (both
+// technical and financial text), page by page — lets the user manually locate
+// a credential the AI missed, before using "Override" to set the result
+// themselves with a note on what they found.
+function searchBidText(bidderIdx){
+  const input = document.getElementById('bidSearch-' + bidderIdx);
+  const query = input ? input.value.trim() : '';
+  if(!query) return;
+  const bidder = state.bidders[bidderIdx];
+  const bidText = bidder.technicalText || ''; // financial submissions are not evaluated at this stage — opened separately, after technical qualification
+  const pages = splitIntoPages(bidText);
+  const q = query.toLowerCase();
+  const results = [];
+  for(const p of pages){
+    const at = p.text.toLowerCase().indexOf(q);
+    if(at === -1) continue;
+    const m = p.text.match(/\[(?:CORR )?PAGE (\d+)\]/);
+    const pageNum = m ? parseInt(m[1], 10) : null;
+    const start = Math.max(0, at - 80);
+    const snippet = p.text.slice(start, at + q.length + 80).replace(/\s+/g, ' ').trim();
+    results.push({ page: pageNum, snippet });
+    if(results.length >= 15) break; // cap for readability
+  }
+  if(!state._bidSearchResults) state._bidSearchResults = {};
+  state._bidSearchResults[bidderIdx] = { query, results };
+  render();
+}
+
+function clearBidSearch(bidderIdx){
+  if(state._bidSearchResults) delete state._bidSearchResults[bidderIdx];
+  render();
+}
+
+// Safe wrapper (index-only, matching the codebase's existing pattern) for
+// previewing one search result's page — avoids passing raw strings through
+// an HTML onclick attribute.
+async function previewBidSearchResult(bidderIdx, resultIndex){
+  const bidder = state.bidders[bidderIdx];
+  const search = (state._bidSearchResults || {})[bidderIdx];
+  const result = search && search.results[resultIndex];
+  if(!bidder || !bidder.technicalFile || !result || !result.page){ log('Preview unavailable'); return; }
+  await openPagePreview(bidder.technicalFile, result.page, `${bidder.name} — Page ${result.page}`, search.query);
+}
+
+// Manual override for an eligibility compliance row. Always shows an explicit
+// warning before applying, since this bypasses the AI's judgment entirely —
+// the user is asserting the result themselves and is responsible for it.
+function overrideEligibilityStatus(bidderIdx, itemIndex){
+  const bidder = state.bidders[bidderIdx];
+  const items = state.eligibilityCompliance[bidder.id] || [];
+  const item = items[itemIndex];
+  if(!item) return;
+  const valid = ['Compliant', 'Non-Compliant', 'Needs Clarification'];
+  const newStatus = prompt(`Manually set status for:\n"${item.description}"\n\nType exactly one of: Compliant / Non-Compliant / Needs Clarification`, item.status || '');
+  if(newStatus === null) return; // cancelled
+  if(!valid.includes(newStatus)){ alert('Please type exactly one of: Compliant, Non-Compliant, Needs Clarification'); return; }
+  const note = prompt('Note explaining this manual override (what you verified, and where — e.g. "Confirmed on page 14, EMD receipt separate from fee receipt"):', item.overrideNote || '');
+  if(note === null) return;
+  if(!confirm(`⚠️ You are manually overriding the AI-generated result — this is not re-verified by the system.\n\nCriterion: ${item.description}\nOld status: ${item.status}\nNew status: ${newStatus}\n\nPlease make sure you've personally checked this. Continue?`)) return;
+  item.status = newStatus;
+  item.manualOverride = true;
+  item.overrideNote = note;
+  const existingScoring = state.scoringResults[bidder.id] || [];
+  updateConsensus(bidder, items, existingScoring);
+  log(`${bidder.name}: manually overrode "${item.description}" to ${newStatus}`);
+  render();
+}
+
+// Manual override for a technical scoring row's marks. Same warning pattern
+// as eligibility — the user takes explicit responsibility for the new value.
+function overrideTechnicalMarks(bidderIdx, itemIndex){
+  const bidder = state.bidders[bidderIdx];
+  const items = state.scoringResults[bidder.id] || [];
+  const item = items[itemIndex];
+  if(!item) return;
+  const raw = prompt(`Manually set marks awarded for:\n"${item.name}"\n(0 to ${item.maxMarks})`, item.marksAwarded ?? '');
+  if(raw === null) return;
+  const val = Number(raw);
+  if(isNaN(val) || val < 0 || (item.maxMarks != null && val > item.maxMarks)){ alert(`Please enter a number between 0 and ${item.maxMarks}`); return; }
+  const note = prompt('Note explaining this manual override (what you verified, and where):', item.overrideNote || '');
+  if(note === null) return;
+  if(!confirm(`⚠️ You are manually overriding the AI-generated score — this is not re-verified by the system.\n\nCriterion: ${item.name}\nOld marks: ${item.marksAwarded}\nNew marks: ${val}\n\nPlease make sure you've personally checked this. Continue?`)) return;
+  item.marksAwarded = val;
+  item.manualOverride = true;
+  item.overrideNote = note;
+  const existingCompliance = state.eligibilityCompliance[bidder.id] || [];
+  updateConsensus(bidder, existingCompliance, items);
+  log(`${bidder.name}: manually overrode "${item.name}" to ${val}/${item.maxMarks}`);
+  render();
 }
 
 // Shared consensus-building logic, used by both the standalone eligibility
@@ -1750,21 +1958,32 @@ async function runEligibilityCheck(){
   setProcessing(7);
   try{
     for(const bidder of state.bidders){
-      const bidText = (bidder.technicalText || '') + '\n\n' + (bidder.financialText || '');
+      const bidText = bidder.technicalText || ''; // financial submissions are not evaluated at this stage — opened separately, after technical qualification
       log(`${bidder.name}: checking against ${state.eligibility.length} eligibility condition(s) from Stage 4`);
 
       const complianceResults = [];
       for(const crit of state.eligibility){
-        const excerpt = getRelevantExcerpt(bidText, crit.description, { topK: 3, maxChars: 10000 });
+        // Page-aware retrieval: pulls whole pages (+ neighbors) rather than
+        // arbitrary character chunks, so info sitting elsewhere on the same
+        // page, or spanning several consecutive pages (e.g. a multi-page
+        // project list), doesn't get cut out of what the AI sees.
+        const excerpt = getRelevantPagesExcerpt(bidText, crit.description, { topKPages: 3, maxChars: 16000 });
         const prompt = `Determine whether this bidder's bid COMPLIES with the following eligibility criterion. This is pass/fail, not a score.
 Criterion: ${crit.description}${crit.type ? ` (type: ${crit.type}${crit.threshold ? ', threshold: ' + crit.threshold : ''})` : ''}
+${crit.documentaryProof ? `Documentary proof the RFP requires for this criterion: ${crit.documentaryProof}` : ''}
 
-Bid excerpts (most relevant sections of a longer document; [...] marks a gap):
+Bid excerpts (whole pages, most relevant to this criterion; [...] marks a gap to another page):
 """${excerpt}"""
 
-Return ONLY valid JSON: {"status": "Compliant"|"Non-Compliant"|"Needs Clarification", "evidence": "brief evidence or reason, citing figures/dates found if present", "evidencePage": "the number from the nearest [PAGE N] marker where this evidence was found, or null if none identifiable"}`;
+Apply these rules carefully before deciding:
+1. COMPOUND CRITERIA: if this criterion actually bundles multiple distinct requirements (e.g. "Bid Processing Fee & EMD Deposit" is TWO separate payments/proofs, not one), verify EACH part independently. Only mark "Compliant" if ALL parts are found; if some parts are found but not others, mark "Needs Clarification" and name exactly which part(s) are missing in the evidence field.
+2. DOCUMENT-TYPE STRICTNESS: if the criterion requires a SPECIFIC type of certificate/document (e.g. a Certificate of Incorporation / Company Registration certificate from the Registrar of Companies), do NOT accept a different, unrelated registration document as a substitute — e.g. an EPFO/PF registration, ESI registration, GST registration, or PAN card does NOT satisfy a "company registration certificate" requirement even though it may reference the same company name. Only count it compliant if the actual document type matches what's required.
+3. SCAN THE FULL LIST FOR MAX/QUALIFYING VALUES: if the criterion requires a minimum project value, turnover, or similar threshold and the bid excerpt contains a LIST of multiple entries (e.g. a table of past projects across several pages), evaluate EVERY entry in the excerpt — not just the first or last one you see — and use the entry that actually satisfies (or best satisfies) the threshold. State which specific entry/value you used and its page.
+4. STANDARD DECLARATION FORMATS: if the criterion is a declaration-type requirement (e.g. non-blacklisting/debarment declaration, non-performance/non-termination declaration), these are typically submitted as a short signed letter on the bidder's letterhead following the RFP's own annexure format — look for a signed statement using formal declaration language (e.g. "This is to notify you that our Company/LLP/Partnership... has not been blacklisted...", or "...has neither failed to perform on any agreement...nor been expelled...") rather than expecting it to appear inside a different document type. If such a signed declaration matching the required assertion is present, mark Compliant even if worded slightly differently from the RFP's exact template, as long as it makes the same substantive commitment.
+
+Return ONLY valid JSON: {"status": "Compliant"|"Non-Compliant"|"Needs Clarification", "evidence": "brief evidence or reason, citing figures/dates/document names found if present, and naming any missing sub-part per rule 1", "evidencePage": "the number from the nearest [PAGE N] marker where the key evidence was found, or null if none identifiable"}`;
         try{
-          const raw = await callAI('evaluate', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:400});
+          const raw = await callAI('evaluate', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:500});
           const parsed = safeParseJsonObject(raw);
           complianceResults.push({
             criterionId: crit.id,
@@ -1806,7 +2025,7 @@ async function runTechnicalScoring(){
   setProcessing(7);
   try{
     for(const bidder of state.bidders){
-      const bidText = (bidder.technicalText || '') + '\n\n' + (bidder.financialText || '');
+      const bidText = bidder.technicalText || ''; // financial submissions are not evaluated at this stage — opened separately, after technical qualification
       log(`${bidder.name}: scoring against ${state.scoringCriteria.length} technical criteria from Stage 5`);
 
       const scoringResults = [];
@@ -1819,28 +2038,49 @@ async function runTechnicalScoring(){
           });
           continue;
         }
-        const excerpt = getRelevantExcerpt(bidText, crit.description, { topK: 4, maxChars: 14000 });
+        // Page-aware retrieval with a wider window — project lists and CVs
+        // often span several consecutive pages, so we need more than a
+        // narrow keyword-dense excerpt to see the whole list.
+        const excerpt = getRelevantPagesExcerpt(bidText, crit.description, { topKPages: 4, maxChars: 20000 });
         const prompt = `Score this bidder against the following technical evaluation criterion, using the EXACT scoring rule given (including any tiers or sub-weights it states) — do not invent your own scale.
 Criterion (full rule as printed in the RFP): ${crit.description}
 Maximum marks: ${crit.maxMarks}
 
-Bid excerpts (most relevant sections of a longer document; [...] marks a gap):
+Bid excerpts (whole pages, most relevant to this criterion; [...] marks a gap to another page):
 """${excerpt}"""
 
-Award marks strictly within 0 to ${crit.maxMarks}, following the tiered/weighted rule stated in the criterion text above if one is given. Justify briefly by naming what was found in the bid (e.g. which projects, whose CV, what experience count).
+IMPORTANT — ITEMIZED BREAKDOWN: many criteria are actually scored by COUNTING or ASSESSING a LIST of individual items — e.g. "Firm's Relevant Experience" is scored by the number of qualifying past projects found (each with its own name/value/page), or "Relevant Experience of Key Personnel" is scored by assessing EACH named role's CV individually (e.g. Team Leader, Structural Designer, Construction Project Management Expert, Resident Engineer (1), Resident Engineer (2) — exactly however many distinct roles the criterion text lists, each often with its own sub-max marks stated in the criterion text). For these list-type criteria, identify and list EVERY individual item you found evidence for as its own entry in the "breakdown" array below — do not just give one combined number with no detail. If the criterion is a genuine single holistic judgment with no natural list (rare), return one breakdown entry summarizing the whole assessment.
 
-Return ONLY valid JSON: {"marksAwarded": number, "justification": "...", "evidencePage": "the number from the nearest [PAGE N] marker where the key evidence was found, or null if none identifiable"}`;
+For each breakdown entry, capture:
+- label: the specific item's name — a project name/title, OR a personnel role name (e.g. "Team Leader"), OR a short label for a holistic single-item criterion
+- detail: the concrete fact found — project cost/value and client, OR the person's name and years of relevant experience found in their CV, etc.
+- marksForThis: this specific item's own contribution toward the total, if the criterion structure allows attributing marks per item (e.g. each role has its own printed sub-max, or a tiered count-based rule where you can show the running count/tier reached at this item) — use your best-faith application of the criterion's stated rule; if genuinely not attributable per-item, use null
+- evidencePage: the number from the nearest [PAGE N] marker where THIS SPECIFIC item's evidence was found, or null if none identifiable
+
+Then separately state:
+- marksAwarded: the OVERALL, AUTHORITATIVE marks for this criterion (0 to ${crit.maxMarks}), computed by correctly applying the criterion's exact tiered/weighted/summed rule as printed — this is the number that actually counts, regardless of what individual breakdown entries show.
+- justification: 1-2 sentence summary of how the overall marksAwarded was reached (e.g. "5 qualifying projects found → tier 5-6 projects = 30 marks" or "Team Leader 8/10, Structural Designer 6/8, ... = 34/40 total")
+
+Return ONLY valid JSON: {"breakdown": [{"label": "...", "detail": "...", "marksForThis": number|null, "evidencePage": number|null}, ...], "marksAwarded": number, "justification": "..."}`;
         try{
-          const raw = await callAI('evaluate', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:500});
+          const raw = await callAI('evaluate', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:1200});
           const parsed = safeParseJsonObject(raw);
           const awarded = Math.max(0, Math.min(crit.maxMarks ?? 100, Number(parsed.marksAwarded) || 0));
+          const breakdown = Array.isArray(parsed.breakdown) ? parsed.breakdown.map(item => ({
+            label: item.label || '',
+            detail: item.detail || '',
+            marksForThis: (item.marksForThis === null || item.marksForThis === undefined) ? null : Number(item.marksForThis),
+            evidencePage: item.evidencePage || null,
+          })) : [];
           scoringResults.push({
             criterionId: crit.id, name: crit.description, maxMarks: crit.maxMarks,
-            marksAwarded: awarded, requiresLiveAssessment: false, evidencePage: parsed.evidencePage || null,
+            marksAwarded: awarded, requiresLiveAssessment: false,
+            evidencePage: breakdown.find(b=>b.evidencePage)?.evidencePage || null, // fallback top-level page = first breakdown item's page
             justification: parsed.justification || '',
+            breakdown,
           });
         } catch(err){
-          scoringResults.push({ criterionId: crit.id, name: crit.description, maxMarks: crit.maxMarks, marksAwarded: 0, requiresLiveAssessment: false, evidencePage: null, justification: 'Evaluation error: ' + err.message });
+          scoringResults.push({ criterionId: crit.id, name: crit.description, maxMarks: crit.maxMarks, marksAwarded: 0, requiresLiveAssessment: false, evidencePage: null, justification: 'Evaluation error: ' + err.message, breakdown: [] });
         }
       }
       state.scoringResults[bidder.id] = scoringResults;
