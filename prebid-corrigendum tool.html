@@ -1492,26 +1492,136 @@ async function extractPdfTextWithItems(file) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  COLUMN-POSITION AWARE TABLE EXTRACTOR
+//  COLUMN-POSITION AWARE TABLE EXTRACTOR (now with DYNAMIC calibration)
 //
-//  IMPORTANT CAVEAT: the X-coordinate ranges below were calibrated
-//  against ONE specific PDF's layout (see the comment block that used
-//  to document exact x-ranges here). They will NOT generalise to a
-//  queries PDF exported with different margins, fonts, or table widths
-//  — in that case this function should legitimately return few/no rows,
-//  which is exactly the signal processQueryFiles() uses to fall through
-//  to the AI-based table extraction (tryAiTableExtraction) instead of
-//  silently mis-assigning text between columns.
+//  Column X-boundaries are now inferred PER-PDF from the actual item
+//  positions in that document, instead of being hardcoded against one
+//  specific layout. This generalises across bidders' PDFs that use
+//  different margins, fonts, or table widths — each upload gets its
+//  own boundaries. If calibration can't find enough structure (e.g.
+//  the table genuinely isn't laid out this way, or has too few rows
+//  to calibrate confidently), this falls back to a fixed default as a
+//  last resort, and ultimately to the AI-based table extraction in
+//  processQueryFiles() if row output is still poor.
 // ═══════════════════════════════════════════════════════════════
+
+// Fixed fallback, used ONLY if dynamic calibration below fails to find
+// enough structure to be confident. Kept as a last-resort default, not
+// the primary mechanism.
+const DEFAULT_COLUMNS = {
+  COL_SERIAL:  { min: 110, max: 140 },
+  COL_BIDDER:  { min: 140, max: 190 },
+  COL_PAGE:    { min: 188, max: 224 },
+  COL_SECTION: { min: 222, max: 292 },
+  COL_RFP:     { min: 290, max: 399 },
+  COL_QUERY:   { min: 398, max: 600 },
+};
+
+const Y_BUCKET = 3; // groups items into row-bands; ~8-10pt gap typically separates real rows
+
+function buildYBandMap(pg) {
+  const byY = new Map();
+  for (const it of pg.rawItems) {
+    if (!it.str || !it.str.trim()) continue;
+    const yk = Math.round(it.y / Y_BUCKET) * Y_BUCKET;
+    if (!byY.has(yk)) byY.set(yk, []);
+    byY.get(yk).push(it);
+  }
+  return byY;
+}
+
+// Finds the serial-number column WITHOUT assuming any fixed X-range: scans
+// each row-band's leftmost item, and keeps only those that form a genuinely
+// consecutive 1,2,3,... sequence (skipping stray numbers like page footers).
+// This works regardless of where that column actually sits in this PDF.
+function detectSerialColumnItems(pages) {
+  const found = [];
+  let expected = 1;
+  for (const pg of pages) {
+    const byY = buildYBandMap(pg);
+    const sortedYs = [...byY.keys()].sort((a, b) => b - a);
+    for (const yk of sortedYs) {
+      const rowItems = byY.get(yk).slice().sort((a, b) => a.x - b.x);
+      const leftmost = rowItems[0];
+      if (leftmost && /^\d{1,3}$/.test(leftmost.str.trim())) {
+        const val = parseInt(leftmost.str.trim(), 10);
+        if (val === expected) {
+          found.push({ page: pg.page, y: yk, x: leftmost.x });
+          expected++;
+        }
+      }
+    }
+  }
+  return found;
+}
+
+// Given confirmed serial-column rows, clusters the X-positions of every
+// OTHER item on those same rows into column groups (by gap size), then maps
+// those clusters onto bidder/page/section/rfp/query roles. Returns null if
+// there isn't enough confirmed structure to calibrate confidently — callers
+// should fall back to DEFAULT_COLUMNS in that case.
+function inferColumnBoundaries(pages) {
+  const serialItems = detectSerialColumnItems(pages);
+  if (serialItems.length < 3) return null; // too few confirmed rows to trust calibration
+
+  const serialXs = serialItems.map(s => s.x);
+  const COL_SERIAL = { min: Math.min(...serialXs) - 5, max: Math.max(...serialXs) + 15 };
+
+  const pageYMap = new Map();
+  for (const pg of pages) pageYMap.set(pg.page, buildYBandMap(pg));
+
+  const rightXs = [];
+  for (const s of serialItems) {
+    const byY = pageYMap.get(s.page);
+    if (!byY) continue;
+    const rowItems = (byY.get(s.y) || []).slice().sort((a, b) => a.x - b.x);
+    for (const it of rowItems) {
+      if (it.x > COL_SERIAL.max) rightXs.push(it.x);
+    }
+  }
+  if (rightXs.length < 5) return null; // not enough data points to cluster meaningfully
+
+  const sortedX = [...new Set(rightXs)].sort((a, b) => a - b);
+  const GAP = 15; // pt gap that signals a genuine column boundary vs. just word-spacing
+  const clusters = [];
+  let current = [sortedX[0]];
+  for (let i = 1; i < sortedX.length; i++) {
+    if (sortedX[i] - sortedX[i - 1] > GAP) { clusters.push(current); current = []; }
+    current.push(sortedX[i]);
+  }
+  clusters.push(current);
+  if (clusters.length < 3) return null; // need at minimum bidder/rfp/query-shaped structure
+
+  const bounds = clusters.map((c, i) => ({
+    min: c[0] - 3,
+    max: i < clusters.length - 1 ? clusters[i + 1][0] - 1 : 900,
+  }));
+
+  // Map clusters to roles depending on how many distinct columns were found.
+  // Fewer clusters than the "full" 5-column layout just means some roles
+  // collapse together (e.g. no separate Page column) — query always gets
+  // the last cluster, with any extra trailing clusters folded into it.
+  let COL_BIDDER, COL_PAGE, COL_SECTION, COL_RFP, COL_QUERY;
+  const EMPTY = { min: -1, max: -1 }; // role not present in this layout
+  if (clusters.length === 3) {
+    COL_BIDDER = bounds[0]; COL_PAGE = EMPTY; COL_SECTION = EMPTY;
+    COL_RFP = bounds[1]; COL_QUERY = bounds[2];
+  } else if (clusters.length === 4) {
+    COL_BIDDER = bounds[0]; COL_PAGE = bounds[1]; COL_SECTION = EMPTY;
+    COL_RFP = bounds[2]; COL_QUERY = bounds[3];
+  } else {
+    COL_BIDDER = bounds[0]; COL_PAGE = bounds[1]; COL_SECTION = bounds[2];
+    COL_RFP = bounds[3];
+    COL_QUERY = { min: clusters[4][0] - 3, max: 1200 }; // open-ended, absorbs any extra clusters
+  }
+
+  return { COL_SERIAL, COL_BIDDER, COL_PAGE, COL_SECTION, COL_RFP, COL_QUERY };
+}
+
 function extractTableByColumns(pages) {
-  // Column X boundaries calibrated from one specific PDF's coordinate data.
-  // These are a best-effort default, not a universal layout — see caveat above.
-  const COL_SERIAL  = { min: 110, max: 140 };
-  const COL_BIDDER  = { min: 140, max: 190 };
-  const COL_PAGE    = { min: 188, max: 224 };
-  const COL_SECTION = { min: 222, max: 292 };
-  const COL_RFP     = { min: 290, max: 399 };
-  const COL_QUERY   = { min: 398, max: 600 };
+  const calibrated = inferColumnBoundaries(pages);
+  const cols = calibrated || DEFAULT_COLUMNS;
+  const { COL_SERIAL, COL_BIDDER, COL_PAGE, COL_SECTION, COL_RFP, COL_QUERY } = cols;
 
   // Bucket size: 3pt — fine enough to separate adjacent lines in this PDF
   // (minimum row gap observed is ~8pt, lines within a cell are ~8–10pt apart)
@@ -1521,7 +1631,6 @@ function extractTableByColumns(pages) {
   const dataRows = [];
   let currentRow = null;
   let prevSerial = 0;
-  const MAX_SERIAL = 200; // safety cap
 
   for (const pg of pages) {
     // Build Y-bucket map for this page
