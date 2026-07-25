@@ -45,6 +45,8 @@
   .toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px; }
   .badge { display:inline-block; background:#E8BB4A; color:#0B1F3A; border-radius:10px; padding:2px 10px; font-size:11px; font-weight:bold; }
   .empty-note { color:#9AA5B8; font-size:12px; padding:14px; text-align:center; }
+  .ai-badge { display:inline-flex; align-items:center; gap:4px; background:#EDE9FE; color:#5B21B6; border-radius:10px; padding:2px 10px; font-size:11px; font-weight:bold; border:1px solid #C4B5FD; }
+  .ai-badge.low { background:#FBE8E6; color:#C0392B; border-color:#F5C6C2; }
 
   /* ── Tender Type Badge ── */
   #tenderTypeBadgeWrap {
@@ -136,6 +138,7 @@
   }
   .cm-result:hover { border-color: #1A5CA8; box-shadow: 0 2px 10px rgba(26,92,168,0.12); }
   .cm-result.selected { border-color: #1A5CA8; background: #EEF4FC; }
+  .cm-result.ai-recommended { border-color: #7C3AED; box-shadow: 0 0 0 2px rgba(124,58,237,0.15); }
   .cm-result-head {
     display: flex; align-items: center; gap: 10px;
     padding: 8px 12px;
@@ -177,6 +180,13 @@
     color: #9AA5B8; font-size: 13px; line-height: 1.7;
   }
   .cm-error { background:#FBE8E6; color:#C0392B; border-radius:6px; padding:10px 14px; font-size:13px; }
+  .cm-ai-banner {
+    display: flex; align-items: center; gap: 10px;
+    background: #F5F3FF; border: 1px solid #DDD6FE; border-radius: 8px;
+    padding: 10px 14px; margin-bottom: 12px; font-size: 12.5px; color: #5B21B6;
+  }
+  .cm-ai-banner.warn { background: #FFF8E1; border-color: #FDE68A; color: #92400E; }
+  .cm-ai-banner .spin-ico { animation: spin 1s linear infinite; display:inline-block; }
 
   /* ── Procurement Reference Modal ── */
   #refModal {
@@ -353,7 +363,7 @@
     </p>
     <div class="lp-tags">
       <span class="lp-tag">PDF Upload</span>
-      <span class="lp-tag">Auto Clause Lookup</span>
+      <span class="lp-tag">AI Clause Lookup</span>
       <span class="lp-tag">Corrigendum Auto-link</span>
       <span class="lp-tag">Excel Export</span>
     </div>
@@ -536,6 +546,62 @@ let corrigRows = []; // {id, srNo, clause, corrigendum, sourceQueryId}
 let rowCounter = 0;
 let pdfBuffers = {}; // {fileName: ArrayBuffer} — kept for Document Viewer
 
+// ═══════════════════════════════════════════════════════════════
+//  AI INTEGRATION — connects to the same /api/ai.js backend used by
+//  the bid evaluator tool. Uses only task names ai.js already knows
+//  (ocr, extract, chat, eligibility, compare, evaluate, report) — any
+//  other task name would be rejected with "Unknown task".
+//  - 'compare' is used for AI-assisted clause matching (semantic
+//    judgement of which candidate clause a query is really about).
+//  - 'extract' is used as a smarter fallback for query-table parsing
+//    when the coordinate-based column extractor is unreliable.
+//  AI calls here are always a best-effort LAYER ON TOP of the existing
+//  deterministic logic — if ai.js is unreachable or errors, every
+//  function below falls back to the original non-AI behaviour rather
+//  than blocking the tool.
+// ═══════════════════════════════════════════════════════════════
+async function callAI(task, messages, opts = {}) {
+  const res = await fetch('/api/ai.js', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      task, messages,
+      temperature: opts.temperature ?? 0.1,
+      max_tokens: opts.max_tokens ?? 1200,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    const detail = data.details ? (' — ' + data.details) : '';
+    throw new Error((data.error || 'AI call failed') + detail);
+  }
+  return data.content;
+}
+
+// Parses a JSON object from an AI response, tolerating markdown code fences
+// or minor leading/trailing prose the model sometimes adds despite instructions.
+function safeParseJsonObject(raw) {
+  if (!raw) return {};
+  let text = raw.trim();
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) text = fence[1].trim();
+  const first = text.indexOf('{');
+  const last = text.lastIndexOf('}');
+  if (first !== -1 && last !== -1 && last > first) text = text.slice(first, last + 1);
+  try { return JSON.parse(text); } catch (e) { return {}; }
+}
+
+function safeParseJsonArray(raw) {
+  if (!raw) return [];
+  let text = raw.trim();
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) text = fence[1].trim();
+  const first = text.indexOf('[');
+  const last = text.lastIndexOf(']');
+  if (first !== -1 && last !== -1 && last > first) text = text.slice(first, last + 1);
+  try { const parsed = JSON.parse(text); return Array.isArray(parsed) ? parsed : []; } catch (e) { return []; }
+}
+
 // ---------- TENDER PDF ----------
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -630,10 +696,51 @@ document.getElementById('tenderPdf').addEventListener('change', async (e) => {
     }
 
     statusEl.innerHTML = `<div class="status ok">✓ Tender PDF indexed — ${clauseSegments.length} clause segments across ${pages.length} pages.${autoNote}${dateNote} Use <strong>🔍 Search Clauses</strong> in any query row.</div>`;
+
+    // If metadata detection came back empty on all fronts, this often means
+    // the PDF has an unusual layout the regex heuristics didn't anticipate.
+    // Offer an AI-based fallback pass rather than leaving fields blank silently.
+    if (!detected.client && !detected.title) {
+      tryAiMetadataFallback(firstText);
+    }
   } catch(err) {
     statusEl.innerHTML = `<div class="status err">Could not read PDF: ${err.message}</div>`;
   }
 });
+
+// AI fallback for tender metadata (authority name + RFP title) when the
+// regex-based detectTenderMetadataBase() finds neither. Only runs as a
+// second pass — never replaces the fast, free regex attempt, only backs it up.
+async function tryAiMetadataFallback(firstPagesText) {
+  const statusEl = document.getElementById('tenderStatus');
+  try {
+    const prompt = `This is the opening excerpt of an Indian government tender/RFP document. Identify:
+1. authorityName — the issuing Authority/Client organization (not a consultant or bidder)
+2. title — the short title of the project/assignment being tendered
+
+Excerpt:
+"""${firstPagesText.slice(0, 6000)}"""
+
+Return ONLY valid JSON: {"authorityName": "..." or null, "title": "..." or null}`;
+    const raw = await callAI('extract', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:200});
+    const parsed = safeParseJsonObject(raw);
+    let filled = [];
+    if (parsed.authorityName) {
+      const el = document.getElementById('authorityName');
+      if (!el.value.trim()) { el.value = parsed.authorityName; el.style.background = '#FFFDE7'; filled.push('Client Name'); }
+    }
+    if (parsed.title) {
+      const el = document.getElementById('rfpTitle');
+      if (!el.value.trim()) { el.value = parsed.title; el.style.background = '#FFFDE7'; filled.push('RFP Title'); }
+    }
+    if (filled.length) {
+      statusEl.innerHTML += ` <div class="status ok" style="margin-top:6px">🤖 AI fallback filled: <strong>${filled.join(', ')}</strong> — please verify.</div>`;
+    }
+  } catch (err) {
+    // Non-fatal: pattern-based detection already ran; AI is just a backup.
+    statusEl.innerHTML += ` <div class="status info" style="margin-top:6px">Automatic detection found nothing — please fill Client Name / RFP Title manually. (AI fallback also unavailable: ${err.message})</div>`;
+  }
+}
 
 // ── Tender metadata detection ────────────────────────────────────
 function detectTenderMetadataBase(text) {
@@ -1091,6 +1198,50 @@ function findClauseText(ref) {
   return (r.ref ? '[' + r.ref + '] ' : '') + '(Page ' + r.page + ') ' + snippet;
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  AI-ASSISTED CLAUSE MATCHING
+//  TF-IDF (searchClauses) gives a fast, cheap SHORTLIST of candidate
+//  clauses. This function sends that shortlist + the bidder's actual
+//  query to the AI and asks it to semantically judge which candidate
+//  (if any) genuinely governs the query — TF-IDF only measures word
+//  overlap, so it can rank a topically-unrelated clause highest just
+//  because it shares common words. The AI never sees the FULL tender,
+//  only the already-shortlisted candidates, keeping cost low.
+//  Returns null (not a forced guess) if the AI itself has no
+//  confident match — this is a legal document, so an honest
+//  "no confident match, verify manually" beats a wrong guess.
+// ═══════════════════════════════════════════════════════════════
+async function aiVerifyClauseMatch(queryText, candidates) {
+  if (!candidates.length) return null;
+  const candidateList = candidates.map((c, i) =>
+    `[${i}] Ref: ${c.ref || '(none)'} | Heading: ${c.heading || '(none)'} | Page: ${c.page}\nText: ${c.text.slice(0, 500)}`
+  ).join('\n\n');
+
+  const prompt = `A bidder submitted this pre-bid query about a government tender:
+"""${queryText}"""
+
+Below are candidate RFP clauses (found via keyword search) that MIGHT be what the query is asking about. Judge which ONE candidate, if any, is genuinely the clause this query is about — based on subject matter, not just shared words. A query can share vocabulary with an unrelated clause; only pick a candidate if it substantively governs what's being asked.
+
+Candidates:
+${candidateList}
+
+Return ONLY valid JSON: {"bestIndex": <index number from the list above, or null if none genuinely match>, "confidence": "high"|"medium"|"low", "reasoning": "one sentence on why"}`;
+
+  try {
+    const raw = await callAI('compare', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:300});
+    const parsed = safeParseJsonObject(raw);
+    if (parsed.bestIndex === null || parsed.bestIndex === undefined) return null;
+    const idx = Number(parsed.bestIndex);
+    if (isNaN(idx) || idx < 0 || idx >= candidates.length) return null;
+    return { index: idx, confidence: parsed.confidence || 'medium', reasoning: parsed.reasoning || '' };
+  } catch (err) {
+    // AI unreachable/erroring — fail silently here; caller falls back to
+    // TF-IDF-only ranking so the tool keeps working without AI.
+    console.log('AI clause verification failed (falling back to TF-IDF only): ' + err.message);
+    return null;
+  }
+}
+
 // ---------- QUERY PARSING ----------
 let _lastQueryPages = null; // stored for diagnostic
 let _uploadedFiles = [];    // track {name, count, status} for each uploaded PDF
@@ -1169,8 +1320,20 @@ async function processQueryFiles(files) {
           sourceFile: file.name
         }));
       } else {
-        // Fallback: line parser — collect without adding yet
-        newRows = extractRowsFromText(pages.map(p => p.text).join('\n'), file.name);
+        // Coordinate-based column extraction found fewer than 2 rows — this is
+        // often a sign the PDF's column layout differs from the one the fixed
+        // X-coordinate ranges were calibrated against, not that the table is
+        // genuinely small. Before falling back to the naive line/block parser,
+        // try an AI-based table read of the raw page text, which is layout-
+        // independent and can say "not confident" rather than mis-assign columns.
+        statusEl.innerHTML = `<span class="status info">⏳ Column layout unclear for <strong>${esc(file.name)}</strong> — trying AI-assisted table read…</span>`;
+        const aiRows = await tryAiTableExtraction(pages, file.name);
+        if (aiRows.length >= 2) {
+          newRows = aiRows;
+        } else {
+          // Final fallback: naive line parser — collect without adding yet
+          newRows = extractRowsFromText(pages.map(p => p.text).join('\n'), file.name);
+        }
       }
 
       let added = 0;
@@ -1198,6 +1361,48 @@ async function processQueryFiles(files) {
   msg += ` &nbsp;|&nbsp; <strong>${queryRows.length}</strong> total in table</span>`;
   if (errors.length) msg += ` <span class="status err" style="margin-top:4px;">${errors.map(esc).join('<br>')}</span>`;
   statusEl.innerHTML = msg;
+}
+
+// AI-assisted table extraction: used ONLY as a fallback when the coordinate-
+// based column extractor (extractTableByColumns) finds fewer than 2 rows,
+// which usually means this PDF's column X-positions don't match the ones
+// that extractor was hard-calibrated against — NOT that the table is
+// actually empty. An LLM reading the raw page text can correctly identify
+// bidder/clause/query columns regardless of layout, and — importantly —
+// returns an empty array rather than forcing a bad guess if it isn't
+// confident this is really a structured query table.
+async function tryAiTableExtraction(pages, sourceFile) {
+  // Cap to first ~6 pages of text to keep the prompt a reasonable size;
+  // pre-bid query tables for a single bidder rarely run longer than this.
+  const combinedText = pages.slice(0, 6).map(p => `[PAGE ${p.page}]\n${p.text}`).join('\n\n');
+  const prompt = `This is text extracted from a PDF that should contain a table of pre-bid queries submitted by a bidder for a government tender. The table typically has columns like: Serial No., Bidder Name, Page/Clause reference, RFP Clause text, and the Query itself. Column layout can vary between PDFs.
+
+Read the raw text below and extract each genuine query row you can confidently identify. If this text does NOT actually contain a structured query table (e.g. it's some other document, or the table isn't recognisable), return an empty array — do not force a guess.
+
+Text:
+"""${combinedText.slice(0, 18000)}"""
+
+For each row found, return: {"bidder": "bidder/firm name if stated, else \\"\\"", "clause": "the page/clause reference cell if present, else \\"\\"", "rfpClause": "the RFP clause text cell if present, else \\"\\"", "query": "the actual query/point of clarification text — this is required, skip the row if you can't find genuine query text"}
+
+Return ONLY valid JSON: an array of these row objects. Return [] if no genuine query table is found.`;
+
+  try {
+    const raw = await callAI('extract', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:3000});
+    const parsed = safeParseJsonArray(raw);
+    return parsed
+      .filter(r => r && r.query && String(r.query).trim().length > 5)
+      .map(r => ({
+        bidder: String(r.bidder || '').trim(),
+        clause: String(r.clause || '').trim(),
+        rfpClause: String(r.rfpClause || '').trim(),
+        query: String(r.query).trim(),
+        responseType: '', responseText: '',
+        sourceFile,
+      }));
+  } catch (err) {
+    console.log('AI table extraction failed (falling back to line parser): ' + err.message);
+    return [];
+  }
 }
 
 // Add a chip to the uploaded files list
@@ -1289,28 +1494,18 @@ async function extractPdfTextWithItems(file) {
 // ═══════════════════════════════════════════════════════════════
 //  COLUMN-POSITION AWARE TABLE EXTRACTOR
 //
-//  This PDF has a 6-column table: S.No | Bidder | Page No. |
-//  Section | RFP Clause/Subject | Query
-//
-//  Key facts from the actual PDF (pdf.js coordinates, page height=792):
-//   - S.No  column:  x ≈ 115–140  (serial numbers live here)
-//   - Bidder column: x ≈ 140–190
-//   - Page   column: x ≈ 190–225
-//   - Section column:x ≈ 224–305
-//   - RFP Clause col:x ≈ 295–400
-//   - Query  column: x ≈ 400–540
-//
-//  The header is split across 3 Y-bands (the "S." "No." are at
-//  different vertical offsets from "Bidder" "Section" etc.) so
-//  header-detection by single-row scan fails. We skip header
-//  detection entirely and use hard-coded column boundaries instead,
-//  then scan every page for consecutive serial numbers 1..N.
+//  IMPORTANT CAVEAT: the X-coordinate ranges below were calibrated
+//  against ONE specific PDF's layout (see the comment block that used
+//  to document exact x-ranges here). They will NOT generalise to a
+//  queries PDF exported with different margins, fonts, or table widths
+//  — in that case this function should legitimately return few/no rows,
+//  which is exactly the signal processQueryFiles() uses to fall through
+//  to the AI-based table extraction (tryAiTableExtraction) instead of
+//  silently mis-assigning text between columns.
 // ═══════════════════════════════════════════════════════════════
 function extractTableByColumns(pages) {
-  // Column X boundaries calibrated from the actual PDF coordinate data
-  // (pdf.js transform[4] matches pdfplumber x0 for this document)
-  // Verified against real item positions: serial x≈121, bidder x≈142–189,
-  // page x≈191–208, section x≈224–290, rfp x≈296–381, query x≈401+
+  // Column X boundaries calibrated from one specific PDF's coordinate data.
+  // These are a best-effort default, not a universal layout — see caveat above.
   const COL_SERIAL  = { min: 110, max: 140 };
   const COL_BIDDER  = { min: 140, max: 190 };
   const COL_PAGE    = { min: 188, max: 224 };
@@ -1789,10 +1984,10 @@ function openClauseSearch(rowId) {
 
   document.getElementById('cmSearchInput').value = searchSeed;
   document.getElementById('clauseModal').classList.add('open');
-  runClauseSearch(searchSeed);
+  runClauseSearch(searchSeed, seedQuery);
 }
 
-function runClauseSearch(queryText) {
+async function runClauseSearch(queryText, originalQueryForAi) {
   const body = document.getElementById('cmBody');
   if (!queryText.trim()) {
     body.innerHTML = '<div class="cm-no-tender">Type a search term above to find matching clauses.</div>';
@@ -1805,28 +2000,50 @@ function runClauseSearch(queryText) {
     return;
   }
 
+  // Show a "verifying" banner immediately, then run AI verification against
+  // the TF-IDF shortlist in the background — this is a LEGAL document, so
+  // we never want the highest-word-overlap clause silently trusted as
+  // correct without a semantic check when AI is available.
+  const aiQuerySeed = (originalQueryForAi || queryText || '').trim();
+  let aiVerification = null;
+  if (aiQuerySeed) {
+    body.innerHTML = `<div class="cm-ai-banner"><span class="spin-ico">🤖</span> Verifying best clause match with AI…</div>`;
+    aiVerification = await aiVerifyClauseMatch(aiQuerySeed, results);
+  }
+
+  renderClauseResults(results, aiVerification);
+}
+
+function renderClauseResults(results, aiVerification) {
+  const body = document.getElementById('cmBody');
   body.innerHTML = '';
+
+  if (aiVerification) {
+    const banner = document.createElement('div');
+    banner.className = 'cm-ai-banner';
+    const r = results[aiVerification.index];
+    banner.innerHTML = `🤖 <strong>AI recommendation (${esc(aiVerification.confidence)} confidence):</strong> ${r.ref ? esc(r.ref) + ' — ' : ''}${esc(r.heading || 'clause below')}. <span style="font-style:italic">${esc(aiVerification.reasoning)}</span> — highlighted below. Please verify before applying.`;
+    body.appendChild(banner);
+  } else if (results.length) {
+    const banner = document.createElement('div');
+    banner.className = 'cm-ai-banner warn';
+    banner.textContent = '⚠ AI verification unavailable or found no confident match — results below are ranked by keyword overlap only. Please review carefully before applying, especially for eligibility/legal clauses.';
+    body.appendChild(banner);
+  }
+
   const container = document.createElement('div');
   container.className = 'cm-results';
-
-  // Helper: build the "Page & Clause No." string exactly as it will fill the table cell
-  function buildClauseNo(r) {
-    const parts = [];
-    if (r.page) parts.push('Page ' + r.page);
-    if (r.ref)  parts.push(r.ref.match(/^\d/) ? 'Cl. ' + r.ref : r.ref);
-    return parts.join(' | ');
-  }
 
   results.forEach((r, i) => {
     const pct = Math.round(r.score * 100);
     const confClass = pct >= 55 ? 'high' : pct >= 30 ? 'medium' : 'low';
     const confLabel = pct >= 55 ? '✦ Strong' : pct >= 30 ? '~ Possible' : '· Weak';
+    const isAiPick = aiVerification && aiVerification.index === i;
 
-    const clauseNo = buildClauseNo(r);
     const hasSubClauses = r.subClauses && r.subClauses.length > 0;
 
     const card = document.createElement('div');
-    card.className = 'cm-result';
+    card.className = 'cm-result' + (isAiPick ? ' ai-recommended' : '');
     card.dataset.idx = i;
 
     // Sub-clause rows HTML
@@ -1855,6 +2072,7 @@ function runClauseSearch(queryText) {
       <div class="cm-result-head" style="cursor:pointer;gap:8px;" onclick="event.stopPropagation();selectSectionClause(${i},this.closest('.cm-result'))">
         <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            ${isAiPick ? `<span class="ai-badge">🤖 AI pick</span>` : ''}
             ${r.ref ? `<span class="cm-clause-ref" style="font-size:13px;">${esc(r.ref)}</span>` : ''}
             ${r.heading ? `<span style="font-size:13px;font-weight:700;color:#0B1F3A;">${esc(r.heading)}</span>` : ''}
           </div>
@@ -1865,7 +2083,7 @@ function runClauseSearch(queryText) {
           </div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
-          <span class="cm-confidence ${confClass}">${confLabel} ${pct}%</span>
+          <span class="cm-confidence ${confClass}">${confLabel} ${pct}% (keyword)</span>
           ${!hasSubClauses ? `<span style="font-size:11px;font-weight:700;background:#E8BB4A;color:#0B1F3A;border-radius:4px;padding:2px 10px;cursor:pointer;">✓ Select whole clause</span>` : `<span style="font-size:11px;color:#5B6478;font-style:italic;">↓ pick sub-clause below</span>`}
         </div>
       </div>
@@ -3166,8 +3384,8 @@ renderCorrigTable();
       <div style="display:flex;gap:8px;padding-bottom:12px;">
         <input id="cmSearchInput" type="text" placeholder="Refine search terms…"
           style="flex:1;font-size:13px;padding:7px 10px;border:1px solid #CBD3E1;border-radius:6px;font-family:inherit;"
-          oninput="clearTimeout(window._cmDbounce);window._cmDbounce=setTimeout(()=>runClauseSearch(this.value),300)" />
-        <button onclick="runClauseSearch(document.getElementById('cmSearchInput').value)"
+          oninput="clearTimeout(window._cmDbounce);window._cmDbounce=setTimeout(()=>runClauseSearch(this.value, document.getElementById('cmQueryBox').textContent),300)" />
+        <button onclick="runClauseSearch(document.getElementById('cmSearchInput').value, document.getElementById('cmQueryBox').textContent)"
           style="padding:7px 14px;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;background:#1A3A5C;color:#fff;border:none;">Search</button>
       </div>
     </div>
