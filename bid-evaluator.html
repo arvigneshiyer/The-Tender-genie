@@ -182,6 +182,7 @@
   .drag-handle{cursor:grab;text-align:center;color:var(--muted);font-size:16px;user-select:none;width:24px}
   tr[draggable="true"]:active .drag-handle{cursor:grabbing}
   tr.drag-over-row{outline:2px dashed var(--blue);outline-offset:-2px}
+  @media (max-width: 900px){
     #rootLayout{flex-direction:column;height:auto;overflow:visible}
     #appShell{height:auto;overflow-y:visible}
     #previewOverlay, #previewOverlay.wide{width:100%;flex-basis:auto;height:70vh;border-left:none;border-top:1px solid var(--border)}
