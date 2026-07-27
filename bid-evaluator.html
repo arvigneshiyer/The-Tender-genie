@@ -176,7 +176,12 @@
   .tag-split{display:flex;gap:0;flex:1 1 auto;overflow:hidden;min-height:0}
   .tag-doc{flex:1 1 55%;overflow-y:auto;padding:18px;background:var(--smoke);border-right:1px solid var(--border)}
   .tag-form-pane{flex:1 1 45%;overflow-y:auto;padding:18px}
-  @media (max-width: 900px){
+  .text-layer-overlay{pointer-events:auto}
+  .text-layer-overlay span{color:transparent;user-select:text;cursor:text}
+  .text-layer-overlay span::selection{background:rgba(196,154,45,.5);color:transparent}
+  .drag-handle{cursor:grab;text-align:center;color:var(--muted);font-size:16px;user-select:none;width:24px}
+  tr[draggable="true"]:active .drag-handle{cursor:grabbing}
+  tr.drag-over-row{outline:2px dashed var(--blue);outline-offset:-2px}
     #rootLayout{flex-direction:column;height:auto;overflow:visible}
     #appShell{height:auto;overflow-y:visible}
     #previewOverlay, #previewOverlay.wide{width:100%;flex-basis:auto;height:70vh;border-left:none;border-top:1px solid var(--border)}
@@ -492,6 +497,15 @@ function renderPreviewPanel(){
   const tagging = !!state._tagCtx;
   panel.classList.toggle('wide', tagging);
 
+  const ctx = state._tagCtx;
+  const taggingDocBody = state._previewLoading
+    ? `<div class="muted" style="padding:40px;text-align:center"><span class="spinner"></span>Rendering page…</div>`
+    : (state._previewImg
+        ? `<div style="position:relative;width:${ctx && ctx.textLayer && ctx.textLayer.width ? ctx.textLayer.width+'px' : '100%'}">
+             <img src="${state._previewImg}" style="display:block;width:100%;border:1px solid var(--border);border-radius:6px" />
+             ${ctx && ctx.textLayer && ctx.textLayer.html ? `<div class="text-layer-overlay" style="position:absolute;top:0;left:0;width:100%;height:100%">${ctx.textLayer.html}</div>` : ''}
+           </div>`
+        : `<div class="muted" style="padding:40px;text-align:center">${escapeHtml(state._previewError || 'Could not render this page.')}</div>`);
   const docBody = state._previewLoading
     ? `<div class="muted" style="padding:40px;text-align:center"><span class="spinner"></span>Rendering page…</div>`
     : (state._previewImg
@@ -502,7 +516,7 @@ function renderPreviewPanel(){
     <div class="preview-header">
       <div>
         <div class="preview-title">${escapeHtml(tagging ? tagPanelTitle(state._tagCtx) : (state._previewTitle || 'Source Page'))}</div>
-        <div class="muted">${escapeHtml(tagging ? 'Browse the document on the left, confirm the exact page, then fill in the result on the right.' : (state._previewCriterionText || ''))}</div>
+        <div class="muted">${escapeHtml(tagging ? 'Click and drag over the text on the left to select the exact clause/credential, then use "Use Selected Text" on the right.' : (state._previewCriterionText || ''))}</div>
       </div>
       <button class="secondary small" onclick="${tagging ? 'closeTagPanel()' : 'closeCriterionPreview()'}">✕ Close</button>
     </div>
@@ -519,7 +533,7 @@ function renderPreviewPanel(){
     ` : ''}
     ${tagging ? `
       <div class="tag-split">
-        <div class="tag-doc">${docBody}</div>
+        <div class="tag-doc">${taggingDocBody}</div>
         <div class="tag-form-pane">${renderTagForm()}</div>
       </div>
     ` : `<div class="preview-body">${docBody}</div>`}
@@ -938,15 +952,22 @@ function renderStage5(){
       <button class="secondary small" onclick="addManualCriterionRow('eligibility')" ${waiting?'disabled':''}>+ Add Criterion Manually</button>
     </div>
     ${state.eligibility.length ? `
+      <div class="muted" style="margin:0 0 6px">Drag the ⠿ handle to reorder. Sequence here controls the order used across Stage 7 and all exports.</div>
       <table>
-        <tr><th>#</th><th>Eligibility Conditions</th><th>Source</th><th></th></tr>
+        <tr><th></th><th>#</th><th>Eligibility Conditions</th><th>Clause No.</th><th>Source</th><th></th></tr>
         ${state.eligibility.map((c,ci)=>`
-          <tr>
+          <tr draggable="true"
+              ondragstart="dragStartCriterion(event,'eligibility',${ci})"
+              ondragover="event.preventDefault()"
+              ondrop="dragDropCriterion(event,'eligibility',${ci})"
+              class="${state._dragOverRow && state._dragOverRow.kind==='eligibility' && state._dragOverRow.index===ci ? 'drag-over-row' : ''}">
+            <td class="drag-handle" title="Drag to reorder">⠿</td>
             <td>${escapeHtml(c.originalNo != null ? String(c.originalNo) : String(ci+1))}</td>
             <td>
               ${escapeHtml(c.description)}
               ${c.manualTag ? '<div class="badge warn" style="margin-top:4px">✏️ Manually tagged</div>' : ''}
             </td>
+            <td>${c.clauseNo ? escapeHtml(c.clauseNo) : '<span class="muted">—</span>'}</td>
             <td>${c.sourcePage ? `<span class="badge ${c.sourceDoc==='Corrigendum'?'warn':'info'}">${escapeHtml(c.sourceDoc||'RFP')} p.${escapeHtml(String(c.sourcePage))}</span>` : '<span class="badge err">No source tagged</span>'}</td>
             <td>
               ${c.sourcePage ? `<button class="secondary small" onclick="showCriterionPreview(${ci})">👁 View Page</button>` : ''}
@@ -984,15 +1005,22 @@ function renderStageTechnical(){
       </div>
     ` : ''}
     ${state.scoringCriteria.length ? `
+      <div class="muted" style="margin:0 0 6px">Drag the ⠿ handle to reorder. Sequence here controls the order used across Stage 7 and all exports.</div>
       <table>
-        <tr><th>#</th><th>Criteria</th><th>Maximum Marks</th><th>Documents to be Submitted</th><th>Source</th><th></th></tr>
+        <tr><th></th><th>#</th><th>Criteria</th><th>Clause No.</th><th>Maximum Marks</th><th>Documents to be Submitted</th><th>Source</th><th></th></tr>
         ${state.scoringCriteria.map((c,ci)=>`
-          <tr>
+          <tr draggable="true"
+              ondragstart="dragStartCriterion(event,'scoring',${ci})"
+              ondragover="event.preventDefault()"
+              ondrop="dragDropCriterion(event,'scoring',${ci})"
+              class="${state._dragOverRow && state._dragOverRow.kind==='scoring' && state._dragOverRow.index===ci ? 'drag-over-row' : ''}">
+            <td class="drag-handle" title="Drag to reorder">⠿</td>
             <td>${escapeHtml(c.originalNo != null ? String(c.originalNo) : String(ci+1))}</td>
             <td>
               ${escapeHtml(c.description)}${c.requiresLiveAssessment ? ' <span class="badge warn">Live assessment only</span>' : ''}
               ${c.manualTag ? '<div class="badge warn" style="margin-top:4px">✏️ Manually tagged</div>' : ''}
             </td>
+            <td>${c.clauseNo ? escapeHtml(c.clauseNo) : '<span class="muted">—</span>'}</td>
             <td><input type="text" inputmode="decimal" value="${escapeHtml(c.maxMarks != null ? String(c.maxMarks) : '')}" style="width:70px" oninput="updateScoringMaxMarks(${ci}, this.value)"></td>
             <td>${escapeHtml(c.documentsRequired || '—')}</td>
             <td>${c.sourcePage ? `<span class="badge ${c.sourceDoc==='Corrigendum'?'warn':'info'}">${escapeHtml(c.sourceDoc||'RFP')} p.${escapeHtml(String(c.sourcePage))}</span>` : '<span class="badge err">No source tagged</span>'}</td>
@@ -1004,7 +1032,9 @@ function renderStageTechnical(){
         `).join('')}
         <tr>
           <td></td>
+          <td></td>
           <td style="text-align:right;font-weight:700">Total Maximum Marks</td>
+          <td></td>
           <td style="font-weight:700"><span id="scoringTotalMarks">${state.scoringCriteria.reduce((s,c)=>s+(Number(c.maxMarks)||0),0)}</span></td>
           <td></td><td></td><td></td>
         </tr>
@@ -1022,6 +1052,35 @@ function updateScoringMaxMarks(idx, val){
   if(totalEl){
     totalEl.textContent = state.scoringCriteria.reduce((s,c)=>s+(Number(c.maxMarks)||0),0);
   }
+}
+
+// Drag-and-drop reordering for the eligibility / technical criteria tables.
+// Sequence here is what Stage 7 iterates in and what every export uses —
+// originalNo (the source document's own serial number) is left untouched so
+// re-ordering never rewrites history, it just changes working order.
+let _dragCriterion = null; // { kind, index }
+
+function dragStartCriterion(e, kind, index){
+  _dragCriterion = { kind, index };
+  e.dataTransfer.effectAllowed = 'move';
+  try{ e.dataTransfer.setData('text/plain', JSON.stringify(_dragCriterion)); } catch(err){}
+  state._dragOverRow = null;
+}
+
+function dragDropCriterion(e, kind, targetIndex){
+  e.preventDefault();
+  let source = _dragCriterion;
+  if(!source){
+    try{ source = JSON.parse(e.dataTransfer.getData('text/plain')); } catch(err){}
+  }
+  state._dragOverRow = null;
+  if(!source || source.kind !== kind || source.index === targetIndex) { render(); return; }
+  const arr = kind === 'eligibility' ? state.eligibility : state.scoringCriteria;
+  const [moved] = arr.splice(source.index, 1);
+  arr.splice(targetIndex, 0, moved);
+  _dragCriterion = null;
+  log(`Reordered ${kind === 'eligibility' ? 'eligibility' : 'technical scoring'} criteria: moved row ${source.index+1} → position ${targetIndex+1}`);
+  render();
 }
 
 // Adds a blank criterion row the user fully controls — for cases where
@@ -2086,6 +2145,69 @@ function updateConsensus(bidder, complianceResults, scoringResults){
    In every mode the right-hand document render is the source of
    truth — the user visually confirms the page before validating.
    ============================================================ */
+// Builds an invisible, text-selectable overlay matching the rendered page
+// image pixel-for-pixel, so the user can click-drag to select the exact
+// clause/credential text on the ACTUAL document instead of retyping it.
+// Returns {html, width, height} — width/height match the canvas used by
+// renderPdfPageToImage (same scale), so the overlay can be absolutely
+// positioned over the <img> at native size.
+async function buildTextLayerOverlay(file, pageNum){
+  if(!file || !file.type || file.type !== 'application/pdf') return { html: '', width: 0, height: 0 };
+  try{
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+    if(pageNum > pdf.numPages) return { html: '', width: 0, height: 0 };
+    const page = await pdf.getPage(pageNum);
+    const viewport = page.getViewport({scale: 1.6});
+    const content = await page.getTextContent();
+    let html = '';
+    for(const item of content.items){
+      if(!item.str || !item.str.trim()) continue;
+      const tr = item.transform;
+      const w = item.width || 1, h = item.height || Math.hypot(tr[2], tr[3]) || 10;
+      const p1 = viewport.convertToViewportPoint(tr[4], tr[5]);
+      const p2 = viewport.convertToViewportPoint(tr[4]+w, tr[5]+h);
+      const left = Math.min(p1[0], p2[0]), top = Math.min(p1[1], p2[1]);
+      const width = Math.max(Math.abs(p2[0]-p1[0]), 2);
+      const fontSize = Math.max(Math.abs(p2[1]-p1[1]), 6);
+      html += `<span data-page="${pageNum}" style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${fontSize}px;font-size:${fontSize}px;line-height:${fontSize}px;white-space:pre">${escapeHtml(item.str)}</span>`;
+    }
+    return { html, width: viewport.width, height: viewport.height };
+  } catch(err){
+    return { html: '', width: 0, height: 0 };
+  }
+}
+
+// Reads the user's current text selection (made by click-dragging over the
+// invisible text layer on top of the document image) and, if it falls
+// inside our text-layer overlay, applies it to the active tag panel's form —
+// along with the page number already on screen, and a best-effort clause
+// number auto-detected from the selected text itself.
+function useSelectedTextForTag(){
+  const ctx = state._tagCtx;
+  if(!ctx){ return; }
+  const sel = window.getSelection ? window.getSelection() : null;
+  const text = sel ? sel.toString().replace(/\s+/g, ' ').trim() : '';
+  if(!text){ alert('Click and drag over the document on the left to select the exact clause or credential text first.'); return; }
+
+  const clauseMatch = text.match(/\b(\d{1,2}(?:\.\d{1,2}){1,3})\b/);
+  if(clauseMatch) ctx.form.clauseNo = clauseMatch[1];
+
+  if(ctx.kind === 'critElig' || ctx.kind === 'critScore'){
+    ctx.form.description = text;
+  } else if(ctx.kind === 'compliance' || ctx.kind === 'newCompliance'){
+    ctx.form.evidence = text;
+    ctx.form.evidenceQuote = text.length <= 100 ? text : text.slice(0, 100);
+  } else if(ctx.kind === 'scoring' || ctx.kind === 'newScoring'){
+    ctx.form.justification = text;
+    ctx.form.evidenceQuote = text.length <= 100 ? text : text.slice(0, 100);
+  }
+  log(`Captured selected text (page ${ctx.page}${ctx.form.clauseNo ? ', clause ' + ctx.form.clauseNo : ''}): "${text.slice(0,80)}${text.length>80?'…':''}"`);
+  render();
+}
+
+
+
 const tagPdfCache = new Map(); // filename -> {numPages}
 
 async function getFileNumPages(file){
@@ -2117,6 +2239,7 @@ async function openTagPanel(kind, index, bidderIdx){
     ctx.form = {
       description: item ? item.description : '',
       maxMarks: item && kind==='critScore' ? item.maxMarks : undefined,
+      clauseNo: item ? (item.clauseNo || '') : '',
     };
   } else if(kind === 'compliance' || kind === 'scoring'){
     const bidder = state.bidders[bidderIdx];
@@ -2125,15 +2248,15 @@ async function openTagPanel(kind, index, bidderIdx){
     ctx.file = bidder.technicalFile;
     ctx.page = (item && item.evidencePage) ? parseInt(item.evidencePage,10) : 1;
     ctx.form = kind === 'compliance'
-      ? { status: item.status || 'Compliant', evidence: item.evidence || '', evidenceQuote: item.evidenceQuote || '', note: item.overrideNote || '' }
-      : { marksAwarded: item.marksAwarded ?? 0, maxMarks: item.maxMarks, justification: item.justification || '', evidenceQuote: item.evidenceQuote || '', note: item.overrideNote || '' };
+      ? { status: item.status || 'Compliant', evidence: item.evidence || '', evidenceQuote: item.evidenceQuote || '', clauseNo: item.clauseNo || '', note: item.overrideNote || '' }
+      : { marksAwarded: item.marksAwarded ?? 0, maxMarks: item.maxMarks, justification: item.justification || '', evidenceQuote: item.evidenceQuote || '', clauseNo: item.clauseNo || '', note: item.overrideNote || '' };
   } else if(kind === 'newCompliance' || kind === 'newScoring'){
     const bidder = state.bidders[bidderIdx];
     ctx.file = bidder.technicalFile;
     ctx.page = 1;
     ctx.form = kind === 'newCompliance'
-      ? { description: '', status: 'Compliant', evidence: '', evidenceQuote: '', note: '' }
-      : { name: '', maxMarks: '', marksAwarded: 0, justification: '', evidenceQuote: '', note: '' };
+      ? { description: '', status: 'Compliant', evidence: '', evidenceQuote: '', clauseNo: '', note: '' }
+      : { name: '', maxMarks: '', marksAwarded: 0, justification: '', evidenceQuote: '', clauseNo: '', note: '' };
   }
 
   // Resolve the actual file object + total page count for navigation.
@@ -2146,6 +2269,8 @@ async function openTagPanel(kind, index, bidderIdx){
   await renderTagPage();
 }
 
+const textLayerCache = new Map(); // "filename|page" -> {html,width,height}
+
 async function renderTagPage(){
   const ctx = state._tagCtx;
   if(!ctx) return;
@@ -2153,6 +2278,7 @@ async function renderTagPage(){
   state._previewLoading = true;
   state._previewImg = null;
   state._previewError = null;
+  ctx.textLayer = null;
   render();
   try{
     if(!ctx.file) throw new Error('No source file available to display for this document');
@@ -2164,6 +2290,14 @@ async function renderTagPage(){
       pageImageCache.set(cacheKey, dataUrl);
     }
     state._previewImg = dataUrl;
+
+    const tlKey = ctx.file.name + '|' + ctx.page;
+    let tl = textLayerCache.get(tlKey);
+    if(!tl){
+      tl = await buildTextLayerOverlay(ctx.file, ctx.page);
+      textLayerCache.set(tlKey, tl);
+    }
+    ctx.textLayer = tl;
   } catch(err){
     state._previewError = 'Could not render page: ' + err.message;
   }
@@ -2226,6 +2360,7 @@ function saveTagPanel(){
     }
     item.sourcePage = ctx.page;
     item.sourceDoc = ctx.fileChoice;
+    item.clauseNo = (ctx.form.clauseNo || '').trim() || null;
     item.manualTag = true;
     log(`Tagged source for "${item.description.slice(0,60)}" → ${ctx.fileChoice} p.${ctx.page}`);
   }
@@ -2238,6 +2373,7 @@ function saveTagPanel(){
     item.status = ctx.form.status;
     item.evidence = ctx.form.evidence || '';
     item.evidenceQuote = ctx.form.evidenceQuote || null;
+    item.clauseNo = (ctx.form.clauseNo || '').trim() || null;
     item.evidencePage = ctx.page;
     item.manualOverride = true;
     item.overrideNote = ctx.form.note || '';
@@ -2256,6 +2392,7 @@ function saveTagPanel(){
     item.marksAwarded = val;
     item.justification = ctx.form.justification || item.justification || '';
     item.evidenceQuote = ctx.form.evidenceQuote || null;
+    item.clauseNo = (ctx.form.clauseNo || '').trim() || null;
     item.evidencePage = ctx.page;
     item.manualOverride = true;
     item.overrideNote = ctx.form.note || '';
@@ -2275,6 +2412,7 @@ function saveTagPanel(){
       status: ctx.form.status,
       evidence: ctx.form.evidence || '',
       evidenceQuote: ctx.form.evidenceQuote || null,
+      clauseNo: (ctx.form.clauseNo || '').trim() || null,
       evidencePage: ctx.page,
       manualOverride: true,
       overrideNote: ctx.form.note || '',
@@ -2300,6 +2438,7 @@ function saveTagPanel(){
       marksAwarded: awarded,
       requiresLiveAssessment: false,
       evidenceQuote: ctx.form.evidenceQuote || null,
+      clauseNo: (ctx.form.clauseNo || '').trim() || null,
       evidencePage: ctx.page,
       justification: ctx.form.justification || '',
       manualOverride: true,
@@ -2350,14 +2489,25 @@ function renderTagForm(){
     </div>
   `;
 
+  const useSelectionBlock = `
+    <div class="row" style="margin-top:10px;background:var(--smoke);padding:10px;border-radius:6px">
+      <button class="secondary small" onclick="useSelectedTextForTag()">📋 Use Selected Text</button>
+      <span class="muted" style="flex:1;min-width:160px">Click-drag over the document on the left to select the clause/credential, then click this.</span>
+    </div>
+    <div class="sub" style="margin-top:10px">Clause No. (auto-filled from selection when detected; edit if needed)</div>
+    <input type="text" value="${escapeHtml(ctx.form.clauseNo || '')}" onchange="tagFormSet('clauseNo', this.value)">
+  `;
+
   let fields = '';
   if(ctx.kind === 'critElig'){
     fields = `
+      ${useSelectionBlock}
       <div class="sub" style="margin-top:14px">Criterion description</div>
       <textarea style="min-height:70px" onchange="tagFormSet('description', this.value)">${escapeHtml(ctx.form.description)}</textarea>
     `;
   } else if(ctx.kind === 'critScore'){
     fields = `
+      ${useSelectionBlock}
       <div class="sub" style="margin-top:14px">Criterion description</div>
       <textarea style="min-height:70px" onchange="tagFormSet('description', this.value)">${escapeHtml(ctx.form.description)}</textarea>
       <div class="sub" style="margin-top:10px">Maximum marks</div>
@@ -2365,6 +2515,7 @@ function renderTagForm(){
     `;
   } else if(ctx.kind === 'compliance'){
     fields = `
+      ${useSelectionBlock}
       <div class="sub" style="margin-top:14px">Status</div>
       <div class="row" style="margin-top:0">
         ${['Compliant','Non-Compliant','Needs Clarification'].map(s=>`
@@ -2385,6 +2536,7 @@ function renderTagForm(){
     `;
   } else if(ctx.kind === 'scoring'){
     fields = `
+      ${useSelectionBlock}
       <div class="sub" style="margin-top:14px">Marks awarded (0–${escapeHtml(String(ctx.form.maxMarks))})</div>
       <input type="text" inputmode="decimal" value="${escapeHtml(String(ctx.form.marksAwarded))}" onchange="tagFormSet('marksAwarded', this.value)">
       <div class="sub" style="margin-top:10px">Justification</div>
@@ -2399,6 +2551,7 @@ function renderTagForm(){
     `;
   } else if(ctx.kind === 'newCompliance'){
     fields = `
+      ${useSelectionBlock}
       <div class="sub" style="margin-top:14px">Criterion description</div>
       <textarea style="min-height:60px" onchange="tagFormSet('description', this.value)">${escapeHtml(ctx.form.description)}</textarea>
       <div class="sub" style="margin-top:10px">Status</div>
@@ -2421,6 +2574,7 @@ function renderTagForm(){
     `;
   } else if(ctx.kind === 'newScoring'){
     fields = `
+      ${useSelectionBlock}
       <div class="sub" style="margin-top:14px">Criterion name</div>
       <input type="text" value="${escapeHtml(ctx.form.name)}" onchange="tagFormSet('name', this.value)">
       <div class="sub" style="margin-top:10px">Maximum marks</div>
@@ -2812,18 +2966,60 @@ async function exportAnnexureWord(){
   if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Building annexure…'; }
   setProcessing(8);
   try{
-    const { Document, Packer, Paragraph, TextRun, HeadingLevel, ImageRun, AlignmentType } = docx;
+    const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, HeadingLevel, ImageRun, AlignmentType, WidthType, ShadingType } = docx;
     const children = [];
+
+    // Assign a stable Annexure No. to every criterion (in current — possibly
+    // drag-reordered — sequence): eligibility criteria first, then technical
+    // criteria continuing the same running count. The same Annexure No. is
+    // reused for that criterion across every bidder's section below, since
+    // it's tied to the RFP clause, not to any one bidder's proof.
+    const annexureIndex = new Map(); // criterionId -> {annexureNo, type, clauseNo, rfpPage, description}
+    let n = 1;
+    state.eligibility.forEach(c => {
+      annexureIndex.set(c.id, { annexureNo: n++, type: 'Eligibility', clauseNo: c.clauseNo || c.originalNo || '—', rfpPage: c.sourcePage || '—', description: c.description });
+    });
+    state.scoringCriteria.forEach(c => {
+      annexureIndex.set(c.id, { annexureNo: n++, type: 'Technical', clauseNo: c.clauseNo || c.originalNo || '—', rfpPage: c.sourcePage || '—', description: c.description });
+    });
 
     children.push(new Paragraph({ text: 'Detailed Bid Evaluation — Annexure of Cited Proof', heading: HeadingLevel.HEADING_1, spacing:{after:100} }));
     children.push(new Paragraph({ text: `NIT No: ${state.tender.nitNo || 'n/a'}   |   Department: ${state.tender.department || 'n/a'}`, spacing:{after:200} }));
+
+    // --- Annexure Index (total clauses, up top) ---
+    children.push(new Paragraph({ text: `Annexure Index — Total Clauses: ${annexureIndex.size}`, heading: HeadingLevel.HEADING_2, spacing:{after:120} }));
+    const idxRows = [['Annexure No.', 'Type', 'Clause No.', 'Pg. No. in RFP', 'Description']];
+    for(const meta of annexureIndex.values()){
+      idxRows.push([String(meta.annexureNo), meta.type, String(meta.clauseNo), String(meta.rfpPage), meta.description]);
+    }
+    const idxColW = [900, 1200, 1200, 1400, 6000];
+    children.push(new Table({
+      width: { size: idxColW.reduce((a,b)=>a+b,0), type: WidthType.DXA },
+      columnWidths: idxColW,
+      rows: idxRows.map((r,ri) => new TableRow({ children: r.map((v,ci) => new TableCell({
+        width: { size: idxColW[ci], type: WidthType.DXA },
+        shading: ri===0 ? { type: ShadingType.CLEAR, fill: 'D4D8E2' } : undefined,
+        children: [ new Paragraph({ children: [ new TextRun({ text: v, bold: ri===0 }) ] }) ],
+      })) })),
+    }));
+    children.push(new Paragraph({ text: '', spacing:{after:200} }));
     children.push(new Paragraph({ text: 'Each item below shows the evaluator\'s finding alongside the exact page of the bidder\'s submission relied upon, with the cited credential/clause boxed for quick visual verification.', spacing:{after:200} }));
 
     const MAX_IMG_WIDTH = 560; // px, scaled to fit page
 
-    async function addEvidenceBlock(item, tick, headerText, bodyLines, file){
+    async function addEvidenceBlock(item, tick, headerText, bodyLines, file, meta){
+      if(meta){
+        children.push(new Paragraph({
+          spacing: { before: 260, after: 20 },
+          children: [ new TextRun({ text: `Annexure No. ${meta.annexureNo}`, bold: true, size: 26 }) ],
+        }));
+        children.push(new Paragraph({
+          spacing: { after: 100 },
+          children: [ new TextRun({ text: `Proof against ${meta.type.toLowerCase()} clause no. ${meta.clauseNo}, pg. no. ${meta.rfpPage} in RFP`, italics: true }) ],
+        }));
+      }
       children.push(new Paragraph({
-        spacing: { before: 200, after: 80 },
+        spacing: { before: 100, after: 80 },
         children: [ new TextRun({ text: `${tick} `, bold: true, size: 28 }), new TextRun({ text: headerText, bold: true }) ],
       }));
       bodyLines.filter(Boolean).forEach(line => {
@@ -2845,7 +3041,7 @@ async function exportAnnexureWord(){
             spacing: { after: 40 },
             children: [ new ImageRun({ data: dataUrlToUint8Array(dataUrl), transformation: { width: w, height: h } }) ],
           }));
-          children.push(new Paragraph({ text: `Source: Page ${item.evidencePage}${item.evidenceQuote ? ' — boxed region shows the cited text' : ' (no exact quote captured — full page shown)'}`, spacing:{after:200} }));
+          children.push(new Paragraph({ text: `Source: Bidder's submission, Page ${item.evidencePage}${item.evidenceQuote ? ' — boxed region shows the cited text' : ' (no exact quote captured — full page shown)'}`, spacing:{after:200} }));
         } catch(err){
           children.push(new Paragraph({ text: `[Could not render page ${item.evidencePage}: ${err.message}]`, spacing:{after:200} }));
         }
@@ -2862,11 +3058,12 @@ async function exportAnnexureWord(){
         children.push(new Paragraph({ text: 'Eligibility Compliance', heading: HeadingLevel.HEADING_3, spacing:{after:80} }));
         for(const item of compliance){
           const tick = item.status === 'Compliant' ? '✓' : (item.status === 'Non-Compliant' ? '✗' : '⚠');
+          const meta = annexureIndex.get(item.criterionId) || { annexureNo: '—', type: 'Eligibility', clauseNo: item.clauseNo || '—', rfpPage: '—' };
           await addEvidenceBlock(
             item, tick,
             `${item.description}  —  ${item.status}${item.manualOverride ? ' (manually set)' : ''}`,
             [item.evidence, item.evidenceQuote ? `Cited text: "${item.evidenceQuote}"` : null, item.overrideNote ? `Note: ${item.overrideNote}` : null],
-            bidder.technicalFile
+            bidder.technicalFile, meta
           );
         }
       }
@@ -2875,8 +3072,10 @@ async function exportAnnexureWord(){
       if(scoring.length){
         children.push(new Paragraph({ text: 'Technical Scoring', heading: HeadingLevel.HEADING_3, spacing:{before:200, after:80} }));
         for(const item of scoring){
+          const meta = annexureIndex.get(item.criterionId) || { annexureNo: '—', type: 'Technical', clauseNo: item.clauseNo || '—', rfpPage: '—' };
           if(item.requiresLiveAssessment){
-            children.push(new Paragraph({ children:[new TextRun({text:'⚠ ', bold:true, size:28}), new TextRun({text:`${item.name} — pending live assessment`, bold:true})], spacing:{before:200,after:200} }));
+            children.push(new Paragraph({ spacing:{before:260,after:20}, children:[new TextRun({text:`Annexure No. ${meta.annexureNo}`, bold:true, size:26})] }));
+            children.push(new Paragraph({ children:[new TextRun({text:'⚠ ', bold:true, size:28}), new TextRun({text:`${item.name} — pending live assessment`, bold:true})], spacing:{before:20,after:200} }));
             continue;
           }
           const pct = item.maxMarks ? (item.marksAwarded||0)/item.maxMarks : 0;
@@ -2885,7 +3084,7 @@ async function exportAnnexureWord(){
             item, tick,
             `${item.name}  —  ${item.marksAwarded ?? '—'} / ${item.maxMarks ?? '—'}${item.manualOverride ? ' (manually set)' : ''}`,
             [item.justification, item.evidenceQuote ? `Cited text: "${item.evidenceQuote}"` : null, item.overrideNote ? `Note: ${item.overrideNote}` : null],
-            bidder.technicalFile
+            bidder.technicalFile, meta
           );
           if(item.breakdown && item.breakdown.length){
             for(const b of item.breakdown){
@@ -2893,7 +3092,7 @@ async function exportAnnexureWord(){
                 b, (b.marksForThis && b.marksForThis>0) ? '✓' : '•',
                 `↳ ${b.label}${b.marksForThis!=null ? ' — ' + b.marksForThis + ' marks' : ''}`,
                 [b.detail, b.evidenceQuote ? `Cited text: "${b.evidenceQuote}"` : null],
-                bidder.technicalFile
+                bidder.technicalFile, null
               );
             }
           }
@@ -2912,7 +3111,7 @@ async function exportAnnexureWord(){
     a.href = url; a.download = 'Bid_Evaluation_Annexure.docx';
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
-    log('Detailed annexure exported (with boxed evidence proof)');
+    log('Detailed annexure exported (with annexure index and cited proof)');
   } catch(err){
     log('Annexure export failed: ' + err.message);
     alert('Annexure export failed: ' + err.message);
