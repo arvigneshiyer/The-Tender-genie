@@ -163,17 +163,25 @@
   .boot-bar{width:200px;height:3px;background:rgba(255,255,255,.15);border-radius:2px;overflow:hidden}
   .boot-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--goldL));border-radius:2px;animation:load 1.4s ease-in-out forwards}
   @keyframes load{from{width:0}to{width:100%}}
-  #previewOverlay{position:fixed;inset:0;z-index:5000}
-  .preview-scrim{position:absolute;inset:0;background:rgba(11,31,58,.55)}
-  .preview-pane{
-    position:absolute;top:0;right:0;bottom:0;width:min(560px,90vw);
-    background:var(--white);box-shadow:-8px 0 24px rgba(11,31,58,.25);
-    display:flex;flex-direction:column;animation:slideIn .25s ease-out;
-  }
-  @keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
-  .preview-header{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+  #rootLayout{display:flex;height:100vh;overflow:hidden}
+  #appShell{flex:1 1 auto;min-width:0;height:100vh;overflow-y:auto}
+  #rootLayout.split #appShell{flex-basis:50%}
+  #previewOverlay{flex:0 0 50%;width:50%;height:100vh;overflow-y:auto;border-left:1px solid var(--border);box-shadow:-4px 0 16px rgba(11,31,58,.08);background:var(--white);display:flex;flex-direction:column;animation:slideIn .2s ease-out}
+  #previewOverlay.wide{flex-basis:min(70%,1100px);width:min(70%,1100px)}
+  @keyframes slideIn{from{opacity:0}to{opacity:1}}
+  .preview-header{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex:0 0 auto}
   .preview-title{font-size:15px;font-weight:700;color:var(--navy);font-family:-apple-system,Segoe UI,Roboto,sans-serif}
-  .preview-body{flex:1;overflow:auto;padding:18px}
+  .preview-nav{padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--smoke);flex:0 0 auto}
+  .preview-body{flex:1 1 auto;overflow-y:auto;padding:18px}
+  .tag-split{display:flex;gap:0;flex:1 1 auto;overflow:hidden;min-height:0}
+  .tag-doc{flex:1 1 55%;overflow-y:auto;padding:18px;background:var(--smoke);border-right:1px solid var(--border)}
+  .tag-form-pane{flex:1 1 45%;overflow-y:auto;padding:18px}
+  @media (max-width: 900px){
+    #rootLayout{flex-direction:column;height:auto;overflow:visible}
+    #appShell{height:auto;overflow-y:visible}
+    #previewOverlay, #previewOverlay.wide{width:100%;flex-basis:auto;height:70vh;border-left:none;border-top:1px solid var(--border)}
+    .tag-split{flex-direction:column}
+  }
 </style>
 </head>
 <body>
@@ -185,13 +193,17 @@
   <div class="boot-bar"><div class="boot-fill"></div></div>
 </div>
 
-<header>
-  <h1>The Tender <span>Genie</span> — Bid Evaluator</h1>
-</header>
+<div id="rootLayout">
+  <div id="appShell">
+    <header>
+      <h1>The Tender <span>Genie</span> — Bid Evaluator</h1>
+    </header>
 
-<div id="rfpBannerHost"></div>
-<div class="stage-track" id="stepNav"></div>
-<main id="mainArea"></main>
+    <div id="rfpBannerHost"></div>
+    <div class="stage-track" id="stepNav"></div>
+    <main id="mainArea"></main>
+  </div>
+</div>
 
 <script>
 window.addEventListener('load', () => {
@@ -461,37 +473,56 @@ function renderRfpBanner(){
 const pageImageCache = new Map(); // "filename|page" -> dataURL
 
 function renderPreviewPanel(){
+  const root = document.getElementById('rootLayout');
   let panel = document.getElementById('previewOverlay');
+
+  if(!state._previewOpen){
+    if(panel) panel.remove();
+    if(root) root.classList.remove('split');
+    return;
+  }
+
   if(!panel){
     panel = document.createElement('div');
     panel.id = 'previewOverlay';
-    document.body.appendChild(panel);
+    root.appendChild(panel);
   }
-  if(!state._previewOpen){
-    panel.innerHTML = '';
-    panel.style.display = 'none';
-    return;
-  }
-  panel.style.display = 'block';
+  root.classList.add('split');
+
+  const tagging = !!state._tagCtx;
+  panel.classList.toggle('wide', tagging);
+
+  const docBody = state._previewLoading
+    ? `<div class="muted" style="padding:40px;text-align:center"><span class="spinner"></span>Rendering page…</div>`
+    : (state._previewImg
+        ? `<img src="${state._previewImg}" style="width:100%;border:1px solid var(--border);border-radius:6px" />`
+        : `<div class="muted" style="padding:40px;text-align:center">${escapeHtml(state._previewError || 'Could not render this page. Use the page controls to browse the document, or check that the source file was uploaded.')}</div>`);
+
   panel.innerHTML = `
-    <div class="preview-scrim" onclick="closeCriterionPreview()"></div>
-    <div class="preview-pane">
-      <div class="preview-header">
-        <div>
-          <div class="preview-title">${escapeHtml(state._previewTitle || 'Source Page')}</div>
-          <div class="muted">${escapeHtml(state._previewCriterionText || '')}</div>
-        </div>
-        <button class="secondary small" onclick="closeCriterionPreview()">✕ Close</button>
+    <div class="preview-header">
+      <div>
+        <div class="preview-title">${escapeHtml(tagging ? tagPanelTitle(state._tagCtx) : (state._previewTitle || 'Source Page'))}</div>
+        <div class="muted">${escapeHtml(tagging ? 'Browse the document on the left, confirm the exact page, then fill in the result on the right.' : (state._previewCriterionText || ''))}</div>
       </div>
-      <div class="preview-body">
-        ${state._previewLoading
-          ? `<div class="muted" style="padding:40px;text-align:center"><span class="spinner"></span>Rendering page…</div>`
-          : (state._previewImg
-              ? `<img src="${state._previewImg}" style="width:100%;border:1px solid var(--border);border-radius:6px" />`
-              : `<div class="muted" style="padding:40px;text-align:center">${escapeHtml(state._previewError || 'Could not render this page.')}</div>`)
-        }
-      </div>
+      <button class="secondary small" onclick="${tagging ? 'closeTagPanel()' : 'closeCriterionPreview()'}">✕ Close</button>
     </div>
+    ${(!tagging && state._previewCtx) ? `
+      <div class="preview-nav">
+        <button class="secondary small" onclick="navPreviewPage(-1)" ${state._previewCtx.page<=1?'disabled':''}>← Prev</button>
+        <span class="muted">Page
+          <input type="text" inputmode="numeric" value="${state._previewCtx.page}" style="width:50px;display:inline-block;text-align:center" onchange="jumpPreviewPage(this.value)">
+          / ${state._previewCtx.numPages}
+        </span>
+        <button class="secondary small" onclick="navPreviewPage(1)" ${state._previewCtx.page>=state._previewCtx.numPages?'disabled':''}>Next →</button>
+        <span class="muted" style="margin-left:auto">Wrong page? Browse to find the right one.</span>
+      </div>
+    ` : ''}
+    ${tagging ? `
+      <div class="tag-split">
+        <div class="tag-doc">${docBody}</div>
+        <div class="tag-form-pane">${renderTagForm()}</div>
+      </div>
+    ` : `<div class="preview-body">${docBody}</div>`}
   `;
 }
 
@@ -522,28 +553,39 @@ async function showBidEvidencePreview(bidderIdx, kind, itemIndex){
     : (state.scoringResults[bidder.id] || [])[itemIndex];
   if(!item || !item.evidencePage) { log('Preview unavailable — no page reference for this item'); return; }
   const label = kind === 'compliance' ? item.description : item.name;
-  await openPagePreview(bidder.technicalFile, item.evidencePage, `${bidder.name} — Technical Bid, Page ${item.evidencePage}`, label);
+  await openPagePreview(bidder.technicalFile, item.evidencePage, `${bidder.name} — Technical Bid, Page ${item.evidencePage}`, label, item.evidenceQuote);
 }
 
 // Core preview logic shared by all three entry points above.
-async function openPagePreview(file, sourcePage, title, contextText){
+async function openPagePreview(file, sourcePage, title, contextText, quote){
   if(!file){ log('Preview unavailable — source file not found'); return; }
   const pageNum = parseInt(sourcePage, 10);
   if(!pageNum || pageNum < 1){ log('Preview unavailable — no valid page number'); return; }
 
+  const numPages = await getFileNumPages(file);
+  state._previewCtx = { file, page: Math.min(pageNum, numPages), numPages, quote, title, contextText };
   state._previewOpen = true;
+  await renderPreviewImage();
+}
+
+// Re-renders the currently open plain preview's page image (used on open and
+// whenever the user navigates to a different page — the extraction may well
+// have pointed at the wrong page, so browsing nearby pages is expected).
+async function renderPreviewImage(){
+  const ctx = state._previewCtx;
+  if(!ctx) return;
   state._previewLoading = true;
   state._previewImg = null;
   state._previewError = null;
-  state._previewTitle = title;
-  state._previewCriterionText = contextText || '';
+  state._previewTitle = ctx.title;
+  state._previewCriterionText = ctx.contextText || '';
   render();
 
-  const cacheKey = file.name + '|' + pageNum;
+  const cacheKey = ctx.file.name + '|' + ctx.page + (ctx.quote ? ('|q:' + ctx.quote) : '');
   try{
     let dataUrl = pageImageCache.get(cacheKey);
     if(!dataUrl){
-      dataUrl = await renderPdfPageToImage(file, pageNum);
+      dataUrl = await renderPdfPageToImage(ctx.file, ctx.page, ctx.quote);
       pageImageCache.set(cacheKey, dataUrl);
     }
     state._previewImg = dataUrl;
@@ -555,12 +597,31 @@ async function openPagePreview(file, sourcePage, title, contextText){
   render();
 }
 
+function navPreviewPage(delta){
+  const ctx = state._previewCtx;
+  if(!ctx) return;
+  const next = ctx.page + delta;
+  if(next < 1 || next > ctx.numPages) return;
+  ctx.page = next;
+  renderPreviewImage();
+}
+
+function jumpPreviewPage(val){
+  const ctx = state._previewCtx;
+  if(!ctx) return;
+  const n = parseInt(val, 10);
+  if(!n || n < 1 || n > ctx.numPages) return;
+  ctx.page = n;
+  renderPreviewImage();
+}
+
 function closeCriterionPreview(){
   state._previewOpen = false;
+  state._previewCtx = null;
   render();
 }
 
-async function renderPdfPageToImage(file, pageNum){
+async function renderPdfPageToImage(file, pageNum, quote){
   if(!file.type || file.type !== 'application/pdf'){
     // Image file (e.g. scanned corrigendum page uploaded as a single image) — just show it directly.
     return await fileToDataUrl(file);
@@ -572,8 +633,77 @@ async function renderPdfPageToImage(file, pageNum){
   const viewport = page.getViewport({scale: 1.6});
   const canvas = document.createElement('canvas');
   canvas.width = viewport.width; canvas.height = viewport.height;
-  await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+  const ctx2d = canvas.getContext('2d');
+  await page.render({canvasContext: ctx2d, viewport}).promise;
+  if(quote){
+    const box = await findQuoteBoxOnPage(pdf, pageNum, quote, viewport);
+    if(box){
+      ctx2d.save();
+      ctx2d.strokeStyle = '#C0392B';
+      ctx2d.lineWidth = 3;
+      ctx2d.strokeRect(box.x, box.y, box.width, box.height);
+      ctx2d.restore();
+    }
+  }
   return canvas.toDataURL('image/png');
+}
+
+// Locates a short verbatim quote within a PDF page's text content and returns
+// its bounding box in viewport (canvas pixel) coordinates, or null if the
+// quote isn't found (e.g. OCR noise, or the AI paraphrased slightly). Matching
+// is whitespace-tolerant since PDF text extraction often inserts irregular
+// spacing at line/column boundaries.
+async function findQuoteBoxOnPage(pdf, pageNum, quote, viewport){
+  if(!quote || !quote.trim()) return null;
+  try{
+    const page = await pdf.getPage(pageNum);
+    const content = await page.getTextContent();
+    const items = content.items;
+    if(!items.length) return null;
+
+    let concat = '';
+    const offsets = []; // offsets[i] = start char offset of items[i] in concat
+    for(let i=0; i<items.length; i++){
+      offsets.push(concat.length);
+      concat += items[i].str + ' ';
+    }
+    const concatLower = concat.toLowerCase();
+    const normQuote = quote.toLowerCase().trim().replace(/\s+/g, ' ');
+    if(!normQuote) return null;
+    // Whitespace-tolerant regex: escape special chars, collapse spaces to \s+
+    const pattern = normQuote
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\s+/g, '\\s+');
+    let match;
+    try{ match = concatLower.match(new RegExp(pattern)); } catch(e){ match = null; }
+    if(!match || match.index === undefined) return null;
+    const start = match.index, end = match.index + match[0].length;
+
+    const matchedIdx = [];
+    for(let i=0; i<items.length; i++){
+      const itemStart = offsets[i], itemEnd = offsets[i] + items[i].str.length;
+      if(itemEnd > start && itemStart < end) matchedIdx.push(i);
+    }
+    if(!matchedIdx.length) return null;
+
+    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+    for(const i of matchedIdx){
+      const it = items[i];
+      const tr = it.transform; // [a,b,c,d,e,f] in PDF user space
+      const w = it.width || 1, h = it.height || Math.hypot(tr[2], tr[3]) || 10;
+      const corners = [[tr[4], tr[5]], [tr[4]+w, tr[5]], [tr[4], tr[5]+h], [tr[4]+w, tr[5]+h]];
+      for(const [px, py] of corners){
+        const [vx, vy] = viewport.convertToViewportPoint(px, py);
+        if(vx < minX) minX = vx; if(vx > maxX) maxX = vx;
+        if(vy < minY) minY = vy; if(vy > maxY) maxY = vy;
+      }
+    }
+    if(!isFinite(minX) || !isFinite(minY)) return null;
+    const pad = 4;
+    return { x: minX-pad, y: minY-pad, width: (maxX-minX)+2*pad, height: (maxY-minY)+2*pad };
+  } catch(err){
+    return null;
+  }
 }
 
 function fileToDataUrl(file){
@@ -804,15 +934,24 @@ function renderStage5(){
     </div>
 
     ${waiting ? `<div class="muted" style="margin-top:6px">Waiting for RFP upload (Stage 1)…</div>` : ''}
+    <div class="row" style="margin-top:0">
+      <button class="secondary small" onclick="addManualCriterionRow('eligibility')" ${waiting?'disabled':''}>+ Add Criterion Manually</button>
+    </div>
     ${state.eligibility.length ? `
       <table>
         <tr><th>#</th><th>Eligibility Conditions</th><th>Source</th><th></th></tr>
         ${state.eligibility.map((c,ci)=>`
           <tr>
             <td>${escapeHtml(c.originalNo != null ? String(c.originalNo) : String(ci+1))}</td>
-            <td>${escapeHtml(c.description)}</td>
-            <td>${c.sourcePage ? `<span class="badge ${c.sourceDoc==='Corrigendum'?'warn':'info'}">${escapeHtml(c.sourceDoc||'RFP')} p.${escapeHtml(String(c.sourcePage))}</span>` : '—'}</td>
-            <td>${c.sourcePage ? `<button class="secondary small" onclick="showCriterionPreview(${ci})">👁 View Page</button>` : ''}</td>
+            <td>
+              ${escapeHtml(c.description)}
+              ${c.manualTag ? '<div class="badge warn" style="margin-top:4px">✏️ Manually tagged</div>' : ''}
+            </td>
+            <td>${c.sourcePage ? `<span class="badge ${c.sourceDoc==='Corrigendum'?'warn':'info'}">${escapeHtml(c.sourceDoc||'RFP')} p.${escapeHtml(String(c.sourcePage))}</span>` : '<span class="badge err">No source tagged</span>'}</td>
+            <td>
+              ${c.sourcePage ? `<button class="secondary small" onclick="showCriterionPreview(${ci})">👁 View Page</button>` : ''}
+              <button class="secondary small" onclick="openTagPanel('critElig', ${ci})">🏷 Tag / Validate Source</button>
+            </td>
           </tr>
         `).join('')}
       </table>
@@ -835,6 +974,9 @@ function renderStageTechnical(){
       ${!waiting ? `<button class="secondary small" onclick="runScoringCriteriaExtraction()" id="scoreCritBtn" title="Run again if some criteria seem missing">🔄 Re-extract</button>` : ''}
     </div>
     ${waiting ? `<div class="muted" style="margin-top:6px">Waiting for RFP upload (Stage 1)…</div>` : ''}
+    <div class="row" style="margin-top:0">
+      <button class="secondary small" onclick="addManualCriterionRow('scoring')" ${waiting?'disabled':''}>+ Add Criterion Manually</button>
+    </div>
     ${state.selectionMethod.method ? `
       <div class="kv">
         <div>Selection Method</div><div>${escapeHtml(state.selectionMethod.method)}</div>
@@ -847,11 +989,17 @@ function renderStageTechnical(){
         ${state.scoringCriteria.map((c,ci)=>`
           <tr>
             <td>${escapeHtml(c.originalNo != null ? String(c.originalNo) : String(ci+1))}</td>
-            <td>${escapeHtml(c.description)}${c.requiresLiveAssessment ? ' <span class="badge warn">Live assessment only</span>' : ''}</td>
+            <td>
+              ${escapeHtml(c.description)}${c.requiresLiveAssessment ? ' <span class="badge warn">Live assessment only</span>' : ''}
+              ${c.manualTag ? '<div class="badge warn" style="margin-top:4px">✏️ Manually tagged</div>' : ''}
+            </td>
             <td><input type="text" inputmode="decimal" value="${escapeHtml(c.maxMarks != null ? String(c.maxMarks) : '')}" style="width:70px" oninput="updateScoringMaxMarks(${ci}, this.value)"></td>
             <td>${escapeHtml(c.documentsRequired || '—')}</td>
-            <td>${c.sourcePage ? `<span class="badge ${c.sourceDoc==='Corrigendum'?'warn':'info'}">${escapeHtml(c.sourceDoc||'RFP')} p.${escapeHtml(String(c.sourcePage))}</span>` : '—'}</td>
-            <td>${c.sourcePage ? `<button class="secondary small" onclick="showScoringCriterionPreview(${ci})">👁 View Page</button>` : ''}</td>
+            <td>${c.sourcePage ? `<span class="badge ${c.sourceDoc==='Corrigendum'?'warn':'info'}">${escapeHtml(c.sourceDoc||'RFP')} p.${escapeHtml(String(c.sourcePage))}</span>` : '<span class="badge err">No source tagged</span>'}</td>
+            <td>
+              ${c.sourcePage ? `<button class="secondary small" onclick="showScoringCriterionPreview(${ci})">👁 View Page</button>` : ''}
+              <button class="secondary small" onclick="openTagPanel('critScore', ${ci})">🏷 Tag / Validate Source</button>
+            </td>
           </tr>
         `).join('')}
         <tr>
@@ -873,6 +1021,21 @@ function updateScoringMaxMarks(idx, val){
   const totalEl = document.getElementById('scoringTotalMarks');
   if(totalEl){
     totalEl.textContent = state.scoringCriteria.reduce((s,c)=>s+(Number(c.maxMarks)||0),0);
+  }
+}
+
+// Adds a blank criterion row the user fully controls — for cases where
+// extraction missed a criterion entirely. Opens the tag panel immediately
+// so the user can name it and tag its source page in one flow.
+function addManualCriterionRow(kind){
+  if(kind === 'eligibility'){
+    state.eligibility.push({ id: 'crit_' + (state.eligibility.length+1) + '_manual_' + Date.now(), description: '(New criterion — describe it)', sourcePage: null, sourceDoc: 'RFP', manualTag: true, originalNo: null });
+    render();
+    openTagPanel('critElig', state.eligibility.length - 1);
+  } else {
+    state.scoringCriteria.push({ id: 'score_' + (state.scoringCriteria.length+1) + '_manual_' + Date.now(), description: '(New criterion — describe it)', maxMarks: null, documentsRequired: '', requiresLiveAssessment: false, sourcePage: null, sourceDoc: 'RFP', manualTag: true, originalNo: null });
+    render();
+    openTagPanel('critScore', state.scoringCriteria.length - 1);
   }
 }
 
@@ -1727,7 +1890,7 @@ function renderEvalTable(idx){
         <button class="secondary small" onclick="searchBidText(${idx})">🔍 Search</button>
         ${search ? `<button class="secondary small" onclick="clearBidSearch(${idx})">Clear</button>` : ''}
       </div>
-      <div class="muted" style="font-size:11px;margin-top:4px">Use this to locate a missing credential yourself, then use "✏️ Override" on the relevant row below to set it — with a note on what you verified and where.</div>
+      <div class="muted" style="font-size:11px;margin-top:4px">Use this to locate a missing credential yourself, then use "✏️ Set Manually" on the relevant row below to set it — with a note on what you verified and where.</div>
       ${search ? `
         <div style="margin-top:8px">
           ${search.results.length === 0
@@ -1742,6 +1905,11 @@ function renderEvalTable(idx){
       ` : ''}
     </div>
 
+    <div class="row" style="margin-top:0">
+      <button class="secondary small" onclick="openTagPanel('newCompliance', -1, ${idx})">+ Add Manual Eligibility Result</button>
+      <button class="secondary small" onclick="openTagPanel('newScoring', -1, ${idx})">+ Add Manual Technical Score</button>
+    </div>
+
     ${compliance.length ? `
       <h2 style="font-size:14px;margin-bottom:8px">Eligibility Compliance <span class="muted" style="font-weight:400">— informational only, does not block technical scoring below</span></h2>
       <table style="margin-bottom:18px">
@@ -1752,12 +1920,12 @@ function renderEvalTable(idx){
             <td>
               <span class="badge ${r.status==='Compliant'?'ok':(r.status==='Needs Clarification'?'warn':'err')}">${escapeHtml(r.status)}</span>
               ${r.status!=='Compliant' ? ' <span class="muted" style="font-size:11px">(verify — could be OCR misread)</span>' : ''}
-              ${r.manualOverride ? `<div class="badge warn" style="margin-top:4px" title="${escapeHtml(r.overrideNote||'')}">✏️ Manually overridden</div>` : ''}
+              ${r.manualOverride ? `<div class="badge warn" style="margin-top:4px" title="${escapeHtml(r.overrideNote||'')}">✏️ Manually set</div>` : ''}
             </td>
-            <td>${escapeHtml(r.evidence)}${r.manualOverride && r.overrideNote ? `<div class="muted" style="font-size:11px;margin-top:4px">Override note: ${escapeHtml(r.overrideNote)}</div>` : ''}</td>
+            <td>${escapeHtml(r.evidence)}${r.manualOverride && r.overrideNote ? `<div class="muted" style="font-size:11px;margin-top:4px">Note: ${escapeHtml(r.overrideNote)}</div>` : ''}</td>
             <td>
               ${r.evidencePage ? `<button class="secondary small" onclick="showBidEvidencePreview(${idx},'compliance',${ci})">👁 View Page</button>` : ''}
-              <button class="secondary small" onclick="overrideEligibilityStatus(${idx},${ci})">✏️ Override</button>
+              <button class="secondary small" onclick="openTagPanel('compliance', ${ci}, ${idx})">✏️ Set Manually</button>
             </td>
           </tr>
         `).join('')}
@@ -1774,12 +1942,12 @@ function renderEvalTable(idx){
             <td>${escapeHtml(String(r.maxMarks ?? '—'))}</td>
             <td>
               ${r.requiresLiveAssessment ? '<span class="badge warn">Pending — live only</span>' : escapeHtml(String(r.marksAwarded ?? '—'))}
-              ${r.manualOverride ? `<div class="badge warn" style="margin-top:4px" title="${escapeHtml(r.overrideNote||'')}">✏️ Manually overridden</div>` : ''}
+              ${r.manualOverride ? `<div class="badge warn" style="margin-top:4px" title="${escapeHtml(r.overrideNote||'')}">✏️ Manually set</div>` : ''}
             </td>
-            <td>${escapeHtml(r.justification || '—')}${r.manualOverride && r.overrideNote ? `<div class="muted" style="font-size:11px;margin-top:4px">Override note: ${escapeHtml(r.overrideNote)}</div>` : ''}</td>
+            <td>${escapeHtml(r.justification || '—')}${r.manualOverride && r.overrideNote ? `<div class="muted" style="font-size:11px;margin-top:4px">Note: ${escapeHtml(r.overrideNote)}</div>` : ''}</td>
             <td>
               ${r.evidencePage ? `<button class="secondary small" onclick="showBidEvidencePreview(${idx},'scoring',${ci})">👁 View Page</button>` : ''}
-              ${!r.requiresLiveAssessment ? `<button class="secondary small" onclick="overrideTechnicalMarks(${idx},${ci})">✏️ Override</button>` : ''}
+              <button class="secondary small" onclick="openTagPanel('scoring', ${ci}, ${idx})">✏️ Set Manually</button>
             </td>
           </tr>
           ${r.breakdown && r.breakdown.length ? `
@@ -1816,12 +1984,12 @@ async function showBidBreakdownPreview(bidderIdx, criterionIndex, breakdownIndex
   const scoring = state.scoringResults[bidder.id] || [];
   const item = (scoring[criterionIndex] && scoring[criterionIndex].breakdown) ? scoring[criterionIndex].breakdown[breakdownIndex] : null;
   if(!item || !item.evidencePage) { log('Preview unavailable — no page reference for this item'); return; }
-  await openPagePreview(bidder.technicalFile, item.evidencePage, `${bidder.name} — Technical Bid, Page ${item.evidencePage}`, item.label);
+  await openPagePreview(bidder.technicalFile, item.evidencePage, `${bidder.name} — Technical Bid, Page ${item.evidencePage}`, item.label, item.evidenceQuote);
 }
 
 // Simple substring search across a bidder's whole submitted document (both
 // technical and financial text), page by page — lets the user manually locate
-// a credential the AI missed, before using "Override" to set the result
+// a credential the AI missed, before using "Set Manually" to set the result
 // themselves with a note on what they found.
 function searchBidText(bidderIdx){
   const input = document.getElementById('bidSearch-' + bidderIdx);
@@ -1860,54 +2028,7 @@ async function previewBidSearchResult(bidderIdx, resultIndex){
   const search = (state._bidSearchResults || {})[bidderIdx];
   const result = search && search.results[resultIndex];
   if(!bidder || !bidder.technicalFile || !result || !result.page){ log('Preview unavailable'); return; }
-  await openPagePreview(bidder.technicalFile, result.page, `${bidder.name} — Page ${result.page}`, search.query);
-}
-
-// Manual override for an eligibility compliance row. Always shows an explicit
-// warning before applying, since this bypasses the AI's judgment entirely —
-// the user is asserting the result themselves and is responsible for it.
-function overrideEligibilityStatus(bidderIdx, itemIndex){
-  const bidder = state.bidders[bidderIdx];
-  const items = state.eligibilityCompliance[bidder.id] || [];
-  const item = items[itemIndex];
-  if(!item) return;
-  const valid = ['Compliant', 'Non-Compliant', 'Needs Clarification'];
-  const newStatus = prompt(`Manually set status for:\n"${item.description}"\n\nType exactly one of: Compliant / Non-Compliant / Needs Clarification`, item.status || '');
-  if(newStatus === null) return; // cancelled
-  if(!valid.includes(newStatus)){ alert('Please type exactly one of: Compliant, Non-Compliant, Needs Clarification'); return; }
-  const note = prompt('Note explaining this manual override (what you verified, and where — e.g. "Confirmed on page 14, EMD receipt separate from fee receipt"):', item.overrideNote || '');
-  if(note === null) return;
-  if(!confirm(`⚠️ You are manually overriding the AI-generated result — this is not re-verified by the system.\n\nCriterion: ${item.description}\nOld status: ${item.status}\nNew status: ${newStatus}\n\nPlease make sure you've personally checked this. Continue?`)) return;
-  item.status = newStatus;
-  item.manualOverride = true;
-  item.overrideNote = note;
-  const existingScoring = state.scoringResults[bidder.id] || [];
-  updateConsensus(bidder, items, existingScoring);
-  log(`${bidder.name}: manually overrode "${item.description}" to ${newStatus}`);
-  render();
-}
-
-// Manual override for a technical scoring row's marks. Same warning pattern
-// as eligibility — the user takes explicit responsibility for the new value.
-function overrideTechnicalMarks(bidderIdx, itemIndex){
-  const bidder = state.bidders[bidderIdx];
-  const items = state.scoringResults[bidder.id] || [];
-  const item = items[itemIndex];
-  if(!item) return;
-  const raw = prompt(`Manually set marks awarded for:\n"${item.name}"\n(0 to ${item.maxMarks})`, item.marksAwarded ?? '');
-  if(raw === null) return;
-  const val = Number(raw);
-  if(isNaN(val) || val < 0 || (item.maxMarks != null && val > item.maxMarks)){ alert(`Please enter a number between 0 and ${item.maxMarks}`); return; }
-  const note = prompt('Note explaining this manual override (what you verified, and where):', item.overrideNote || '');
-  if(note === null) return;
-  if(!confirm(`⚠️ You are manually overriding the AI-generated score — this is not re-verified by the system.\n\nCriterion: ${item.name}\nOld marks: ${item.marksAwarded}\nNew marks: ${val}\n\nPlease make sure you've personally checked this. Continue?`)) return;
-  item.marksAwarded = val;
-  item.manualOverride = true;
-  item.overrideNote = note;
-  const existingCompliance = state.eligibilityCompliance[bidder.id] || [];
-  updateConsensus(bidder, existingCompliance, items);
-  log(`${bidder.name}: manually overrode "${item.name}" to ${val}/${item.maxMarks}`);
-  render();
+  await openPagePreview(bidder.technicalFile, result.page, `${bidder.name} — Page ${result.page}`, search.query, search.query);
 }
 
 // Shared consensus-building logic, used by both the standalone eligibility
@@ -1948,6 +2069,386 @@ function updateConsensus(bidder, complianceResults, scoringResults){
   };
 }
 
+/* ============================================================
+   MANUAL TAGGING / VALIDATION PANEL
+   One unified side-panel workflow for:
+   - critElig / critScore: tag or correct the source RFP/Corrigendum
+     page for a Stage 4/5 criterion (in case extraction missed it,
+     or found the wrong page) — browse the actual document page by
+     page, right in the panel, then confirm.
+   - compliance / scoring: manually set (or correct) a bidder's
+     eligibility compliance status or technical marks — browse the
+     bidder's actual technical bid page by page, tag the exact
+     evidence page, fill in the result, then confirm.
+   - newCompliance / newScoring: add a brand-new manual eligibility
+     result / technical score row for a bidder (e.g. for a criterion
+     the AI never got to, or a result entered entirely by hand).
+   In every mode the right-hand document render is the source of
+   truth — the user visually confirms the page before validating.
+   ============================================================ */
+const tagPdfCache = new Map(); // filename -> {numPages}
+
+async function getFileNumPages(file){
+  if(!file) return 1;
+  if(tagPdfCache.has(file.name)) return tagPdfCache.get(file.name).numPages;
+  if(!file.type || file.type !== 'application/pdf'){ tagPdfCache.set(file.name, {numPages:1}); return 1; }
+  try{
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+    tagPdfCache.set(file.name, { numPages: pdf.numPages });
+    return pdf.numPages;
+  } catch(err){
+    tagPdfCache.set(file.name, { numPages: 1 });
+    return 1;
+  }
+}
+
+// Opens the tagging panel. `kind` selects the workflow; `index` is the row
+// index within the relevant array (-1 for "new" modes); `bidderIdx` is only
+// used for compliance/scoring/newCompliance/newScoring modes.
+async function openTagPanel(kind, index, bidderIdx){
+  const ctx = { kind, index, bidderIdx, page: 1, numPages: 1, fileChoice: 'RFP' };
+
+  if(kind === 'critElig' || kind === 'critScore'){
+    const arr = kind === 'critElig' ? state.eligibility : state.scoringCriteria;
+    const item = arr[index];
+    ctx.fileChoice = (item && item.sourceDoc === 'Corrigendum' && state.corrigendumFiles[0]) ? 'Corrigendum' : 'RFP';
+    ctx.page = (item && item.sourcePage) ? parseInt(item.sourcePage,10) : 1;
+    ctx.form = {
+      description: item ? item.description : '',
+      maxMarks: item && kind==='critScore' ? item.maxMarks : undefined,
+    };
+  } else if(kind === 'compliance' || kind === 'scoring'){
+    const bidder = state.bidders[bidderIdx];
+    const arr = kind === 'compliance' ? (state.eligibilityCompliance[bidder.id] || []) : (state.scoringResults[bidder.id] || []);
+    const item = arr[index];
+    ctx.file = bidder.technicalFile;
+    ctx.page = (item && item.evidencePage) ? parseInt(item.evidencePage,10) : 1;
+    ctx.form = kind === 'compliance'
+      ? { status: item.status || 'Compliant', evidence: item.evidence || '', evidenceQuote: item.evidenceQuote || '', note: item.overrideNote || '' }
+      : { marksAwarded: item.marksAwarded ?? 0, maxMarks: item.maxMarks, justification: item.justification || '', evidenceQuote: item.evidenceQuote || '', note: item.overrideNote || '' };
+  } else if(kind === 'newCompliance' || kind === 'newScoring'){
+    const bidder = state.bidders[bidderIdx];
+    ctx.file = bidder.technicalFile;
+    ctx.page = 1;
+    ctx.form = kind === 'newCompliance'
+      ? { description: '', status: 'Compliant', evidence: '', evidenceQuote: '', note: '' }
+      : { name: '', maxMarks: '', marksAwarded: 0, justification: '', evidenceQuote: '', note: '' };
+  }
+
+  // Resolve the actual file object + total page count for navigation.
+  ctx.file = ctx.file || (ctx.fileChoice === 'Corrigendum' ? state.corrigendumFiles[0] : state.rfpFiles[0]);
+  ctx.numPages = await getFileNumPages(ctx.file);
+  if(ctx.page > ctx.numPages) ctx.page = ctx.numPages;
+  if(ctx.page < 1) ctx.page = 1;
+
+  state._tagCtx = ctx;
+  await renderTagPage();
+}
+
+async function renderTagPage(){
+  const ctx = state._tagCtx;
+  if(!ctx) return;
+  state._previewOpen = true;
+  state._previewLoading = true;
+  state._previewImg = null;
+  state._previewError = null;
+  render();
+  try{
+    if(!ctx.file) throw new Error('No source file available to display for this document');
+    const quote = ctx.form && ctx.form.evidenceQuote ? ctx.form.evidenceQuote : null;
+    const cacheKey = ctx.file.name + '|' + ctx.page + (quote ? ('|q:' + quote) : '');
+    let dataUrl = pageImageCache.get(cacheKey);
+    if(!dataUrl){
+      dataUrl = await renderPdfPageToImage(ctx.file, ctx.page, quote);
+      pageImageCache.set(cacheKey, dataUrl);
+    }
+    state._previewImg = dataUrl;
+  } catch(err){
+    state._previewError = 'Could not render page: ' + err.message;
+  }
+  state._previewLoading = false;
+  render();
+}
+
+function tagNavPage(delta){
+  const ctx = state._tagCtx;
+  if(!ctx) return;
+  const next = ctx.page + delta;
+  if(next < 1 || next > ctx.numPages) return;
+  ctx.page = next;
+  renderTagPage();
+}
+
+function tagJumpPage(val){
+  const ctx = state._tagCtx;
+  if(!ctx) return;
+  const n = parseInt(val, 10);
+  if(!n || n < 1 || n > ctx.numPages) return;
+  ctx.page = n;
+  renderTagPage();
+}
+
+async function tagSwitchFile(which){
+  const ctx = state._tagCtx;
+  if(!ctx) return;
+  ctx.fileChoice = which;
+  ctx.file = which === 'Corrigendum' ? state.corrigendumFiles[0] : state.rfpFiles[0];
+  ctx.numPages = await getFileNumPages(ctx.file);
+  ctx.page = 1;
+  renderTagPage();
+}
+
+function tagFormSet(field, value){
+  const ctx = state._tagCtx;
+  if(!ctx) return;
+  ctx.form[field] = value;
+}
+
+function closeTagPanel(){
+  state._tagCtx = null;
+  state._previewOpen = false;
+  render();
+}
+
+function saveTagPanel(){
+  const ctx = state._tagCtx;
+  if(!ctx) return;
+
+  if(ctx.kind === 'critElig' || ctx.kind === 'critScore'){
+    const arr = ctx.kind === 'critElig' ? state.eligibility : state.scoringCriteria;
+    const item = arr[ctx.index];
+    if(!item) return;
+    item.description = (ctx.form.description || '').trim() || item.description;
+    if(ctx.kind === 'critScore'){
+      const mm = parseFloat(ctx.form.maxMarks);
+      item.maxMarks = isNaN(mm) ? null : mm;
+    }
+    item.sourcePage = ctx.page;
+    item.sourceDoc = ctx.fileChoice;
+    item.manualTag = true;
+    log(`Tagged source for "${item.description.slice(0,60)}" → ${ctx.fileChoice} p.${ctx.page}`);
+  }
+
+  else if(ctx.kind === 'compliance'){
+    const bidder = state.bidders[ctx.bidderIdx];
+    const arr = state.eligibilityCompliance[bidder.id] || [];
+    const item = arr[ctx.index];
+    if(!item) return;
+    item.status = ctx.form.status;
+    item.evidence = ctx.form.evidence || '';
+    item.evidenceQuote = ctx.form.evidenceQuote || null;
+    item.evidencePage = ctx.page;
+    item.manualOverride = true;
+    item.overrideNote = ctx.form.note || '';
+    const existingScoring = state.scoringResults[bidder.id] || [];
+    updateConsensus(bidder, arr, existingScoring);
+    log(`${bidder.name}: manually set "${item.description.slice(0,50)}" → ${item.status} (p.${ctx.page})`);
+  }
+
+  else if(ctx.kind === 'scoring'){
+    const bidder = state.bidders[ctx.bidderIdx];
+    const arr = state.scoringResults[bidder.id] || [];
+    const item = arr[ctx.index];
+    if(!item) return;
+    const val = Number(ctx.form.marksAwarded);
+    if(isNaN(val) || val < 0 || (item.maxMarks != null && val > item.maxMarks)){ alert(`Enter a number between 0 and ${item.maxMarks}`); return; }
+    item.marksAwarded = val;
+    item.justification = ctx.form.justification || item.justification || '';
+    item.evidenceQuote = ctx.form.evidenceQuote || null;
+    item.evidencePage = ctx.page;
+    item.manualOverride = true;
+    item.overrideNote = ctx.form.note || '';
+    const existingCompliance = state.eligibilityCompliance[bidder.id] || [];
+    updateConsensus(bidder, existingCompliance, arr);
+    log(`${bidder.name}: manually set "${item.name.slice(0,50)}" → ${val}/${item.maxMarks} (p.${ctx.page})`);
+  }
+
+  else if(ctx.kind === 'newCompliance'){
+    const bidder = state.bidders[ctx.bidderIdx];
+    if(!ctx.form.description || !ctx.form.description.trim()){ alert('Enter a criterion description first'); return; }
+    if(!state.eligibilityCompliance[bidder.id]) state.eligibilityCompliance[bidder.id] = [];
+    const arr = state.eligibilityCompliance[bidder.id];
+    arr.push({
+      criterionId: 'manual_' + Date.now(),
+      description: ctx.form.description.trim(),
+      status: ctx.form.status,
+      evidence: ctx.form.evidence || '',
+      evidenceQuote: ctx.form.evidenceQuote || null,
+      evidencePage: ctx.page,
+      manualOverride: true,
+      overrideNote: ctx.form.note || '',
+    });
+    const existingScoring = state.scoringResults[bidder.id] || [];
+    updateConsensus(bidder, arr, existingScoring);
+    log(`${bidder.name}: added manual eligibility result "${ctx.form.description.slice(0,50)}" → ${ctx.form.status}`);
+  }
+
+  else if(ctx.kind === 'newScoring'){
+    const bidder = state.bidders[ctx.bidderIdx];
+    if(!ctx.form.name || !ctx.form.name.trim()){ alert('Enter a criterion name first'); return; }
+    const maxM = parseFloat(ctx.form.maxMarks);
+    const awarded = Number(ctx.form.marksAwarded);
+    if(isNaN(maxM) || maxM <= 0){ alert('Enter a valid max marks value'); return; }
+    if(isNaN(awarded) || awarded < 0 || awarded > maxM){ alert(`Enter marks between 0 and ${maxM}`); return; }
+    if(!state.scoringResults[bidder.id]) state.scoringResults[bidder.id] = [];
+    const arr = state.scoringResults[bidder.id];
+    arr.push({
+      criterionId: 'manual_' + Date.now(),
+      name: ctx.form.name.trim(),
+      maxMarks: maxM,
+      marksAwarded: awarded,
+      requiresLiveAssessment: false,
+      evidenceQuote: ctx.form.evidenceQuote || null,
+      evidencePage: ctx.page,
+      justification: ctx.form.justification || '',
+      manualOverride: true,
+      overrideNote: ctx.form.note || '',
+      breakdown: [],
+    });
+    const existingCompliance = state.eligibilityCompliance[bidder.id] || [];
+    updateConsensus(bidder, existingCompliance, arr);
+    log(`${bidder.name}: added manual technical score "${ctx.form.name.slice(0,50)}" → ${awarded}/${maxM}`);
+  }
+
+  closeTagPanel();
+}
+
+function tagPanelTitle(ctx){
+  switch(ctx.kind){
+    case 'critElig': return 'Tag Eligibility Criterion Source';
+    case 'critScore': return 'Tag Technical Criterion Source';
+    case 'compliance': return 'Set Eligibility Result Manually';
+    case 'scoring': return 'Set Technical Score Manually';
+    case 'newCompliance': return 'Add Manual Eligibility Result';
+    case 'newScoring': return 'Add Manual Technical Score';
+    default: return 'Manual Validation';
+  }
+}
+
+// Renders the form half of the tag panel — different fields per mode — plus
+// the shared page-navigation header used by every mode.
+function renderTagForm(){
+  const ctx = state._tagCtx;
+  if(!ctx) return '';
+  const showFileToggle = (ctx.kind === 'critElig' || ctx.kind === 'critScore') && state.corrigendumFiles[0];
+
+  const nav = `
+    <div class="row" style="margin-top:0;align-items:center">
+      ${showFileToggle ? `
+        <div class="bidder-tabs" style="margin-bottom:0">
+          <div class="tab ${ctx.fileChoice==='RFP'?'active':''}" onclick="tagSwitchFile('RFP')">RFP</div>
+          <div class="tab ${ctx.fileChoice==='Corrigendum'?'active':''}" onclick="tagSwitchFile('Corrigendum')">Corrigendum</div>
+        </div>
+      ` : `<span class="muted">${escapeHtml(ctx.fileChoice==='Corrigendum' ? 'Corrigendum' : (ctx.file ? ctx.file.name : 'Source document'))}</span>`}
+      <button class="secondary small" onclick="tagNavPage(-1)" ${ctx.page<=1?'disabled':''}>← Prev</button>
+      <span class="muted">Page
+        <input type="text" inputmode="numeric" value="${ctx.page}" style="width:50px;display:inline-block;text-align:center" onchange="tagJumpPage(this.value)">
+        / ${ctx.numPages}
+      </span>
+      <button class="secondary small" onclick="tagNavPage(1)" ${ctx.page>=ctx.numPages?'disabled':''}>Next →</button>
+    </div>
+  `;
+
+  let fields = '';
+  if(ctx.kind === 'critElig'){
+    fields = `
+      <div class="sub" style="margin-top:14px">Criterion description</div>
+      <textarea style="min-height:70px" onchange="tagFormSet('description', this.value)">${escapeHtml(ctx.form.description)}</textarea>
+    `;
+  } else if(ctx.kind === 'critScore'){
+    fields = `
+      <div class="sub" style="margin-top:14px">Criterion description</div>
+      <textarea style="min-height:70px" onchange="tagFormSet('description', this.value)">${escapeHtml(ctx.form.description)}</textarea>
+      <div class="sub" style="margin-top:10px">Maximum marks</div>
+      <input type="text" inputmode="decimal" value="${escapeHtml(ctx.form.maxMarks != null ? String(ctx.form.maxMarks) : '')}" onchange="tagFormSet('maxMarks', this.value)">
+    `;
+  } else if(ctx.kind === 'compliance'){
+    fields = `
+      <div class="sub" style="margin-top:14px">Status</div>
+      <div class="row" style="margin-top:0">
+        ${['Compliant','Non-Compliant','Needs Clarification'].map(s=>`
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+            <input type="radio" name="tagStatus" value="${s}" ${ctx.form.status===s?'checked':''} onchange="tagFormSet('status','${s}')"> ${s}
+          </label>
+        `).join('')}
+      </div>
+      <div class="sub" style="margin-top:10px">Evidence / reasoning</div>
+      <textarea style="min-height:70px" onchange="tagFormSet('evidence', this.value)">${escapeHtml(ctx.form.evidence)}</textarea>
+      <div class="sub" style="margin-top:10px">Exact quote to box on the page (copy the precise credential/clause text, e.g. a certificate no. or turnover figure)</div>
+      <div class="row" style="margin-top:0">
+        <input type="text" style="flex:1" value="${escapeHtml(ctx.form.evidenceQuote||'')}" onchange="tagFormSet('evidenceQuote', this.value)">
+        <button class="secondary small" onclick="renderTagPage()">🔲 Box it</button>
+      </div>
+      <div class="sub" style="margin-top:10px">Note (what you verified, and where)</div>
+      <textarea style="min-height:50px" onchange="tagFormSet('note', this.value)">${escapeHtml(ctx.form.note)}</textarea>
+    `;
+  } else if(ctx.kind === 'scoring'){
+    fields = `
+      <div class="sub" style="margin-top:14px">Marks awarded (0–${escapeHtml(String(ctx.form.maxMarks))})</div>
+      <input type="text" inputmode="decimal" value="${escapeHtml(String(ctx.form.marksAwarded))}" onchange="tagFormSet('marksAwarded', this.value)">
+      <div class="sub" style="margin-top:10px">Justification</div>
+      <textarea style="min-height:70px" onchange="tagFormSet('justification', this.value)">${escapeHtml(ctx.form.justification)}</textarea>
+      <div class="sub" style="margin-top:10px">Exact quote to box on the page</div>
+      <div class="row" style="margin-top:0">
+        <input type="text" style="flex:1" value="${escapeHtml(ctx.form.evidenceQuote||'')}" onchange="tagFormSet('evidenceQuote', this.value)">
+        <button class="secondary small" onclick="renderTagPage()">🔲 Box it</button>
+      </div>
+      <div class="sub" style="margin-top:10px">Note (what you verified, and where)</div>
+      <textarea style="min-height:50px" onchange="tagFormSet('note', this.value)">${escapeHtml(ctx.form.note)}</textarea>
+    `;
+  } else if(ctx.kind === 'newCompliance'){
+    fields = `
+      <div class="sub" style="margin-top:14px">Criterion description</div>
+      <textarea style="min-height:60px" onchange="tagFormSet('description', this.value)">${escapeHtml(ctx.form.description)}</textarea>
+      <div class="sub" style="margin-top:10px">Status</div>
+      <div class="row" style="margin-top:0">
+        ${['Compliant','Non-Compliant','Needs Clarification'].map(s=>`
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+            <input type="radio" name="tagStatus" value="${s}" ${ctx.form.status===s?'checked':''} onchange="tagFormSet('status','${s}')"> ${s}
+          </label>
+        `).join('')}
+      </div>
+      <div class="sub" style="margin-top:10px">Evidence / reasoning</div>
+      <textarea style="min-height:60px" onchange="tagFormSet('evidence', this.value)">${escapeHtml(ctx.form.evidence)}</textarea>
+      <div class="sub" style="margin-top:10px">Exact quote to box on the page</div>
+      <div class="row" style="margin-top:0">
+        <input type="text" style="flex:1" value="${escapeHtml(ctx.form.evidenceQuote||'')}" onchange="tagFormSet('evidenceQuote', this.value)">
+        <button class="secondary small" onclick="renderTagPage()">🔲 Box it</button>
+      </div>
+      <div class="sub" style="margin-top:10px">Note</div>
+      <textarea style="min-height:50px" onchange="tagFormSet('note', this.value)">${escapeHtml(ctx.form.note)}</textarea>
+    `;
+  } else if(ctx.kind === 'newScoring'){
+    fields = `
+      <div class="sub" style="margin-top:14px">Criterion name</div>
+      <input type="text" value="${escapeHtml(ctx.form.name)}" onchange="tagFormSet('name', this.value)">
+      <div class="sub" style="margin-top:10px">Maximum marks</div>
+      <input type="text" inputmode="decimal" value="${escapeHtml(String(ctx.form.maxMarks))}" onchange="tagFormSet('maxMarks', this.value)">
+      <div class="sub" style="margin-top:10px">Marks awarded</div>
+      <input type="text" inputmode="decimal" value="${escapeHtml(String(ctx.form.marksAwarded))}" onchange="tagFormSet('marksAwarded', this.value)">
+      <div class="sub" style="margin-top:10px">Justification</div>
+      <textarea style="min-height:60px" onchange="tagFormSet('justification', this.value)">${escapeHtml(ctx.form.justification)}</textarea>
+      <div class="sub" style="margin-top:10px">Exact quote to box on the page</div>
+      <div class="row" style="margin-top:0">
+        <input type="text" style="flex:1" value="${escapeHtml(ctx.form.evidenceQuote||'')}" onchange="tagFormSet('evidenceQuote', this.value)">
+        <button class="secondary small" onclick="renderTagPage()">🔲 Box it</button>
+      </div>
+      <div class="sub" style="margin-top:10px">Note</div>
+      <textarea style="min-height:50px" onchange="tagFormSet('note', this.value)">${escapeHtml(ctx.form.note)}</textarea>
+    `;
+  }
+
+  return `
+    ${nav}
+    ${fields}
+    <div class="row">
+      <button onclick="saveTagPanel()">✓ Validate &amp; Save</button>
+      <button class="secondary" onclick="closeTagPanel()">Cancel</button>
+    </div>
+  `;
+}
+
 // Standalone eligibility check — uses the exact eligibility criteria
 // extracted in Stage 4 (state.eligibility) against each bidder's submitted
 // text, independent of technical scoring. Faster than the full evaluation
@@ -1981,7 +2482,7 @@ Apply these rules carefully before deciding:
 3. SCAN THE FULL LIST FOR MAX/QUALIFYING VALUES: if the criterion requires a minimum project value, turnover, or similar threshold and the bid excerpt contains a LIST of multiple entries (e.g. a table of past projects across several pages), evaluate EVERY entry in the excerpt — not just the first or last one you see — and use the entry that actually satisfies (or best satisfies) the threshold. State which specific entry/value you used and its page.
 4. STANDARD DECLARATION FORMATS: if the criterion is a declaration-type requirement (e.g. non-blacklisting/debarment declaration, non-performance/non-termination declaration), these are typically submitted as a short signed letter on the bidder's letterhead following the RFP's own annexure format — look for a signed statement using formal declaration language (e.g. "This is to notify you that our Company/LLP/Partnership... has not been blacklisted...", or "...has neither failed to perform on any agreement...nor been expelled...") rather than expecting it to appear inside a different document type. If such a signed declaration matching the required assertion is present, mark Compliant even if worded slightly differently from the RFP's exact template, as long as it makes the same substantive commitment.
 
-Return ONLY valid JSON: {"status": "Compliant"|"Non-Compliant"|"Needs Clarification", "evidence": "brief evidence or reason, citing figures/dates/document names found if present, and naming any missing sub-part per rule 1", "evidencePage": "the number from the nearest [PAGE N] marker where the key evidence was found, or null if none identifiable"}`;
+Return ONLY valid JSON: {"status": "Compliant"|"Non-Compliant"|"Needs Clarification", "evidence": "brief evidence or reason, citing figures/dates/document names found if present, and naming any missing sub-part per rule 1", "evidenceQuote": "a short exact verbatim phrase (max ~12 words) copied character-for-character from the excerpt above that is the specific credential/clause being relied on — e.g. a certificate number, a turnover figure with its label, a declaration sentence fragment — or null if no single short phrase captures it", "evidencePage": "the number from the nearest [PAGE N] marker where the key evidence was found, or null if none identifiable"}`;
         try{
           const raw = await callAI('evaluate', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:500});
           const parsed = safeParseJsonObject(raw);
@@ -1990,6 +2491,7 @@ Return ONLY valid JSON: {"status": "Compliant"|"Non-Compliant"|"Needs Clarificat
             description: crit.description,
             status: parsed.status || 'Needs Clarification',
             evidence: parsed.evidence || '',
+            evidenceQuote: parsed.evidenceQuote || null,
             evidencePage: parsed.evidencePage || null,
           });
         } catch(err){
@@ -2055,13 +2557,14 @@ For each breakdown entry, capture:
 - label: the specific item's name — a project name/title, OR a personnel role name (e.g. "Team Leader"), OR a short label for a holistic single-item criterion
 - detail: the concrete fact found — project cost/value and client, OR the person's name and years of relevant experience found in their CV, etc.
 - marksForThis: this specific item's own contribution toward the total, if the criterion structure allows attributing marks per item (e.g. each role has its own printed sub-max, or a tiered count-based rule where you can show the running count/tier reached at this item) — use your best-faith application of the criterion's stated rule; if genuinely not attributable per-item, use null
+- evidenceQuote: a short exact verbatim phrase (max ~12 words) copied character-for-character from the excerpt above that pins down this specific item (e.g. a project title with its value, or a person's name with their years of experience) — or null if none captures it cleanly
 - evidencePage: the number from the nearest [PAGE N] marker where THIS SPECIFIC item's evidence was found, or null if none identifiable
 
 Then separately state:
 - marksAwarded: the OVERALL, AUTHORITATIVE marks for this criterion (0 to ${crit.maxMarks}), computed by correctly applying the criterion's exact tiered/weighted/summed rule as printed — this is the number that actually counts, regardless of what individual breakdown entries show.
 - justification: 1-2 sentence summary of how the overall marksAwarded was reached (e.g. "5 qualifying projects found → tier 5-6 projects = 30 marks" or "Team Leader 8/10, Structural Designer 6/8, ... = 34/40 total")
 
-Return ONLY valid JSON: {"breakdown": [{"label": "...", "detail": "...", "marksForThis": number|null, "evidencePage": number|null}, ...], "marksAwarded": number, "justification": "..."}`;
+Return ONLY valid JSON: {"breakdown": [{"label": "...", "detail": "...", "marksForThis": number|null, "evidenceQuote": "..."|null, "evidencePage": number|null}, ...], "marksAwarded": number, "justification": "..."}`;
         try{
           const raw = await callAI('evaluate', [{role:'user', content: prompt}], {temperature:0.1, max_tokens:1200});
           const parsed = safeParseJsonObject(raw);
@@ -2070,12 +2573,14 @@ Return ONLY valid JSON: {"breakdown": [{"label": "...", "detail": "...", "marksF
             label: item.label || '',
             detail: item.detail || '',
             marksForThis: (item.marksForThis === null || item.marksForThis === undefined) ? null : Number(item.marksForThis),
+            evidenceQuote: item.evidenceQuote || null,
             evidencePage: item.evidencePage || null,
           })) : [];
           scoringResults.push({
             criterionId: crit.id, name: crit.description, maxMarks: crit.maxMarks,
             marksAwarded: awarded, requiresLiveAssessment: false,
             evidencePage: breakdown.find(b=>b.evidencePage)?.evidencePage || null, // fallback top-level page = first breakdown item's page
+            evidenceQuote: breakdown.find(b=>b.evidenceQuote)?.evidenceQuote || null,
             justification: parsed.justification || '',
             breakdown,
           });
@@ -2126,6 +2631,10 @@ function renderStage8(){
       <button ${!hasEval?'disabled':''} onclick="runReportGeneration()" id="reportBtn">Draft Executive Summary</button>
       <button ${!hasEval?'disabled':''} class="secondary" onclick="exportExcel()">Export Excel (${state.reportOrientation})</button>
       <button ${!hasEval?'disabled':''} class="secondary" onclick="exportWordReport()" id="wordBtn">Export Word (${state.reportOrientation})</button>
+    </div>
+    <div class="row">
+      <button ${!hasEval?'disabled':''} onclick="exportAnnexureWord()" id="annexureBtn">📎 Generate Detailed Annexure (with cited proof)</button>
+      ${hasEval ? `<span class="muted">One tick/cross per criterion per bidder, each followed by the exact evidence page — boxed around the cited credential/clause where a quote was captured</span>` : ''}
     </div>
   </div>
   ${hasEval ? `
@@ -2272,12 +2781,145 @@ function exportExcel(){
   log(`Excel report exported (${state.reportOrientation})`);
 }
 
+function dataUrlToUint8Array(dataUrl){
+  const base64 = dataUrl.split(',')[1];
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for(let i=0; i<binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function getImageNaturalSize(dataUrl){
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth || 800, height: img.naturalHeight || 1000 });
+    img.onerror = () => resolve({ width: 800, height: 1000 });
+    img.src = dataUrl;
+  });
+}
+
 /* ============================================================
-   WORD REPORT EXPORT (docx.js) — mirrors the same content as
-   Excel, styled like the sample report: side-by-side compliance
-   matrix, then one evaluation table per bidder. Orientation flips
-   page dimensions and widens/narrows columns to fit.
+   ANNEXURE — DETAILED BID EVALUATION WITH TICKED PROOF
+   For each bidder, walks every eligibility compliance result and
+   every technical scoring result, renders the exact evidence page
+   (boxed around the cited quote when one was captured), and lays
+   it out as a tick-mark annexure: ✓/✗/⚠ + criterion + result +
+   evidence text, followed by the boxed page image as visual proof.
    ============================================================ */
+async function exportAnnexureWord(){
+  const btn = document.getElementById('annexureBtn');
+  const orig = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Building annexure…'; }
+  setProcessing(8);
+  try{
+    const { Document, Packer, Paragraph, TextRun, HeadingLevel, ImageRun, AlignmentType } = docx;
+    const children = [];
+
+    children.push(new Paragraph({ text: 'Detailed Bid Evaluation — Annexure of Cited Proof', heading: HeadingLevel.HEADING_1, spacing:{after:100} }));
+    children.push(new Paragraph({ text: `NIT No: ${state.tender.nitNo || 'n/a'}   |   Department: ${state.tender.department || 'n/a'}`, spacing:{after:200} }));
+    children.push(new Paragraph({ text: 'Each item below shows the evaluator\'s finding alongside the exact page of the bidder\'s submission relied upon, with the cited credential/clause boxed for quick visual verification.', spacing:{after:200} }));
+
+    const MAX_IMG_WIDTH = 560; // px, scaled to fit page
+
+    async function addEvidenceBlock(item, tick, headerText, bodyLines, file){
+      children.push(new Paragraph({
+        spacing: { before: 200, after: 80 },
+        children: [ new TextRun({ text: `${tick} `, bold: true, size: 28 }), new TextRun({ text: headerText, bold: true }) ],
+      }));
+      bodyLines.filter(Boolean).forEach(line => {
+        children.push(new Paragraph({ text: line, spacing: { after: 60 } }));
+      });
+      if(item.evidencePage && file){
+        try{
+          const cacheKey = file.name + '|' + item.evidencePage + (item.evidenceQuote ? ('|q:' + item.evidenceQuote) : '');
+          let dataUrl = pageImageCache.get(cacheKey);
+          if(!dataUrl){
+            dataUrl = await renderPdfPageToImage(file, item.evidencePage, item.evidenceQuote);
+            pageImageCache.set(cacheKey, dataUrl);
+          }
+          const natural = await getImageNaturalSize(dataUrl);
+          const scale = Math.min(1, MAX_IMG_WIDTH / natural.width);
+          const w = Math.round(natural.width * scale), h = Math.round(natural.height * scale);
+          children.push(new Paragraph({
+            alignment: AlignmentType.LEFT,
+            spacing: { after: 40 },
+            children: [ new ImageRun({ data: dataUrlToUint8Array(dataUrl), transformation: { width: w, height: h } }) ],
+          }));
+          children.push(new Paragraph({ text: `Source: Page ${item.evidencePage}${item.evidenceQuote ? ' — boxed region shows the cited text' : ' (no exact quote captured — full page shown)'}`, spacing:{after:200} }));
+        } catch(err){
+          children.push(new Paragraph({ text: `[Could not render page ${item.evidencePage}: ${err.message}]`, spacing:{after:200} }));
+        }
+      } else {
+        children.push(new Paragraph({ text: '[No source page tagged for this item — use "Set Manually" in Stage 7 to tag one]', spacing:{after:200} }));
+      }
+    }
+
+    for(const bidder of state.bidders){
+      children.push(new Paragraph({ text: bidder.name, heading: HeadingLevel.HEADING_2, spacing:{before:300, after:120} }));
+
+      const compliance = state.eligibilityCompliance[bidder.id] || [];
+      if(compliance.length){
+        children.push(new Paragraph({ text: 'Eligibility Compliance', heading: HeadingLevel.HEADING_3, spacing:{after:80} }));
+        for(const item of compliance){
+          const tick = item.status === 'Compliant' ? '✓' : (item.status === 'Non-Compliant' ? '✗' : '⚠');
+          await addEvidenceBlock(
+            item, tick,
+            `${item.description}  —  ${item.status}${item.manualOverride ? ' (manually set)' : ''}`,
+            [item.evidence, item.evidenceQuote ? `Cited text: "${item.evidenceQuote}"` : null, item.overrideNote ? `Note: ${item.overrideNote}` : null],
+            bidder.technicalFile
+          );
+        }
+      }
+
+      const scoring = state.scoringResults[bidder.id] || [];
+      if(scoring.length){
+        children.push(new Paragraph({ text: 'Technical Scoring', heading: HeadingLevel.HEADING_3, spacing:{before:200, after:80} }));
+        for(const item of scoring){
+          if(item.requiresLiveAssessment){
+            children.push(new Paragraph({ children:[new TextRun({text:'⚠ ', bold:true, size:28}), new TextRun({text:`${item.name} — pending live assessment`, bold:true})], spacing:{before:200,after:200} }));
+            continue;
+          }
+          const pct = item.maxMarks ? (item.marksAwarded||0)/item.maxMarks : 0;
+          const tick = pct >= 0.5 ? '✓' : (pct > 0 ? '⚠' : '✗');
+          await addEvidenceBlock(
+            item, tick,
+            `${item.name}  —  ${item.marksAwarded ?? '—'} / ${item.maxMarks ?? '—'}${item.manualOverride ? ' (manually set)' : ''}`,
+            [item.justification, item.evidenceQuote ? `Cited text: "${item.evidenceQuote}"` : null, item.overrideNote ? `Note: ${item.overrideNote}` : null],
+            bidder.technicalFile
+          );
+          if(item.breakdown && item.breakdown.length){
+            for(const b of item.breakdown){
+              await addEvidenceBlock(
+                b, (b.marksForThis && b.marksForThis>0) ? '✓' : '•',
+                `↳ ${b.label}${b.marksForThis!=null ? ' — ' + b.marksForThis + ' marks' : ''}`,
+                [b.detail, b.evidenceQuote ? `Cited text: "${b.evidenceQuote}"` : null],
+                bidder.technicalFile
+              );
+            }
+          }
+        }
+      }
+
+      if(!compliance.length && !scoring.length){
+        children.push(new Paragraph({ text: 'Not evaluated yet.', spacing:{after:200} }));
+      }
+    }
+
+    const doc = new Document({ sections: [{ children }] });
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'Bid_Evaluation_Annexure.docx';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    log('Detailed annexure exported (with boxed evidence proof)');
+  } catch(err){
+    log('Annexure export failed: ' + err.message);
+    alert('Annexure export failed: ' + err.message);
+  }
+  if(btn){ btn.disabled = false; btn.innerHTML = orig; }
+  clearProcessing();
+}
 async function exportWordReport(){
   const btn = document.getElementById('wordBtn');
   const orig = btn.innerHTML;
